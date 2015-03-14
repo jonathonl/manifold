@@ -74,20 +74,20 @@ namespace IPSuite
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  ssize_t TCP::recvLine(Socket& sock, char* buf, std::size_t numBytes, const std::string& delim)
+  ssize_t TCP::recvLine(Socket& sock, char* buf, std::size_t bufSize, const std::string& delim)
   {
     ssize_t ret = -1;
 
     const size_t discardBufferSize = 1024;
 
-    if (delim.size() <= numBytes)
+    if (delim.size() <= bufSize)
     {
       bool delimFound = false;
       char* bufEnd = buf;
       std::size_t putPosition = 0;
-      while (numBytes && !delimFound)
+      while (bufSize && !delimFound)
       {
-        std::size_t bytesToRead = (numBytes > discardBufferSize ? discardBufferSize : numBytes);
+        std::size_t bytesToRead = (bufSize > discardBufferSize ? discardBufferSize : bufSize);
         ssize_t bytesActuallyRead = sock.recv(&buf[putPosition], bytesToRead, MSG_PEEK);
         if (bytesActuallyRead == -1)
           break;
@@ -102,13 +102,37 @@ namespace IPSuite
         char tmp[discardBufferSize];
         size_t bytesToDiscard = bufEnd - &buf[putPosition];
         sock.recv(tmp, bytesToDiscard); //TODO: Handle Error Case
-        numBytes -= bytesToDiscard;
+        bufSize -= bytesToDiscard;
         putPosition += bytesToDiscard; //= bufEnd - buf;
       }
 
       if (delimFound)
         ret = putPosition;
     }
+    return ret;
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  bool TCP::sendAll(Socket& sock, const char* buf, std::size_t bufSize)
+  {
+    bool ret = false;
+    std::size_t localBytesSent = 0;
+    while (localBytesSent < bufSize)
+    {
+      ssize_t sendResult = sock.send(&buf[localBytesSent], bufSize - localBytesSent);
+      if (sendResult < 0)
+      {
+        break;
+      }
+      else
+      {
+        localBytesSent += sendResult;
+      }
+    }
+
+    if (localBytesSent == bufSize)
+      ret = true;
     return ret;
   }
   //----------------------------------------------------------------//

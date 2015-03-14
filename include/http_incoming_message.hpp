@@ -3,6 +3,7 @@
 #ifndef IPSUITE_HTTP_INCOMING_MESSAGE_HPP
 #define IPSUITE_HTTP_INCOMING_MESSAGE_HPP
 
+#include "socket.hpp"
 #include "http_message_head.hpp"
 
 namespace IPSuite
@@ -15,6 +16,7 @@ namespace IPSuite
     private:
       //----------------------------------------------------------------//
       MessageHead& head_;
+      Socket& socket_;
       TransferEncoding transferEncoding_;
       //----------------------------------------------------------------//
 
@@ -25,7 +27,7 @@ namespace IPSuite
     public:
       //----------------------------------------------------------------//
       //IncomingMessage(const MessageHead& head, Socket&& sock);
-      IncomingMessage(MessageHead& head, Socket&& sock);
+      IncomingMessage(MessageHead& head, Socket& sock);
       ~IncomingMessage();
       //----------------------------------------------------------------//
 

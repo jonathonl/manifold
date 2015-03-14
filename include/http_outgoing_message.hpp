@@ -3,6 +3,7 @@
 #ifndef IPSUITE_HTTP_OUTGOING_MESSAGE_HPP
 #define IPSUITE_HTTP_OUTGOING_MESSAGE_HPP
 
+#include "socket.hpp"
 #include "http_message_head.hpp"
 
 namespace IPSuite
@@ -15,24 +16,28 @@ namespace IPSuite
     private:
       //----------------------------------------------------------------//
       MessageHead& head_;
+      Socket& socket_;
       TransferEncoding transferEncoding_;
+      std::uint64_t contentLength_;
+      std::uint64_t bytesSent_;
+      bool headersSent_;
+      bool eof_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      ssize_t sendChunkedEntity(const char* data, std::size_t dataSize);
-      ssize_t sendKnownLengthEntity(const char* data, std::size_t dataSize);
+      bool sendChunkedEntity(const char* data, std::size_t dataSize);
+      bool sendKnownLengthEntity(const char* data, std::size_t dataSize);
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      //IncomingMessage(const MessageHead& head, Socket&& sock);
-      OutgoingMessage(MessageHead& head, Socket&& sock);
+      OutgoingMessage(MessageHead& head, Socket& sock);
       ~OutgoingMessage();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      ssize_t send(const char* data, std::size_t dataSize);
       bool sendHead();
-      void end();
+      bool send(const char* data, std::size_t dataSize);
+      virtual bool end() = 0;
       //----------------------------------------------------------------//
     };
     //================================================================//

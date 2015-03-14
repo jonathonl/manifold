@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <list>
-#include <sys/socket.h>
+#include <functional>
 
 #include "http_request_head.hpp"
 #include "http_response_head.hpp"
@@ -22,7 +22,31 @@ namespace IPSuite
     {
     public:
       //================================================================//
-      typedef std::uint64_t ConnectionHandle;
+      class ConnectionHandle
+      {
+        friend class Client;
+      private:
+        std::uint64_t intVal_;
+        ConnectionHandle(std::uint64_t intVal);
+      public:
+        ConnectionHandle();
+        ConnectionHandle(const ConnectionHandle& source);
+        ConnectionHandle& operator=(const ConnectionHandle& source);
+      };
+      //================================================================//
+
+      //================================================================//
+      class AsyncConnectionHandle
+      {
+        friend class Client;
+      private:
+        std::uint64_t intVal_;
+        AsyncConnectionHandle(std::uint64_t intVal);
+      public:
+        AsyncConnectionHandle();
+        AsyncConnectionHandle(const ConnectionHandle& source);
+        AsyncConnectionHandle& operator=(const ConnectionHandle& source);
+      };
       //================================================================//
 
       //================================================================//
@@ -31,7 +55,7 @@ namespace IPSuite
       private:
         RequestHead head_;
       public:
-        Request(RequestHead&& head, Socket&& sock);
+        Request(RequestHead&& head, Socket& sock);
         ~Request();
 
         RequestHead& head();
@@ -44,7 +68,7 @@ namespace IPSuite
       private:
         ResponseHead head_;
       public:
-        Response(ResponseHead&& head, Socket&& sock);
+        Response(ResponseHead&& head, Socket& sock);
         ~Response();
 
         const ResponseHead& head() const;
@@ -59,10 +83,14 @@ namespace IPSuite
       ConnectionHandle connect(std::string& host, std::uint16_t)
       {
         auto sock = socket(1,2,3);
-        return 0;
+        return ConnectionHandle(0);
       }
 
+      void request(ConnectionHandle handle, std::function<void(Request& request)>&& requestFn, std::function<void(Response& response)>&& responseFn);
+      void request(AsyncConnectionHandle handle, std::function<void(Request& request)>&& requestFn, std::function<void(Response& response)>&& responseFn);
 
+      void close(ConnectionHandle handle);
+      void close(AsyncConnectionHandle handle);
     };
     //================================================================//
   }

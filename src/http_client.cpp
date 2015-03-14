@@ -6,8 +6,8 @@ namespace IPSuite
   namespace HTTP
   {
     //----------------------------------------------------------------//
-    Client::Request::Request(RequestHead&& head, Socket&& sock)
-      : OutgoingMessage(this->head_, std::move(sock))
+    Client::Request::Request(RequestHead&& head, Socket& sock)
+      : OutgoingMessage(this->head_, sock)
     {
       this->head_ = std::move(head);
     }
@@ -27,8 +27,8 @@ namespace IPSuite
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    Client::Response::Response(ResponseHead&& head, Socket&& sock)
-      : IncomingMessage(this->head_, std::move(sock))
+    Client::Response::Response(ResponseHead&& head, Socket& sock)
+      : IncomingMessage(this->head_, sock)
     {
       this->head_ = std::move(head);
     }

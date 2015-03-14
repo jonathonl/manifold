@@ -3,10 +3,11 @@ project(ipsuite)
 
 include_directories("include")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -fno-weak")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -fno-weak")
 
-set(CMAKE_CXX_COMPILER "/opt/local/bin/g++-mp-4.9")
-set(CMAKE_CC_COMPILER "/opt/local/bin/gcc-mp-4.9")
+#set(CMAKE_CXX_COMPILER "/opt/local/bin/g++-mp-4.9")
+#set(CMAKE_CC_COMPILER "/opt/local/bin/gcc-mp-4.9")
 
 set(HEADER_FILES
   include/socket.hpp
