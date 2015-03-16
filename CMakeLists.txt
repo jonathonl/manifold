@@ -15,6 +15,7 @@ set(HEADER_FILES
   include/http_message_head.hpp
   include/http_request_head.hpp
   include/http_response_head.hpp
+  include/http_message.hpp
   include/http_incoming_message.hpp
   include/http_outgoing_message.hpp
   include/http_client.hpp)
@@ -25,6 +26,7 @@ set(SOURCE_FILES
   src/http_message_head.cpp
   src/http_request_head.cpp
   src/http_response_head.cpp
+  src/http_message.cpp
   src/http_incoming_message.cpp
   src/http_outgoing_message.cpp
   src/http_client.cpp

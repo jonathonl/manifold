@@ -10,13 +10,9 @@ namespace IPSuite
   {
     //----------------------------------------------------------------//
     OutgoingMessage::OutgoingMessage(MessageHead& head, Socket& sock)
-      : head_(head),
-        socket_(sock),
-        transferEncoding_(TransferEncoding::Unknown),
-        contentLength_(0),
+      : Message(head, sock),
         bytesSent_(0),
-        headersSent_(false),
-        eof_(false)
+        headersSent_(false)
     {
     }
     //----------------------------------------------------------------//
@@ -139,31 +135,18 @@ namespace IPSuite
       }
       else
       {
-        size_t i = 0;
-        while (dataSize)
+        if (!TCP::sendAll(this->socket_, data, dataSize))
         {
-          ssize_t bytesJustSent = this->socket_.send(&data[i], dataSize);
-          if (bytesJustSent < 0)
-          {
-            // TODO: Set error.
-            break;
-          }
-          else
-          {
-            dataSize -= bytesJustSent;
-            i += bytesJustSent;
-            this->bytesSent_ += bytesJustSent;
-          }
-        }
-
-
-
-        if (!TCP::sendAll(this->socket_, &data[i], dataSize))
-        {
+          // TODO: Set error.
         }
         else
         {
-          this->eof_ = ret = true;
+          this->bytesSent_ += dataSize;
+
+          if (this->bytesSent_ == this->contentLength_)
+            this->eof_ = true;
+
+          ret = true;
         }
       }
 
@@ -179,7 +162,7 @@ namespace IPSuite
       std::string headerString;
       HTTP::MessageHead::serialize(this->head_, headerString);
 
-      if (this->socket_.send(headerString.data(), headerString.size(), MSG_WAITALL) < 0)
+      if (!TCP::sendAll(this->socket_, headerString.data(), headerString.size()))
       {
         // TODO: Set error.
       }

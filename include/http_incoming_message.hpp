@@ -4,20 +4,22 @@
 #define IPSUITE_HTTP_INCOMING_MESSAGE_HPP
 
 #include "socket.hpp"
-#include "http_message_head.hpp"
+#include "http_message.hpp"
 
 namespace IPSuite
 {
   namespace HTTP
   {
     //================================================================//
-    class IncomingMessage
+    class IncomingMessage : public Message
     {
     private:
       //----------------------------------------------------------------//
-      MessageHead& head_;
-      Socket& socket_;
-      TransferEncoding transferEncoding_;
+      std::uint64_t bytesReceived_;
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      std::uint64_t bytesRemainingInChunk_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -28,7 +30,7 @@ namespace IPSuite
       //----------------------------------------------------------------//
       //IncomingMessage(const MessageHead& head, Socket&& sock);
       IncomingMessage(MessageHead& head, Socket& sock);
-      ~IncomingMessage();
+      virtual ~IncomingMessage();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//

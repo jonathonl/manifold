@@ -3,25 +3,19 @@
 #ifndef IPSUITE_HTTP_OUTGOING_MESSAGE_HPP
 #define IPSUITE_HTTP_OUTGOING_MESSAGE_HPP
 
-#include "socket.hpp"
-#include "http_message_head.hpp"
+#include "http_message.hpp"
 
 namespace IPSuite
 {
   namespace HTTP
   {
     //================================================================//
-    class OutgoingMessage
+    class OutgoingMessage : public Message
     {
     private:
       //----------------------------------------------------------------//
-      MessageHead& head_;
-      Socket& socket_;
-      TransferEncoding transferEncoding_;
-      std::uint64_t contentLength_;
       std::uint64_t bytesSent_;
       bool headersSent_;
-      bool eof_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -31,7 +25,7 @@ namespace IPSuite
     public:
       //----------------------------------------------------------------//
       OutgoingMessage(MessageHead& head, Socket& sock);
-      ~OutgoingMessage();
+      virtual ~OutgoingMessage();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
