@@ -13,6 +13,10 @@ namespace IPSuite
     //================================================================//
     class Message
     {
+    public:
+      //----------------------------------------------------------------//
+      enum class ErrorCode { NoError = 0, SocketError, HeadCorrupt, HeadTooLarge };
+      //----------------------------------------------------------------//
     protected:
       //----------------------------------------------------------------//
       MessageHead& head_;
@@ -20,11 +24,19 @@ namespace IPSuite
       TransferEncoding transferEncoding_;
       std::uint64_t contentLength_;
       bool eof_;
+      ErrorCode errorCode_;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
       Message(MessageHead& head, Socket& sock);
       virtual ~Message();
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      ErrorCode errorCode() const;
+      std::string errorMessage() const;
+      bool isGood() const;
+      const Socket& socket() const;
       //----------------------------------------------------------------//
     };
     //================================================================//

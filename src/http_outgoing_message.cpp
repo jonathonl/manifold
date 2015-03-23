@@ -91,13 +91,13 @@ namespace IPSuite
 
       if (!TCP::sendAll(this->socket_, sizeLine.data(), sizeLine.size()))
       {
-        // TODO: Set error.
+        this->errorCode_ = ErrorCode::SocketError;
       }
       else
       {
         if (!TCP::sendAll(this->socket_, sizeLine.data(), sizeLine.size()))
         {
-          // TODO: Set error.
+          this->errorCode_ = ErrorCode::SocketError;
         }
         else
         {
@@ -106,7 +106,7 @@ namespace IPSuite
           const char* newLine = "\r\n";
           if (!TCP::sendAll(this->socket_, newLine, 2))
           {
-            // TODO: Set error.
+            this->errorCode_ = ErrorCode::SocketError;
           }
           else
           {
@@ -137,7 +137,7 @@ namespace IPSuite
       {
         if (!TCP::sendAll(this->socket_, data, dataSize))
         {
-          // TODO: Set error.
+          this->errorCode_ = ErrorCode::SocketError;
         }
         else
         {
@@ -164,7 +164,7 @@ namespace IPSuite
 
       if (!TCP::sendAll(this->socket_, headerString.data(), headerString.size()))
       {
-        // TODO: Set error.
+        this->errorCode_ = ErrorCode::SocketError;
       }
       else
       {

@@ -1,5 +1,6 @@
 
 #include <sstream>
+#include <algorithm>
 
 #include "http_incoming_message.hpp"
 #include "tcp.hpp"
@@ -46,7 +47,7 @@ namespace IPSuite
           ssize_t recvResult = TCP::recvLine(this->socket_, &sizeLine[0], 2048, "\r\n");
           if (recvResult <= 0)
           {
-            // TODO: Set error.
+            this->errorCode_ = ErrorCode::SocketError;
           }
           else
           {
@@ -63,32 +64,34 @@ namespace IPSuite
           }
         }
 
-        // TODO: Check for error
-        if (bytesRemainingInChunk_ == 0)
+        if (this->errorCode_ == ErrorCode::NoError)
         {
-          this->eof_ = true;
-        }
-        else
-        {
-          ssize_t recvResult = this->socket_.recv(buff, this->bytesRemainingInChunk_ > buffSize ? buffSize : this->bytesRemainingInChunk_);
-          if (recvResult <= 0)
+          if (bytesRemainingInChunk_ == 0)
           {
-            // TODO: Set error.
+            this->eof_ = true;
           }
           else
           {
-            this->bytesRemainingInChunk_ -= recvResult;
-            ret = recvResult;
+            ssize_t recvResult = this->socket_.recv(buff, this->bytesRemainingInChunk_ > buffSize ? buffSize : this->bytesRemainingInChunk_);
+            if (recvResult <= 0)
+            {
+              this->errorCode_ = ErrorCode::SocketError;
+            }
+            else
+            {
+              this->bytesRemainingInChunk_ -= recvResult;
+              ret = recvResult;
+            }
           }
-        }
 
-        if (bytesRemainingInChunk_ == 0)
-        {
-          char emptyLineDiscard[2];
-          ssize_t recvResult = TCP::recvLine(this->socket_, emptyLineDiscard, 2, "\r\n");
-          if (recvResult <= 0)
+          if (bytesRemainingInChunk_ == 0 && this->errorCode_ == ErrorCode::NoError)
           {
-            // TODO: Set error.
+            char emptyLineDiscard[2];
+            ssize_t recvResult = TCP::recvLine(this->socket_, emptyLineDiscard, 2, "\r\n");
+            if (recvResult <= 0)
+            {
+              this->errorCode_ = ErrorCode::SocketError;
+            }
           }
         }
       }
@@ -115,7 +118,7 @@ namespace IPSuite
         ret = this->socket_.recv(buff, bytesRemaining < buffSize ? bytesRemaining : buffSize);
         if (ret < 0)
         {
-          // TODO: Set error.
+          this->errorCode_ = ErrorCode::SocketError;
         }
         else
         {
