@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.4)
-project(ipsuite)
+project(manifold)
 
 include_directories("include")
 
@@ -38,5 +38,5 @@ set(SOURCE_FILES
   src/http_server.cpp
   main.cpp)
 
-add_executable(ipsuite ${SOURCE_FILES} ${HEADER_FILES})
-target_link_libraries(ipsuite /opt/local/lib/libboost_system-mt.a)
+add_executable(manifold ${SOURCE_FILES} ${HEADER_FILES})
+target_link_libraries(manifold /opt/local/lib/libboost_system-mt.a)
