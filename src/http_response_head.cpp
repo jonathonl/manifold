@@ -3,73 +3,73 @@
 
 #include "http_response_head.hpp"
 
-namespace IPSuite
+namespace manifold
 {
-  namespace HTTP
+  namespace http
   {
     //----------------------------------------------------------------//
-    ResponseHead::ResponseHead()
+    response_head::response_head()
     {
-      this->statusCode_ = (unsigned short)StatusCode::Ok;
+      this->status_code_ = (unsigned short) status_code::Ok;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    ResponseHead::~ResponseHead()
+    response_head::~response_head()
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    unsigned short ResponseHead::statusCode() const
+    unsigned short response_head::status_code() const
     {
-      return this->statusCode_;
+      return this->status_code_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void ResponseHead::statusCode(unsigned short value)
+    void response_head::status_code(unsigned short value)
     {
-      this->statusCode_ = value;
+      this->status_code_ = value;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void ResponseHead::statusCode(StatusCode value)
+    void response_head::status_code(http::status_code value)
     {
-      this->statusCode_ = (unsigned short)value;
+      this->status_code_ = (unsigned short)value;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::string& ResponseHead::reasonPhrase() const
+    const std::string& response_head::reason_phrase() const
     {
-      return this->reasonPhrase_;
+      return this->reason_phrase_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void ResponseHead::reasonPhrase(const std::string& value)
+    void response_head::reason_phrase(const std::string& value)
     {
-      this->reasonPhrase_ = value;
+      this->reason_phrase_ = value;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void ResponseHead::startLine(const std::string& value)
+    void response_head::start_line(const std::string& value)
     {
       std::stringstream ss(value);
       std::getline(ss, this->version_, ' ');
-      this->statusCode_ = 0;
-      ss >> this->statusCode_;
-      std::getline(ss, this->reasonPhrase_);
+      this->status_code_ = 0;
+      ss >> this->status_code_;
+      std::getline(ss, this->reason_phrase_);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string ResponseHead::startLine() const
+    std::string response_head::start_line() const
     {
-      return this->version_ + " " + std::to_string(this->statusCode_) + " " + this->reasonPhrase_;
+      return this->version_ + " " + std::to_string(this->status_code_) + " " + this->reason_phrase_;
     }
     //----------------------------------------------------------------//
   }

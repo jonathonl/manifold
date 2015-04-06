@@ -7,7 +7,7 @@
 #include "socket.hpp"
 
 //################################################################//
-namespace IPSuite
+namespace manifold
 {
   //----------------------------------------------------------------//
   Socket::Socket()
@@ -18,7 +18,7 @@ namespace IPSuite
 
   //----------------------------------------------------------------//
   Socket::Socket(Family family, Type type, int proto)
-    : family_(family), type_(type), fd_(-1), errno_(0) //, fd_(::socket(PF_INET6, (type == Type::Stream ? SOCK_STREAM : SOCK_DGRAM), 0)) // May put this in connect/listen functions if this blocks.
+    : family_(family), type_(type), fd_(-1), errno_(0) //, fd_(::socket(PF_INET6, (frame_type == Type::Stream ? SOCK_STREAM : SOCK_DGRAM), 0)) // May put this in connect/listen functions if this blocks.
   {
     this->fd_ = ::socket((int)family, (int)type, proto);
   }

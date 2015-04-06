@@ -14,9 +14,9 @@
 //#include "http_outgoing_message.hpp"
 //#include "http_incoming_message.hpp"
 //
-//namespace IPSuite
+//namespace manifold
 //{
-//  namespace HTTP
+//  namespace http
 //  {
 //    //================================================================//
 //    class Client
@@ -51,28 +51,28 @@
 //      //================================================================//
 //
 //      //================================================================//
-//      class Request : public OutgoingMessage
+//      class request : public outgoing_message
 //      {
 //      private:
-//        RequestHead head_;
+//        request_head head_;
 //      public:
-//        Request(RequestHead&& head, Socket& sock);
-//        ~Request();
+//        request(request_head&& head, Socket& sock);
+//        request();
 //
-//        RequestHead& head();
+//        request_head& head();
 //      };
 //      //================================================================//
 //
 //      //================================================================//
-//      class Response : public IncomingMessage
+//      class response : public incoming_message
 //      {
 //      private:
-//        ResponseHead head_;
+//        response_head head_;
 //      public:
-//        Response(ResponseHead&& head, Socket& sock);
-//        ~Response();
+//        response(response_head&& head, Socket& sock);
+//        response();
 //
-//        const ResponseHead& head() const;
+//        const response_head& head() const;
 //      };
 //      //================================================================//
 //    private:
@@ -87,8 +87,8 @@
 //      ConnectionHandle connect(std::string& host, std::uint16_t port = 0);
 //      AsyncConnectionHandle asyncConnect(std::string& host, std::uint16_t port = 0);
 //
-//      void request(ConnectionHandle handle, std::function<void(Request& request)>&& requestFn, std::function<void(Response& response)>&& responseFn);
-//      void request(AsyncConnectionHandle handle, std::function<void(Request& request)>&& requestFn, std::function<void(Response& response)>&& responseFn);
+//      void request(ConnectionHandle handle, std::function<void(request& request)>&& requestFn, std::function<void(response& response)>&& responseFn);
+//      void request(AsyncConnectionHandle handle, std::function<void(request& request)>&& requestFn, std::function<void(response& response)>&& responseFn);
 //
 //      void close(ConnectionHandle handle);
 //      void close(AsyncConnectionHandle handle);

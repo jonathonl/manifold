@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "asio.hpp"
+#include "http_server.hpp"
 
 asio::io_service ioservice;
 asio::ip::tcp::resolver resolv{ioservice};
@@ -25,7 +26,7 @@ void connect_handler(const std::error_code &ec)
   if (!ec)
   {
     std::string r =
-      "GET / HTTP/1.1\r\nHost: theboostcpplibraries.com\r\n\r\n";
+      "GET / http/1.1\r\nHost: theboostcpplibraries.com\r\n\r\n";
     asio::write(tcp_socket, asio::buffer(r));
     tcp_socket.async_read_some(asio::buffer(bytes), read_handler);
   }
@@ -40,8 +41,12 @@ void resolve_handler(const std::error_code &ec,
 
 int main()
 {
-  asio::ip::tcp::resolver::query q{"theboostcpplibraries.com", "80"};
-  resolv.async_resolve(q, resolve_handler);
+  manifold::Socket s;
+
+  manifold::http::server::request r(manifold::http::request_head(), s);
+
+  manifold::http::server srv(ioservice);
+  srv.listen(8080, "0.0.0.0");
 
   auto i = ioservice.run();
 
@@ -60,7 +65,7 @@ int main()
 
 
 //using namespace std;
-//using namespace IPSuite;
+//using namespace manifold;
 //int main()
 //{
 //  boost::asio::io_service io_service;
@@ -87,8 +92,8 @@ int main()
 ////  std::cout << "\"" << name << "\"" << std::endl;
 ////  std::cout << "\"" << value << "\"" << std::endl;
 ////
-////  HTTP::ResponseHead res;
-////  res.statusCode(HTTP::StatusCode::Ok);
+////  http::response_head res;
+////  res.status_code(http::status_code::Ok);
 //
 //
 //
@@ -99,7 +104,7 @@ int main()
 ////  hints.ai_socktype = (int)Socket::Type::Stream;
 ////
 ////  Socket s = TCP::connect(80, "rfactor.net", std::chrono::seconds(15));
-////  TCP::recvLine(s, nullptr, 8);
+////  TCP::recvline(s, nullptr, 8);
 ////
 ////  s.close();
 //

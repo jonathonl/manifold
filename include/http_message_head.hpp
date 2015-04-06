@@ -8,18 +8,18 @@
 
 #include "socket.hpp"
 
-namespace IPSuite
+namespace manifold
 {
-  namespace HTTP
+  namespace http
   {
     // Reference URL: http://tools.ietf.org/html/rfc2616#section-4.4
 
     //================================================================//
-    enum class TransferEncoding { Unknown = 0, Identity, Chunked };
+    enum class transfer_encoding { Unknown = 0, Identity, Chunked };
     //================================================================//
 
     //================================================================//
-    class MessageHead
+    class message_head
     {
     protected:
       //----------------------------------------------------------------//
@@ -28,29 +28,29 @@ namespace IPSuite
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      MessageHead();
-      virtual ~MessageHead();
+      message_head();
+      virtual ~message_head();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       void header(const std::string& name, const std::string& value);
       void header(std::string&& name, std::string&& value);
-      void multiHeader(const std::string& name, const std::list<std::string>& values);
-      void multiHeader(std::string&& name, std::list<std::string>&& values);
+      void multi_header(const std::string& name, const std::list<std::string>& values);
+      void multi_header(std::string&& name, std::list<std::string>&& values);
       std::string header(const std::string& name) const;
-      std::list<std::string> multiHeader(const std::string& name) const;
-      const std::string& httpVersion() const;
-      void httpVersion(const std::string& version); // TODO: Make this an enum.
+      std::list<std::string> multi_header(const std::string& name) const;
+      const std::string& http_version() const;
+      void http_version(const std::string& version); // TODO: Make this an enum.
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      virtual void startLine(const std::string& value) = 0;
-      virtual std::string startLine() const = 0;
+      virtual void start_line(const std::string& value) = 0;
+      virtual std::string start_line() const = 0;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      static void serialize(const MessageHead& source, std::string& destination);
-      static bool deserialize(const std::string& source, MessageHead& destination);
+      static void serialize(const message_head& source, std::string& destination);
+      static bool deserialize(const std::string& source, message_head& destination);
       //----------------------------------------------------------------//
     };
     //================================================================//

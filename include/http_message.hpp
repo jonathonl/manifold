@@ -3,40 +3,33 @@
 #ifndef IPSUITE_HTTP_MESSAGE_HPP
 #define IPSUITE_HTTP_MESSAGE_HPP
 
-#include "socket.hpp"
+#include "http_connection.hpp"
 #include "http_message_head.hpp"
 
-namespace IPSuite
+namespace manifold
 {
-  namespace HTTP
+  namespace http
   {
     //================================================================//
-    class Message
+    class message
     {
     public:
       //----------------------------------------------------------------//
-      enum class ErrorCode { NoError = 0, SocketError, HeadCorrupt, HeadTooLarge };
+      enum class error_code
+      { NoError = 0, SocketError, HeadCorrupt, HeadTooLarge };
       //----------------------------------------------------------------//
     protected:
       //----------------------------------------------------------------//
-      MessageHead& head_;
-      Socket& socket_;
-      TransferEncoding transferEncoding_;
-      std::uint64_t contentLength_;
-      bool eof_;
-      ErrorCode errorCode_;
+      message_head& head_;
+      std::shared_ptr<http::connection> connection_;
+      std::int32_t stream_id_;
+      transfer_encoding transfer_encoding_;
+      std::uint64_t content_length_;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      Message(MessageHead& head, Socket& sock);
-      virtual ~Message();
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-      ErrorCode errorCode() const;
-      std::string errorMessage() const;
-      bool isGood() const;
-      const Socket& socket() const;
+      message(message_head& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+      virtual ~message();
       //----------------------------------------------------------------//
     };
     //================================================================//

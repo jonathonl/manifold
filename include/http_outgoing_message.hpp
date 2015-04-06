@@ -5,12 +5,12 @@
 
 #include "http_message.hpp"
 
-namespace IPSuite
+namespace manifold
 {
-  namespace HTTP
+  namespace http
   {
     //================================================================//
-    class OutgoingMessage : public Message
+    class outgoing_message : public message
     {
     private:
       //----------------------------------------------------------------//
@@ -19,19 +19,21 @@ namespace IPSuite
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      bool sendChunkedEntity(const char* data, std::size_t dataSize);
-      bool sendKnownLengthEntity(const char* data, std::size_t dataSize);
+      //bool sendChunkedEntity(const char* data, std::size_t dataSize);
+      //bool sendKnownLengthEntity(const char* data, std::size_t dataSize);
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      OutgoingMessage(MessageHead& head, Socket& sock);
-      virtual ~OutgoingMessage();
+      outgoing_message(message_head& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+      virtual ~outgoing_message();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      bool sendHead();
-      bool send(const char* data, std::size_t dataSize);
-      virtual bool end() = 0;
+      bool send_head();
+      bool send(const char*const data, std::size_t data_sz);
+      void on_drain(const std::function<void()>& fn);
+      bool end(const char*const data, std::size_t data_sz);
+      bool end();
       //----------------------------------------------------------------//
     };
     //================================================================//

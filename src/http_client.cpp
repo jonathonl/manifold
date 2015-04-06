@@ -1,48 +1,48 @@
 //#include "tcp.hpp"
 //#include "http_client.hpp"
 //
-//namespace IPSuite
+//namespace manifold
 //{
-//  namespace HTTP
+//  namespace http
 //  {
 //    //----------------------------------------------------------------//
-//    Client::Request::Request(RequestHead&& head, Socket& sock)
-//      : OutgoingMessage(this->head_, sock)
+//    Client::request::request(request_head&& head, Socket& sock)
+//      : outgoing_message(this->head_, sock)
 //    {
 //      this->head_ = std::move(head);
 //    }
 //    //----------------------------------------------------------------//
 //
 //    //----------------------------------------------------------------//
-//    Client::Request::~Request()
+//    Client::request::request()
 //    {
 //    }
 //    //----------------------------------------------------------------//
 //
 //    //----------------------------------------------------------------//
-//    RequestHead& Client::Request::head()
+//    request_head& Client::request::head()
 //    {
 //      return this->head_;
 //    }
 //    //----------------------------------------------------------------//
 //
 //    //----------------------------------------------------------------//
-//    Client::Response::Response(ResponseHead&& head, Socket& sock)
-//      : IncomingMessage(this->head_, sock)
+//    Client::response::response(response_head&& head, Socket& sock)
+//      : incoming_message(this->head_, sock)
 //    {
 //      this->head_ = std::move(head);
 //    }
 //    //----------------------------------------------------------------//
 //
 //    //----------------------------------------------------------------//
-//    Client::Response::~Response()
+//    Client::response::response()
 //    {
 //
 //    }
 //    //----------------------------------------------------------------//
 //
 //    //----------------------------------------------------------------//
-//    const ResponseHead& Client::Response::head() const
+//    const response_head& Client::response::head() const
 //    {
 //      return this->head_;
 //    }
@@ -90,7 +90,7 @@
 //    //----------------------------------------------------------------//
 //
 //    //----------------------------------------------------------------//
-//    void Client::request(ConnectionHandle handle, std::function<void(Request& request)>&& requestFn, std::function<void(Response& response)>&& responseFn)
+//    void Client::request(ConnectionHandle handle, std::function<void(request& request)>&& requestFn, std::function<void(response& response)>&& responseFn)
 //    {
 ////      bool found = false;
 ////      Socket sock;
@@ -120,7 +120,7 @@
 //    //----------------------------------------------------------------//
 //
 //    //----------------------------------------------------------------//
-//    void Client::request(AsyncConnectionHandle handle, std::function<void(Request& request)>&& requestFn, std::function<void(Response& response)>&& responseFn)
+//    void Client::request(AsyncConnectionHandle handle, std::function<void(request& request)>&& requestFn, std::function<void(response& response)>&& responseFn)
 //    {
 //    }
 //    //----------------------------------------------------------------//

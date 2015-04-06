@@ -6,12 +6,12 @@
 #include "socket.hpp"
 #include "http_message.hpp"
 
-namespace IPSuite
+namespace manifold
 {
-  namespace HTTP
+  namespace http
   {
     //================================================================//
-    class IncomingMessage : public Message
+    class incoming_message : public message
     {
     private:
       //----------------------------------------------------------------//
@@ -23,18 +23,19 @@ namespace IPSuite
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      ssize_t recvChunkedEntity(char* buff, std::size_t buffSize);
-      ssize_t recvKnownLengthEntity(char* buff, std::size_t buffSize);
+      //ssize_t recvChunkedEntity(char* buff, std::size_t buffSize);
+      //ssize_t recvKnownLengthEntity(char* buff, std::size_t buffSize);
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      //IncomingMessage(const MessageHead& head, Socket&& sock);
-      IncomingMessage(MessageHead& head, Socket& sock);
-      virtual ~IncomingMessage();
+      //incoming_message(const message_head& head, Socket&& sock);
+      incoming_message(message_head& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+      virtual ~incoming_message();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      ssize_t recv(char* buff, std::size_t buffSize);
+      void on_data(const std::function<void(const char*const buff, std::size_t buffSize)>& fn);
+      void on_end(const std::function<void()>& fn);
       //----------------------------------------------------------------//
     };
     //================================================================//

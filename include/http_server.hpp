@@ -5,61 +5,84 @@
 
 #include <regex>
 #include <functional>
+#include <set>
+#include <memory>
 
 #include "asio.hpp"
 #include "http_request_head.hpp"
 #include "http_response_head.hpp"
 #include "http_outgoing_message.hpp"
 #include "http_incoming_message.hpp"
+#include "http_connection.hpp"
 
-namespace IPSuite
+namespace manifold
 {
-  namespace HTTP
+  namespace http
   {
     //================================================================//
-    class Server
+    class server
     {
     public:
       //================================================================//
-      class Request : public IncomingMessage
+      class request : public incoming_message
       {
       private:
-        RequestHead head_;
+        //----------------------------------------------------------------//
+        request_head head_;
+        //----------------------------------------------------------------//
       public:
-        Request(RequestHead&& head, Socket& sock);
-        ~Request();
+        //----------------------------------------------------------------//
+        request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+        ~request();
+        //----------------------------------------------------------------//
 
-        const RequestHead& head() const;
+        //----------------------------------------------------------------//
+        const request_head& head() const;
+        //----------------------------------------------------------------//
       };
       //================================================================//
 
       //================================================================//
-      class Response : public OutgoingMessage
+      class response : public outgoing_message
       {
       private:
-        ResponseHead head_;
+        //----------------------------------------------------------------//
+        response_head head_;
+        //----------------------------------------------------------------//
       public:
-        Response(ResponseHead&& head, Socket& sock);
-        ~Response();
+        //----------------------------------------------------------------//
+        response(response_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+        ~response();
+        //----------------------------------------------------------------//
 
-        ResponseHead& head();
+        //----------------------------------------------------------------//
+        response_head& head();
+        //bool end() { return false; }
+        //----------------------------------------------------------------//
       };
       //================================================================//
     private:
-      asio::io_service& ioService_;
+      //----------------------------------------------------------------//
+      asio::io_service& io_service_;
       asio::ip::tcp::acceptor acceptor_;
       asio::ip::tcp::socket socket_;
-      std::set<asio::connection_ptr> connections_;
+      std::set<std::shared_ptr<http::connection>> connections_;
+      std::list<std::pair<std::regex,std::function<void(server::request&& req, server::response&& res)>>> stream_handlers_;
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      void accept();
+      void manage_connection(const std::shared_ptr<http::connection>& conn);
+      //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      Server(asio::io_service& ioService);
-      ~Server();
+      server(asio::io_service& ioService);
+      ~server();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       void listen(unsigned short port, const std::string& host = "");
-      void accept();
-      void registerHandler(const std::regex& expression, std::function<void(Server::Request& req, Server::Response& res)> handler);
+      void register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler);
       //----------------------------------------------------------------//
     };
     //================================================================//

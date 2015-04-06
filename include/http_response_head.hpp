@@ -5,90 +5,90 @@
 
 #include "http_message_head.hpp"
 
-namespace IPSuite
+namespace manifold
 {
-  namespace HTTP
+  namespace http
   {
     //================================================================//
-    enum class StatusCode : unsigned short
+    enum class status_code : unsigned short
     {
-      // Informational
-      Continue = 100,
-      SwitchingProtocols = 101,
+      // informational
+      continue_status                 = 100,
+      switching_protocols             = 101,
 
-      // Successful
-      Ok                            = 200,
-      Created                       = 201,
-      NonAuthoritativeInformation   = 202,
-      NoContent                     = 203,
-      ResetContent                  = 204,
-      PartialContent                = 205,
+      // successful
+      ok                              = 200,
+      created                         = 201,
+      non_authoritative_information   = 202,
+      no_content                      = 203,
+      reset_content                   = 204,
+      partial_content                 = 205,
 
-      // Redirection
-      MultipleChoices               = 300,
-      MovedPermanently              = 301,
-      Found                         = 302,
-      SeeOther                      = 303,
-      NotModified                   = 304,
-      UseProxy                      = 305,
+      // redirection
+      multiple_choices                = 300,
+      moved_permanently               = 301,
+      found                           = 302,
+      see_other                       = 303,
+      not_modified                    = 304,
+      use_proxy                       = 305,
       // 306 unused
-      TemporaryRedirect             = 307,
+      temporary_redirect              = 307,
 
-      // Client Error
-      BadRequest                    = 400,
-      Unauthorize                   = 401,
-      PaymentRequired               = 402,
-      Forbidden                     = 403,
-      NotFound                      = 404,
-      MethodNotAllowed              = 405,
-      NotAcceptable                 = 406,
-      ProxyAuthenticationRequired   = 407,
-      RequestTimeout                = 408,
-      Conflict                      = 409,
-      Gone                          = 410,
-      LengthRequired                = 411,
-      PreconditionFailed            = 412,
-      RequestEntityTooLarge         = 413,
-      RequestURITooLong             = 414,
-      UnsupportedMediaType          = 415,
-      RequestedRangeNotSatisfiable  = 416,
-      ExpectationFailed             = 417,
+      // client error
+      bad_request                     = 400,
+      unauthorize                     = 401,
+      payment_required                = 402,
+      forbidden                       = 403,
+      notfound                        = 404,
+      method_not_allowed              = 405,
+      not_acceptable                  = 406,
+      proxy_authentication_required   = 407,
+      request_timeout                 = 408,
+      conflict                        = 409,
+      gone                            = 410,
+      length_required                 = 411,
+      precondition_failed             = 412,
+      requestentity_too_large         = 413,
+      request_uri_too_long            = 414,
+      unsupported_media_type          = 415,
+      requested_range_not_satisfiable = 416,
+      expectation_failed              = 417,
 
-      // Server Error
-      InternalServerError           = 500,
-      NotImplemented                = 501,
-      BadGateway                    = 502,
-      ServiceUnavailable            = 503,
-      GatewayTimeout                = 504,
-      HTTPVersionNotSupported       = 505
+      // server error
+      internal_server_error           = 500,
+      not_implemented                 = 501,
+      bad_gateway                     = 502,
+      service_unavailable             = 503,
+      gateway_timeout                 = 504,
+      http_version_not_supported      = 505
     };
     //================================================================//
 
     //================================================================//
-    class ResponseHead : public MessageHead
+    class response_head : public message_head
     {
     private:
       //----------------------------------------------------------------//
-      unsigned short statusCode_;
-      std::string reasonPhrase_;
+      unsigned short status_code_;
+      std::string reason_phrase_;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      ResponseHead();
-      ~ResponseHead();
+      response_head();
+      ~response_head();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      unsigned short statusCode() const;
-      void statusCode(unsigned short value);
-      void statusCode(StatusCode value);
-      const std::string& reasonPhrase() const;
-      void reasonPhrase(const std::string& value);
+      unsigned short status_code() const;
+      void status_code(unsigned short value);
+      void status_code(http::status_code value);
+      const std::string& reason_phrase() const;
+      void reason_phrase(const std::string& value);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void startLine(const std::string& value);
-      std::string startLine() const;
+      void start_line(const std::string& value);
+      std::string start_line() const;
       //----------------------------------------------------------------//
     };
     //================================================================//

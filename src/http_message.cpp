@@ -2,60 +2,37 @@
 #include "http_message.hpp"
 #include "tcp.hpp"
 
-namespace IPSuite
+namespace manifold
 {
-  namespace HTTP
+  namespace http
   {
     //----------------------------------------------------------------//
-    Message::Message(MessageHead& head, Socket& sock)
+    message::message(message_head& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
       : head_(head),
-        socket_(sock),
-        transferEncoding_(TransferEncoding::Unknown),
-        contentLength_(0),
-        eof_(false),
-        errorCode_(ErrorCode::NoError)
+        connection_(conn),
+        stream_id_(stream_id),
+        transfer_encoding_(transfer_encoding::Unknown),
+        content_length_(0)
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    Message::~Message()
+    message::~message()
     {
     }
     //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    Message::ErrorCode Message::errorCode() const
-    {
-      return this->errorCode_;
-    }
-    //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    std::string Message::errorMessage() const
-    {
-      switch (this->errorCode_)
-      {
-        case ErrorCode::SocketError: return "Socket Error";
-        case ErrorCode::HeadCorrupt: return "Headers Are Corrupt";
-        case ErrorCode::HeadTooLarge: return "Headers Are Too Large";
-        default: return "";
-      }
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    bool Message::isGood() const
-    {
-      return (!this->eof_ && this->errorCode_ == ErrorCode::NoError);
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    const Socket& Message::socket() const
-    {
-      return this->socket_;
-    }
-    //----------------------------------------------------------------//
-  }
-}
+//    //----------------------------------------------------------------//
+//    std::string message::errorMessage() const
+//    {
+//      switch (this->error_code_)
+//      {
+//        case error_code::SocketError: return "Socket Error";
+//        case error_code::HeadCorrupt: return "Headers Are Corrupt";
+//        case error_code::HeadTooLarge: return "Headers Are Too Large";
+//        default: return "";
+//      }
+//    }
+//    //----------------------------------------------------------------//

@@ -3,19 +3,20 @@
 #ifndef IPSUITE_HTTP_REQUEST_HEAD_HPP
 #define IPSUITE_HTTP_REQUEST_HEAD_HPP
 
+#include <system_error>
 #include "http_message_head.hpp"
 
-namespace IPSuite
+namespace manifold
 {
-  namespace HTTP
+  namespace http
   {
     //================================================================//
-    enum class Method { Head = 1, Get, Post, Put, Delete, Options, Trace, Connect, Patch };
-    std::string methodEnumToString(Method method);
+    enum class method { head = 1, get, post, put, del, options, trace, connect, patch };
+    std::string method_enum_to_string(method method);
     //================================================================//
 
     //================================================================//
-    class RequestHead : public MessageHead
+    class request_head : public message_head
     {
     private:
       //----------------------------------------------------------------//
@@ -24,22 +25,22 @@ namespace IPSuite
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      RequestHead();
-      ~RequestHead();
+      request_head();
+      ~request_head();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       const std::string& method() const;
       void method(const std::string& value);
-      void method(Method value);
-      bool methodIs(Method methodToCheck) const;
+      void method(http::method value);
+      bool method_is(http::method methodToCheck) const;
       const std::string& url() const;
       void url(const std::string& value);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void startLine(const std::string& value);
-      std::string startLine() const;
+      void start_line(const std::string& value);
+      std::string start_line() const;
       //----------------------------------------------------------------//
     };
     //================================================================//

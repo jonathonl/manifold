@@ -4,48 +4,48 @@
 
 #include "http_request_head.hpp"
 
-namespace IPSuite
+namespace manifold
 {
-  namespace HTTP
+  namespace http
   {
-    std::string methodEnumToString(Method method)
+    std::string method_enum_to_string(method method)
     {
       std::string ret;
 
-      if (method == Method::Head) ret         = "HEAD";
-      else if (method == Method::Get) ret     = "GET";
-      else if (method == Method::Post) ret    = "POST";
-      else if (method == Method::Put) ret     = "PUT";
-      else if (method == Method::Delete) ret  = "DELETE";
-      else if (method == Method::Options) ret = "OPTIONS";
-      else if (method == Method::Trace) ret   = "TRACE";
-      else if (method == Method::Connect) ret = "CONNECT";
-      else if (method == Method::Patch) ret   = "PATCH";
+      if (method == method::head)         ret = "HEAD";
+      else if (method == method::get)     ret = "GET";
+      else if (method == method::post)    ret = "POST";
+      else if (method == method::put)     ret = "PUT";
+      else if (method == method::del)     ret = "DELETE";
+      else if (method == method::options) ret = "OPTIONS";
+      else if (method == method::trace)   ret = "TRACE";
+      else if (method == method::connect) ret = "CONNECT";
+      else if (method == method::patch)   ret = "PATCH";
 
       return ret;
     }
 
     //----------------------------------------------------------------//
-    RequestHead::RequestHead()
+    request_head::request_head()
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    RequestHead::~RequestHead()
+    request_head::~request_head()
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::string& RequestHead::method() const
+    const std::string& request_head::method() const
     {
       return this->method_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void RequestHead::method(const std::string& value)
+    void request_head::method(const std::string& value)
     {
       this->method_ = value;
       std::for_each(this->method_.begin(), this->method_.end(), ::toupper);
@@ -53,35 +53,35 @@ namespace IPSuite
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void RequestHead::method(Method value)
+    void request_head::method(http::method value)
     {
-      this->method_ = methodEnumToString(value);
+      this->method_ = method_enum_to_string(value);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool RequestHead::methodIs(Method methodToCheck) const
+    bool request_head::method_is(http::method methodToCheck) const
     {
-      return (this->method_ == methodEnumToString(methodToCheck));
+      return (this->method_ == method_enum_to_string(methodToCheck));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::string& RequestHead::url() const
+    const std::string& request_head::url() const
     {
       return this->url_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void RequestHead::url(const std::string& value)
+    void request_head::url(const std::string& value)
     {
       this->url_ = value;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void RequestHead::startLine(const std::string& value)
+    void request_head::start_line(const std::string& value)
     {
       std::stringstream ss(value);
       std::getline(ss, this->method_, ' ');
@@ -91,7 +91,7 @@ namespace IPSuite
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string RequestHead::startLine() const
+    std::string request_head::start_line() const
     {
       return this->method_ + " " + this->url_ + " " + this->version_;
     }

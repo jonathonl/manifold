@@ -12,6 +12,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -DASIO_STANDALONE -std=c++11 -stdl
 set(HEADER_FILES
   include/socket.hpp
   include/tcp.hpp
+  include/http_frame.hpp
+  include/http_connection.hpp
   include/http_message_head.hpp
   include/http_request_head.hpp
   include/http_response_head.hpp
@@ -24,6 +26,8 @@ set(HEADER_FILES
 set(SOURCE_FILES
   src/socket.cpp
   src/tcp.cpp
+  src/http_frame.cpp
+  src/http_connection.cpp
   src/http_message_head.cpp
   src/http_request_head.cpp
   src/http_response_head.cpp

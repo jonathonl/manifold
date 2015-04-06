@@ -4,25 +4,25 @@
 
 #include "http_message_head.hpp"
 
-namespace IPSuite
+namespace manifold
 {
-  namespace HTTP
+  namespace http
   {
     //----------------------------------------------------------------//
-    MessageHead::MessageHead()
+    message_head::message_head()
     {
 
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    MessageHead::~MessageHead()
+    message_head::~message_head()
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void MessageHead::header(const std::string& name, const std::string& value)
+    void message_head::header(const std::string& name, const std::string& value)
     {
       std::string n(name);
       std::string v(value);
@@ -31,7 +31,7 @@ namespace IPSuite
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void MessageHead::header(std::string&& name, std::string&& value)
+    void message_head::header(std::string&& name, std::string&& value)
     {
       // trim
       const std::string whitespace(" \t\f\v\r\n");
@@ -55,16 +55,16 @@ namespace IPSuite
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void MessageHead::multiHeader(const std::string& name, const std::list<std::string>& values)
+    void message_head::multi_header(const std::string& name, const std::list<std::string>& values)
     {
       std::string n(name);
       std::list<std::string> v(values);
-      this->multiHeader(std::move(n), std::move(v));
+      this->multi_header(std::move(n), std::move(v));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void MessageHead::multiHeader(std::string&& name, std::list<std::string>&& values)
+    void message_head::multi_header(std::string&& name, std::list<std::string>&& values)
     {
       // trim
       const std::string whitespace(" \t\f\v\r\n");
@@ -94,7 +94,7 @@ namespace IPSuite
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string MessageHead::header(const std::string& name) const
+    std::string message_head::header(const std::string& name) const
     {
       std::string ret;
       std::string nameToLower(name);
@@ -111,7 +111,7 @@ namespace IPSuite
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::list<std::string> MessageHead::multiHeader(const std::string& name) const
+    std::list<std::string> message_head::multi_header(const std::string& name) const
     {
       std::list<std::string> ret;
       std::string nameToLower(name);
@@ -128,23 +128,23 @@ namespace IPSuite
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::string&  MessageHead::httpVersion() const
+    const std::string& message_head::http_version() const
     {
       return this->version_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void  MessageHead::httpVersion(const std::string& version)
+    void  message_head::http_version(const std::string& version)
     {
       this->version_ = version;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void MessageHead::serialize(const MessageHead& source, std::string& destination)
+    void message_head::serialize(const message_head& source, std::string& destination)
     {
-      destination = source.startLine() + "\r\n";
+      destination = source.start_line() + "\r\n";
       for (auto it = source.headers_.begin(); it != source.headers_.end(); ++it)
       {
         destination += it->first;
@@ -157,14 +157,14 @@ namespace IPSuite
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool MessageHead::deserialize(const std::string& source, MessageHead& destination)
+    bool message_head::deserialize(const std::string& source, message_head& destination)
     {
       bool ret = false;
       std::size_t pos = 0;
       pos = source.find("\r\n", pos);
       if (pos != std::string::npos)
       {
-        destination.startLine(source.substr(0, pos));
+        destination.start_line(source.substr(0, pos));
         pos += 2;
 
         while (!ret && pos != source.size())
@@ -192,7 +192,7 @@ namespace IPSuite
               ++colonPtr;
               std::string value(colonPtr, &source[endPos] - colonPtr);
 
-              destination.header(std::move(name), std::move(value)); // header method trims.
+              destination.header(std::move(name), std::move(value)); // header set_method trims.
 
               pos = endPos + 2;
             }
