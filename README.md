@@ -1,3 +1,5 @@
-IPSuite
+Manifold
 =======
-Coming Soon.
+A lightweight http/2 library.
+
+In progress.
