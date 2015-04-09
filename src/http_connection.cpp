@@ -27,6 +27,9 @@ namespace manifold
           { setting_code::max_frame_size,      16384 }
         };
 
+      this->started_ = false;
+      this->send_loop_running_ = false;
+
     };
     //----------------------------------------------------------------//
 
@@ -37,7 +40,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::run()
+    void connection::run_recv_loop()
     {
       auto self = shared_from_this();
       http::frame::recv_frame(this->socket_, this->incoming_frame_, [self](const std::error_code& ec)
@@ -55,8 +58,70 @@ namespace manifold
           else
           {
           }
+
+          self->run_recv_loop();
         }
       });
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::run_send_loop()
+    {
+      if (!this->send_loop_running_)
+      {
+        this->send_loop_running_ = true;
+
+        auto self = shared_from_this();
+
+        bool outgoing_frame_found = false;
+        for (int i = 0; !outgoing_frame_found && i < this->stream_outgoing_process_queue_.size(); ++i)
+        {
+          stream& s = this->streams_[this->stream_outgoing_process_queue_.front()];
+          if (s.outgoing_frames.size())
+          {
+            this->outgoing_frame_ = std::move(s.outgoing_frames.front());
+            s.outgoing_frames.pop();
+
+            outgoing_frame_found = true;
+          }
+
+          this->stream_outgoing_process_queue_.push(this->stream_outgoing_process_queue_.front());
+          this->stream_outgoing_process_queue_.pop();
+        }
+
+        if (outgoing_frame_found)
+        {
+          http::frame::send_frame(this->socket_, this->outgoing_frame_, [self](const std::error_code& ec)
+          {
+            this->send_loop_running_ = false;
+            if (ec)
+            {
+              // TODO: Handle error.
+            }
+            else
+            {
+              self->run_send_loop();
+            }
+          });
+        }
+        else
+        {
+          this->send_loop_running_ = false;
+        }
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::run()
+    {
+      if (!this->started_)
+      {
+        this->run_recv_loop();
+
+        this->started_ = true;
+      }
     }
     //----------------------------------------------------------------//
 
@@ -97,28 +162,25 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_headers_frame(std::uint32_t stream_id, const message_head& head)
+    bool connection::send_headers(std::uint32_t stream_id, const message_head &head, bool end_stream)
     {
       return false;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_data_frame(std::uint32_t stream_id, const char*const data, std::size_t data_sz)
+    bool connection::send_data(std::uint32_t stream_id, const char *const data, std::size_t data_sz, bool end_stream)
     {
-      return false;
-    }
-    //----------------------------------------------------------------//
+      bool ret = false;
 
-    //----------------------------------------------------------------//
-    void connection::send_end_frame(std::uint32_t stream_id)
-    {
-    }
-    //----------------------------------------------------------------//
+      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
 
-    //----------------------------------------------------------------//
-    void connection::send_end_frame(std::uint32_t stream_id, const char*const data, std::size_t data_sz)
-    {
+      if (it != this->streams_.end())
+      {
+        it->second.outgoing_frames.push(http::frame(http::data_frame()))
+      }
+
+      return ret;
     }
     //----------------------------------------------------------------//
 

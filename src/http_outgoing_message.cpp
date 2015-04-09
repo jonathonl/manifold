@@ -30,7 +30,7 @@ namespace manifold
 
       if (!this->headersSent_)
       {
-        ret = this->connection_->send_headers_frame(this->stream_id_, this->head_);
+        ret = this->connection_->send_headers(this->stream_id_, this->head_);
       }
 
       return ret;
@@ -46,7 +46,7 @@ namespace manifold
 
       if (ret)
       {
-        ret = this->connection_->send_data_frame(this->stream_id_, data, data_sz);
+        ret = this->connection_->send_data(this->stream_id_, data, data_sz);
       }
 
       return ret;

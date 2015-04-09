@@ -7,6 +7,7 @@
 #include <cstdint>
 
 #include "asio.hpp"
+#include "http_error_category.hpp"
 
 namespace manifold
 {
@@ -38,6 +39,7 @@ namespace manifold
     protected:
       std::vector<char> buf_;
     public:
+      std::uint32_t serialized_length() const;
       static void recv_frame_payload(asio::ip::tcp::socket& sock, frame_payload_base& destination, std::uint32_t payload_size, const std::function<void(const std::error_code& ec)>& cb);
     };
     //================================================================//
@@ -158,7 +160,8 @@ namespace manifold
       ping,
       goaway,
       window_update,
-      continuation
+      continuation,
+      invalid_type = 0xFF
     };
     //================================================================//
 
@@ -195,7 +198,7 @@ namespace manifold
         http::settings_frame      settings_frame_;
         http::push_promise_frame  push_promise_frame_
         http::ping_frame          ping_frame_;
-        http::goaway_frame       goaway_frame_;
+        http::goaway_frame        goaway_frame_;
         http::window_update_frame window_update_frame_;
         http::continuation_frame  continuation_frame_;
         //----------------------------------------------------------------//
@@ -211,10 +214,26 @@ namespace manifold
       payload_union payload_;
       std::array<char, 9> metadata_;
       //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      void destroy_union();
+      void init_meta(frame_type t, std::uint32_t payload_length, std::uint32_t stream_id, std::uint8_t flags);
+      //----------------------------------------------------------------//
     public:
-//      frame(frame_type t, std::uint8_t flags, std::vector<char>&& payload, std::int32_t stream_id = 0)
-//        : type_(t), flags_(flags), payload_(std::move(payload)), stream_id_(stream_id) {}
-//      ~frame() {}
+      //----------------------------------------------------------------//
+      frame();
+      frame(http::data_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
+      frame(http::headers_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
+      frame(http::priority_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
+      frame(http::rst_stream_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
+      frame(http::settings_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
+      frame(http::push_promise_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
+      frame(http::ping_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
+      frame(http::goaway_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
+      frame(http::window_update_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
+      frame(http::continuation_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
+      ~frame();
+      //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       template <typename T>

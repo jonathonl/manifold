@@ -4,6 +4,7 @@
 #define MANIFOLD_HTTP_CONNECTION_HPP
 
 #include <list>
+#include <queue>
 #include <map>
 #include <memory>
 #include <vector>
@@ -35,31 +36,38 @@ namespace manifold
       //================================================================//
       struct stream
       {
-        std::function<void(const char* const buf, std::size_t buf_size)> on_data_frame_;
-        std::function<void()> on_end_frame_;
-        std::function<void()> on_window_update_;
+        std::function<void(const char* const buf, std::size_t buf_size)> on_data_frame;
+        std::function<void()> on_end_frame;
+        std::function<void()> on_window_update;
 
-        std::vector<frame> frames_;
+        std::queue<frame> incoming_frames;
+        std::queue<frame> outgoing_frames;
       };
       //================================================================//
     private:
       //----------------------------------------------------------------//
       asio::ip::tcp::socket socket_;
       std::map<setting_code,std::uint32_t> settings_;
-      std::array<char, 65535> incoming_buffer_; // For http/2 flow control window.
-      //td::set<std::shared_ptr<http::incoming_message>> incomingMessages_;
-      //td::set<std::shared_ptr<http::outgoing_message>> outgoingMessages_;
+      bool started_;
+      bool send_loop_running_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       // Connection level callbacks:
-      std::function<void(std::int32_t stream_id, std::list<std::pair<std::string,std::string>>&& headers, std::int32_t stream_dependency_id)> on_new_stream_;
+      std::function<void(std::uint32_t stream_id, std::list<std::pair<std::string,std::string>>&& headers, std::uint32_t stream_dependency_id)> on_new_stream_;
       std::function<void()> on_close_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      std::map<std::int32_t, stream> streams_;
+      std::map<std::uint32_t,stream> streams_;
       http::frame incoming_frame_;
+      http::frame outgoing_frame_;
+      std::queue<std::uint32_t> stream_outgoing_process_queue_; // TODO: Implement dependency trees.
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      void run_recv_loop();
+      void run_send_loop();
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
@@ -86,10 +94,8 @@ namespace manifold
 
       //----------------------------------------------------------------//
       void on_window_update(std::uint32_t stream_id, const std::function<void()>& fn);
-      bool send_headers_frame(std::uint32_t stream_id, const message_head& head);
-      bool send_data_frame(std::uint32_t stream_id, const char*const data, std::size_t data_sz);
-      void send_end_frame(std::uint32_t stream_id);
-      void send_end_frame(std::uint32_t stream_id, const char*const data, std::size_t data_sz);
+      bool send_headers(std::uint32_t stream_id, const message_head &head, bool end_stream = false);
+      bool send_data(std::uint32_t stream_id, const char *const data, std::size_t data_sz, bool end_stream = false);
       //----------------------------------------------------------------//
 
 
