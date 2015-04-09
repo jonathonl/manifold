@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef IPSUITE_HTTP_MESSAGE_HEAD_HPP
-#define IPSUITE_HTTP_MESSAGE_HEAD_HPP
+#ifndef MANIFOLD_HTTP_MESSAGE_HEAD_HPP
+#define MANIFOLD_HTTP_MESSAGE_HEAD_HPP
 
 #include <string>
 #include <list>
@@ -57,4 +57,4 @@ namespace manifold
   }
 }
 
-#endif // IPSUITE_HTTP_MESSAGE_HEAD_HPP
+#endif // MANIFOLD_HTTP_MESSAGE_HEAD_HPP

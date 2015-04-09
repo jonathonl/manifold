@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef IPSUITE_HTTP_REQUEST_HEAD_HPP
-#define IPSUITE_HTTP_REQUEST_HEAD_HPP
+#ifndef MANIFOLD_HTTP_REQUEST_HEAD_HPP
+#define MANIFOLD_HTTP_REQUEST_HEAD_HPP
 
 #include <system_error>
 #include "http_message_head.hpp"
@@ -47,4 +47,4 @@ namespace manifold
   };
 }
 
-#endif // IPSUITE_HTTP_REQUEST_HEAD_HPP
+#endif // MANIFOLD_HTTP_REQUEST_HEAD_HPP

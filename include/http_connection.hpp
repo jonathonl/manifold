@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef IPSUITE_HTTP_CONNECTION_HPP
-#define IPSUITE_HTTP_CONNECTION_HPP
+#ifndef MANIFOLD_HTTP_CONNECTION_HPP
+#define MANIFOLD_HTTP_CONNECTION_HPP
 
 #include <list>
 #include <map>
@@ -21,36 +21,14 @@ namespace manifold
     {
     private:
       //================================================================//
-
-      //================================================================//
-
-      //================================================================//
-      class frame
+      enum class setting_code
       {
-      public:
-        enum class type { data = 0x0, headers, priority, rst_stream, settings, push_promise, ping, go_away, window_update, continuation };
-        union payload_union
-        {
-          //----------------------------------------------------------------//
-
-          //----------------------------------------------------------------//
-
-          //----------------------------------------------------------------//
-          payload_union(){}
-          payload_union(const payload_union&){}
-          payload_union& operator=(const payload_union&) { return (*this); }
-          ~payload_union(){}
-          //----------------------------------------------------------------//
-        } payload_;
-      private:
-        type type_;
-        std::uint8_t flags_;
-        std::vector<char> payload_;
-        std::int32_t stream_id_;
-      public:
-        frame(type t, std::uint8_t flags, std::vector<char>&& payload, std::int32_t stream_id = 0)
-          : type_(t), flags_(flags), payload_(std::move(payload)), stream_id_(stream_id) {}
-        ~frame() {}
+        header_table_size      = 0x1, // 4096
+        enable_push            = 0x2, // 1
+        max_concurrent_streams = 0x3, // (infinite)
+        initial_window_size    = 0x4, // 65535
+        max_frame_size         = 0x5, // 16384
+        max_header_list_size   = 0x6  // (infinite)
       };
       //================================================================//
 
@@ -67,6 +45,7 @@ namespace manifold
     private:
       //----------------------------------------------------------------//
       asio::ip::tcp::socket socket_;
+      std::map<setting_code,std::uint32_t> settings_;
       std::array<char, 65535> incoming_buffer_; // For http/2 flow control window.
       //td::set<std::shared_ptr<http::incoming_message>> incomingMessages_;
       //td::set<std::shared_ptr<http::outgoing_message>> outgoingMessages_;
@@ -80,6 +59,7 @@ namespace manifold
 
       //----------------------------------------------------------------//
       std::map<std::int32_t, stream> streams_;
+      http::frame incoming_frame_;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
@@ -88,21 +68,28 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
+      void run();
+      void close();
+      void cancelAllStreams();
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
       void on_new_stream(const std::function<void(std::int32_t stream_id, std::list<std::pair<std::string,std::string>>&& headers, std::int32_t stream_dependency_id)>& fn);
       void on_close(const std::function<void()>& fn);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void on_data_frame(std::int32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
-      void on_end_frame(std::int32_t stream_id, const std::function<void()>& fn);
+      void on_data_frame(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
+      void on_end_frame(std::uint32_t stream_id, const std::function<void()>& fn);
+      void on_rst_stream_frame(std::uint32_t stream_id, std::function<void(const std::error_code& ec)>& fn);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void on_window_update(std::int32_t stream_id, const std::function<void()>& fn);
-      bool send_headers_frame(std::int32_t stream_id, const message_head& head);
-      bool send_data_frame(std::int32_t stream_id, const char*const data, std::size_t data_sz);
-      void send_end_frame(std::int32_t stream_id);
-      void send_end_frame(std::int32_t stream_id, const char*const data, std::size_t data_sz);
+      void on_window_update(std::uint32_t stream_id, const std::function<void()>& fn);
+      bool send_headers_frame(std::uint32_t stream_id, const message_head& head);
+      bool send_data_frame(std::uint32_t stream_id, const char*const data, std::size_t data_sz);
+      void send_end_frame(std::uint32_t stream_id);
+      void send_end_frame(std::uint32_t stream_id, const char*const data, std::size_t data_sz);
       //----------------------------------------------------------------//
 
 
@@ -115,4 +102,4 @@ namespace manifold
 
 
 
-#endif //IPSUITE_HTTP_CONNECTION_HPP
+#endif //MANIFOLD_HTTP_CONNECTION_HPP

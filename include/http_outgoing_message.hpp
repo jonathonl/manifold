@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef IPSUITE_HTTP_OUTGOING_MESSAGE_HPP
-#define IPSUITE_HTTP_OUTGOING_MESSAGE_HPP
+#ifndef MANIFOLD_HTTP_OUTGOING_MESSAGE_HPP
+#define MANIFOLD_HTTP_OUTGOING_MESSAGE_HPP
 
 #include "http_message.hpp"
 
@@ -40,4 +40,4 @@ namespace manifold
   }
 }
 
-#endif //IPSUITE_HTTP_OUTGOING_MESSAGE_HPP
+#endif //MANIFOLD_HTTP_OUTGOING_MESSAGE_HPP

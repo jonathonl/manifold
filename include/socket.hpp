@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef IPSUITE_SOCKET_HPP
-#define IPSUITE_SOCKET_HPP
+#ifndef MANIFOLD_SOCKET_HPP
+#define MANIFOLD_SOCKET_HPP
 
 #include "asio.hpp"
 
@@ -109,4 +109,4 @@ namespace manifold
 }
 //################################################################//
 
-#endif // IPSUITE_SOCKET_HPP
+#endif // MANIFOLD_SOCKET_HPP

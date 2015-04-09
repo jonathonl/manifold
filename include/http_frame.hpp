@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef IPSUITE_HTTP_FRAME_HPP
-#define IPSUITE_HTTP_FRAME_HPP
+#ifndef MANIFOLD_HTTP_FRAME_HPP
+#define MANIFOLD_HTTP_FRAME_HPP
 
 #include <vector>
 #include <cstdint>
@@ -12,6 +12,26 @@ namespace manifold
 {
   namespace http
   {
+    //================================================================//
+//    enum class errc : std::uint32_t // TODO: Make error_condition
+//    {
+//      no_error            = 0x0,
+//      protocol_error      = 0x1,
+//      internal_error      = 0x2,
+//      flow_control_error  = 0x3,
+//      settings_timeout    = 0x4,
+//      stream_closed       = 0x5,
+//      frame_size_error    = 0x6,
+//      refused_stream      = 0x7,
+//      cancel              = 0x8,
+//      compression_error   = 0x9,
+//      connect_error       = 0xa,
+//      enhance_your_calm   = 0xb,
+//      inadequate_security = 0xc,
+//      http_1_1_required   = 0xd
+//    };
+    //================================================================//
+
     //================================================================//
     class frame_payload_base
     {
@@ -61,7 +81,7 @@ namespace manifold
     class rst_stream_frame : public frame_payload_base
     {
     public:
-      std::uint32_t error_code() const; // TODO: Make enum.
+      http::errc error_code() const;
     };
     //================================================================//
 
@@ -82,6 +102,11 @@ namespace manifold
     class push_promise_frame : public frame_payload_base
     {
     public:
+      const char*const header_block_fragment() const;
+      std::uint32_t header_block_fragment_length() const;
+      const char*const padding() const;
+      std::uint8_t pad_length() const;
+      std::uint32_t promised_stream_id() const;
     };
     //================================================================//
 
@@ -89,13 +114,18 @@ namespace manifold
     class ping_frame : public frame_payload_base
     {
     public:
+      // ping data should not be retrievable.
     };
     //================================================================//
 
     //================================================================//
-    class go_away_frame : public frame_payload_base
+    class goaway_frame : public frame_payload_base
     {
     public:
+      std::uint32_t last_stream_id() const;
+      http::errc error_code() const;
+      const char*const additional_debug_data() const;
+      std::uint32_t additional_debug_data_length() const;
     };
     //================================================================//
 
@@ -103,6 +133,7 @@ namespace manifold
     class window_update_frame : public frame_payload_base
     {
     public:
+      std::uint32_t window_size_increment() const;
     };
     //================================================================//
 
@@ -110,6 +141,8 @@ namespace manifold
     class continuation_frame : public frame_payload_base
     {
     public:
+      const char*const header_block_fragment() const;
+      std::uint32_t header_block_fragment_length() const;
     };
     //================================================================//
 
@@ -123,7 +156,7 @@ namespace manifold
       settings,
       push_promise,
       ping,
-      go_away,
+      goaway,
       window_update,
       continuation
     };
@@ -141,7 +174,7 @@ namespace manifold
       const http::settings_frame      default_settings_frame_     ;
       const http::push_promise_frame  default_push_promise_frame_ ;
       const http::ping_frame          default_ping_frame_         ;
-      const http::go_away_frame       default_go_away_frame_      ;
+      const http::goaway_frame        default_goaway_frame_       ;
       const http::window_update_frame default_window_update_frame_;
       const http::continuation_frame  default_continuation_frame_ ;
       //----------------------------------------------------------------//
@@ -162,7 +195,7 @@ namespace manifold
         http::settings_frame      settings_frame_;
         http::push_promise_frame  push_promise_frame_
         http::ping_frame          ping_frame_;
-        http::go_away_frame       go_away_frame_;
+        http::goaway_frame       goaway_frame_;
         http::window_update_frame window_update_frame_;
         http::continuation_frame  continuation_frame_;
         //----------------------------------------------------------------//
@@ -201,7 +234,7 @@ namespace manifold
       const http::settings_frame&       settings_frame()      const;
       const http::push_promise_frame&   push_promise_frame()  const;
       const http::ping_frame&           ping_frame()          const;
-      const http::go_away_frame&        go_away_frame()       const;
+      const http::goaway_frame&        goaway_frame()       const;
       const http::window_update_frame&  window_update_frame() const;
       const http::continuation_frame&   continuation_frame()  const;
       //----------------------------------------------------------------//
@@ -212,4 +245,4 @@ namespace manifold
 
 
 
-#endif //IPSUITE_HTTP_FRAME_HPP
+#endif //MANIFOLD_HTTP_FRAME_HPP

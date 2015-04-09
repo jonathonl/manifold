@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef IPSUITE_HTTP_INCOMING_MESSAGE_HPP
-#define IPSUITE_HTTP_INCOMING_MESSAGE_HPP
+#ifndef MANIFOLD_HTTP_INCOMING_MESSAGE_HPP
+#define MANIFOLD_HTTP_INCOMING_MESSAGE_HPP
 
 #include "socket.hpp"
 #include "http_message.hpp"
@@ -34,7 +34,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void on_data(const std::function<void(const char*const buff, std::size_t buffSize)>& fn);
+      void on_data(const std::function<void(const char*const buff, std::size_t buff_size)>& fn);
       void on_end(const std::function<void()>& fn);
       //----------------------------------------------------------------//
     };
@@ -42,4 +42,4 @@ namespace manifold
   }
 }
 
-#endif //IPSUITE_HTTP_INCOMING_MESSAGE_HPP
+#endif //MANIFOLD_HTTP_INCOMING_MESSAGE_HPP

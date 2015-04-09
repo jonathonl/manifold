@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef IPSUITE_TCP_HPP
-#define IPSUITE_TCP_HPP
+#ifndef MANIFOLD_TCP_HPP
+#define MANIFOLD_TCP_HPP
 
 #include "asio.hpp"
 #include "socket.hpp"
@@ -38,4 +38,4 @@ namespace manifold
 }
 //################################################################//
 
-#endif // IPSUITE_TCP_HPP
+#endif // MANIFOLD_TCP_HPP

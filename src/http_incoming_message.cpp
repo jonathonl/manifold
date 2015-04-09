@@ -23,7 +23,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void incoming_message::on_data(const std::function<void(const char*const buff, std::size_t buffSize)>& fn)
+    void incoming_message::on_data(const std::function<void(const char*const buff, std::size_t buff_size)>& fn)
     {
       this->connection_->on_data_frame(this->stream_id_, fn);
     }

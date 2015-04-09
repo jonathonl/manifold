@@ -12,12 +12,51 @@ namespace manifold
     : socket_(std::move(sock))
     {
       std::cout << this->socket_.non_blocking() << ":" __FILE__ << "/" << __LINE__ << std::endl;
-    }
+
+      // header_table_size      = 0x1, // 4096
+      // enable_push            = 0x2, // 1
+      // max_concurrent_streams = 0x3, // (infinite)
+      // initial_window_size    = 0x4, // 65535
+      // max_frame_size         = 0x5, // 16384
+      // max_header_list_size   = 0x6  // (infinite)
+      this->settings_ =
+        {
+          { setting_code::header_table_size,    4096 },
+          { setting_code::enable_push,             1 },
+          { setting_code::initial_window_size, 65535 },
+          { setting_code::max_frame_size,      16384 }
+        };
+
+    };
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     connection::~connection()
     {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::run()
+    {
+      auto self = shared_from_this();
+      http::frame::recv_frame(this->socket_, this->incoming_frame_, [self](const std::error_code& ec)
+      {
+        if (ec)
+        {
+          // TODO: Handle error.
+        }
+        else
+        {
+          if (self->incoming_frame_.stream_id())
+          {
+            //self->streams_[self->incoming_frame_.stream_id()].frames_.push_back(std::move(self->incoming_frame_));
+          }
+          else
+          {
+          }
+        }
+      });
     }
     //----------------------------------------------------------------//
 
@@ -34,45 +73,51 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::on_data_frame(std::int32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn)
+    void connection::on_data_frame(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn)
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::on_end_frame(std::int32_t stream_id, const std::function<void()>& fn)
+    void connection::on_end_frame(std::uint32_t stream_id, const std::function<void()>& fn)
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::on_window_update(std::int32_t stream_id, const std::function<void()>& fn)
+    void connection::on_rst_stream_frame(std::uint32_t stream_id, std::function<void(const std::error_code& ec)>& fn)
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_headers_frame(std::int32_t stream_id, const message_head& head)
+    void connection::on_window_update(std::uint32_t stream_id, const std::function<void()>& fn)
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool connection::send_headers_frame(std::uint32_t stream_id, const message_head& head)
     {
       return false;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_data_frame(std::int32_t stream_id, const char*const data, std::size_t data_sz)
+    bool connection::send_data_frame(std::uint32_t stream_id, const char*const data, std::size_t data_sz)
     {
       return false;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::send_end_frame(std::int32_t stream_id)
+    void connection::send_end_frame(std::uint32_t stream_id)
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::send_end_frame(std::int32_t stream_id, const char*const data, std::size_t data_sz)
+    void connection::send_end_frame(std::uint32_t stream_id, const char*const data, std::size_t data_sz)
     {
     }
     //----------------------------------------------------------------//

@@ -7,7 +7,7 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    message::message(message_head& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
+    message::message(message_head& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
       : head_(head),
         connection_(conn),
         stream_id_(stream_id),
@@ -23,6 +23,19 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
+    //----------------------------------------------------------------//
+    std::uint32_t message::stream_id() const
+    {
+      return this->stream_id_;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void message::on_stream_reset(const std::function<void(const std::error_code& ec)>& cb)
+    {
+      this->connection_->on_rst_stream_frame(this->stream_id_, cb);
+    }
+    //----------------------------------------------------------------//
 
 //    //----------------------------------------------------------------//
 //    std::string message::errorMessage() const
@@ -36,3 +49,5 @@ namespace manifold
 //      }
 //    }
 //    //----------------------------------------------------------------//
+  }
+}

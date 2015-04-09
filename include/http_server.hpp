@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef IPSUITE_HTTP_SERVER_HPP
-#define IPSUITE_HTTP_SERVER_HPP
+#ifndef MANIFOLD_HTTP_SERVER_HPP
+#define MANIFOLD_HTTP_SERVER_HPP
 
 #include <regex>
 #include <functional>
@@ -89,4 +89,4 @@ namespace manifold
   }
 }
 
-#endif // IPSUITE_HTTP_SERVER_HPP
+#endif // MANIFOLD_HTTP_SERVER_HPP
