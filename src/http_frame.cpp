@@ -30,6 +30,15 @@ namespace manifold
     //****************************************************************//
     // data_frame
     //----------------------------------------------------------------//
+    data_frame::data_frame(const char*const data, std::uint32_t datasz)
+    {
+      this->buf_.resize(datasz + 1);
+      this->buf_[0] = '\0'; // pad length
+      memcpy(this->buf_.data() + 1, data, datasz);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     const char*const data_frame::data() const
     {
       return this->buf_.data() + 1;
@@ -62,6 +71,18 @@ namespace manifold
 
     //****************************************************************//
     // headers_frame
+    //----------------------------------------------------------------//
+    headers_frame::headers_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive)
+    {
+      this->buf_.resize(6 + header_block_sz);
+      this->buf_[0] = '\0'; // pad length
+      std::uint32_t tmp = (exclusive ? (0x80000000 ^ stream_dependency_id) : (0x7FFFFFFF & stream_dependency_id));
+      memcpy(this->buf_.data() + 1, &tmp, 4);
+      memcpy(this->buf_.data() + 5, &weight, 1);
+      memcpy(this->buf_.data() + 6, header_block, header_block_sz);
+    }
+    //----------------------------------------------------------------//
+
     //----------------------------------------------------------------//
     const char*const headers_frame::header_block_fragment() const
     {
@@ -124,6 +145,16 @@ namespace manifold
     //****************************************************************//
     // priority_frame
     //----------------------------------------------------------------//
+    priority_frame::priority_frame(std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive)
+    {
+      this->buf_.resize(5);
+      std::uint32_t tmp = (exclusive ? (0x80000000 ^ stream_dependency_id) : (0x7FFFFFFF & stream_dependency_id));
+      memcpy(this->buf_.data(), &tmp, 4);
+      memcpy(this->buf_.data() + 4, &weight, 1);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     std::uint8_t priority_frame::weight() const
     {
       std::uint8_t ret;
@@ -155,6 +186,14 @@ namespace manifold
     //****************************************************************//
     // rst_stream_frame
     //----------------------------------------------------------------//
+    rst_stream_frame::rst_stream_frame(http::errc error_code)
+    {
+      this->buf_.resize(4);
+      memcpy(this->buf_.data(), &error_code, 4);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     http::errc rst_stream_frame::error_code() const
     {
       http::errc ret;
@@ -167,6 +206,30 @@ namespace manifold
     //****************************************************************//
     // settings_frame
     //----------------------------------------------------------------//
+    settings_frame::settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end)
+      : settings_(beg, end)
+    {
+      this->serialize_settings();
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void settings_frame::serialize_settings()
+    {
+      this->buf_.resize(6*this->settings_.size());
+      std::size_t pos = 0;
+      for (auto it = this->settings_.begin(); it != this->settings_.end(); ++it)
+      {
+        std::uint16_t key;
+        std::uint32_t value;
+        memcpy(&this->buf_[pos], &(it->first),  2);
+        memcpy(&this->buf_[pos + 2], &(it->second),  4);
+        pos = pos + 6;
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     void settings_frame::deserialize_settings()
     {
       std::size_t bytesToParse = this->buf_.size();
@@ -176,7 +239,7 @@ namespace manifold
         std::uint16_t key;
         std::uint32_t value;
         memcpy(&key, &this->buf_[pos], 2);
-        memcpy(&key, &this->buf_[pos + 2], 4);
+        memcpy(&value, &this->buf_[pos + 2], 4);
         this->settings_.push_back(std::pair<std::uint16_t,std::uint32_t>(key, value));
         pos = pos + 6;
         bytesToParse = bytesToParse - 6;
@@ -185,7 +248,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::vector<std::pair<std::uint16_t,std::uint32_t>>::const_iterator settings_frame::begin()
+    std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator settings_frame::begin()
     {
       if (this->settings_.empty())
         this->deserialize_settings();
@@ -194,7 +257,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::vector<std::pair<std::uint16_t,std::uint32_t>>::const_iterator settings_frame::end()
+    std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator settings_frame::end()
     {
       if (this->settings_.empty())
         this->deserialize_settings();
@@ -214,6 +277,17 @@ namespace manifold
 
     //****************************************************************//
     // push_promise_frame
+    //----------------------------------------------------------------//
+    push_promise_frame::push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id)
+    {
+      this->buf_.resize(5 + header_block_sz);
+      this->buf_[0] = '\0'; // pad length
+      std::uint32_t tmp = (0x7FFFFFFF & promise_stream_id);
+      memcpy(this->buf_.data() + 1, &tmp, 4);
+      memcpy(this->buf_.data() + 5, header_block, header_block_sz);
+    }
+    //----------------------------------------------------------------//
+
     //----------------------------------------------------------------//
     const char*const push_promise_frame::header_block_fragment() const
     {
@@ -255,7 +329,38 @@ namespace manifold
     //****************************************************************//
 
     //****************************************************************//
+    // ping_frame
+    //----------------------------------------------------------------//
+    ping_frame::ping_frame(std::uint64_t ping_data)
+    {
+      this->buf_.resize(8);
+      memcpy(this->buf_.data(), &ping_data, 8);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    std::uint64_t ping_frame::data() const
+    {
+      std::uint64_t ret;
+      memcpy(&ret, this->buf_.data(), 8);
+      return ret;
+    }
+    //----------------------------------------------------------------//
+    //****************************************************************//
+
+    //****************************************************************//
     // goaway_frame
+    //----------------------------------------------------------------//
+    goaway_frame::goaway_frame(std::uint32_t last_stream_id, std::uint32_t error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz)
+    {
+      this->buf_.resize(8 + addl_error_data_sz);
+      std::uint32_t tmp = 0x7FFFFFFF & last_stream_id;
+      memcpy(this->buf_.data(), &tmp, 4);
+      memcpy(this->buf_.data() + 4, &error_code, 4);
+      memcpy(this->buf_.data() + 8, addl_error_data, addl_error_data_sz);
+    }
+    //----------------------------------------------------------------//
+
     //----------------------------------------------------------------//
     std::uint32_t goaway_frame::last_stream_id() const
     {
@@ -292,6 +397,15 @@ namespace manifold
     //****************************************************************//
     // window_update_frame
     //----------------------------------------------------------------//
+    window_update_frame::window_update_frame(std::uint32_t window_size_increment)
+    {
+      this->buf_.resize(4);
+      std::uint32_t tmp = 0x7FFFFFFF & window_size_increment;
+      memcpy(this->buf_.data(), &tmp, 4);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     std::uint32_t window_update_frame::window_size_increment() const
     {
       std::uint32_t ret;
@@ -303,6 +417,14 @@ namespace manifold
 
     //****************************************************************//
     // continuation_frame
+    //----------------------------------------------------------------//
+    continuation_frame::continuation_frame(const char*const header_data, std::uint32_t header_data_sz)
+    {
+      this->buf_.resize(header_data_sz);
+      memcpy(this->buf_.data(), header_data, header_data_sz);
+    }
+    //----------------------------------------------------------------//
+
     //----------------------------------------------------------------//
     const char*const continuation_frame::header_block_fragment() const
     {

@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef MANIFOLD_HTTP_ERROR_CATEGORY_HPP
+#define MANIFOLD_HTTP_ERROR_CATEGORY_HPP
+
 #include <string>
 #include <system_error>
 
@@ -63,6 +66,6 @@ namespace manifold
 }
 
 
-
-
   //error_condition make_error_condition(BridgeDB::BTree::errc e);
+
+#endif //MANIFOLD_HTTP_ERROR_CATEGORY_HPP

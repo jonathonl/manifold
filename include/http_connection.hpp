@@ -3,6 +3,7 @@
 #ifndef MANIFOLD_HTTP_CONNECTION_HPP
 #define MANIFOLD_HTTP_CONNECTION_HPP
 
+#include <random>
 #include <list>
 #include <queue>
 #include <map>
@@ -12,6 +13,7 @@
 #include "asio.hpp"
 #include "http_frame.hpp"
 #include "http_message_head.hpp"
+#include "http_stream_dependency_tree.hpp"
 
 namespace manifold
 {
@@ -42,6 +44,32 @@ namespace manifold
 
         std::queue<frame> incoming_frames;
         std::queue<frame> outgoing_frames;
+
+        std::uint32_t stream_dependency_id;
+        std::uint8_t weight;
+      };
+      //================================================================//
+
+      //================================================================//
+      class stream_dependency_tree
+      {
+      private:
+        //----------------------------------------------------------------//
+        std::vector<stream_dependency_tree> children_;
+        stream* stream_ptr_;
+        //----------------------------------------------------------------//
+      public:
+        //----------------------------------------------------------------//
+        stream_dependency_tree(stream* stream_ptr);
+        stream_dependency_tree(stream* stream_ptr, const std::vector<stream_dependency_tree>& children);
+        ~stream_dependency_tree() {}
+        //----------------------------------------------------------------//
+
+
+        //----------------------------------------------------------------//
+        stream* stream_ptr() const;
+        const std::vector<stream_dependency_tree>& children() const;
+        //----------------------------------------------------------------//
       };
       //================================================================//
     private:
@@ -50,6 +78,7 @@ namespace manifold
       std::map<setting_code,std::uint32_t> settings_;
       bool started_;
       bool send_loop_running_;
+      std::minstd_rand rg_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -62,10 +91,13 @@ namespace manifold
       std::map<std::uint32_t,stream> streams_;
       http::frame incoming_frame_;
       http::frame outgoing_frame_;
-      std::queue<std::uint32_t> stream_outgoing_process_queue_; // TODO: Implement dependency trees.
+      stream_dependency_tree stream_dependency_tree_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
+      stream* get_next_send_stream_ptr(const stream_dependency_tree& current_node = stream_dependency_tree_);
+      static bool check_tree_for_outgoing_frame(const stream_dependency_tree& current_node);
+
       void run_recv_loop();
       void run_send_loop();
       //----------------------------------------------------------------//
