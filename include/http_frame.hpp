@@ -34,25 +34,42 @@ namespace manifold
 //    };
     //================================================================//
 
+
+    //================================================================//
+    class frame_flag
+    {
+    public:
+      static const std::uint8_t end_stream  = 0x01;
+      static const std::uint8_t end_headers = 0x04;
+      static const std::uint8_t padded      = 0x08;
+      static const std::uint8_t priority    = 0x20;
+    };
+    //================================================================//
+
     //================================================================//
     class frame_payload_base
     {
     protected:
       std::vector<char> buf_;
+      std::uint8_t flags_;
     public:
-      frame_payload_base() {}
+      frame_payload_base(std::uint8_t flags) : flags_(flags) {}
       ~frame_payload_base() {}
+
+      std::uint8_t flags() const;
       std::uint32_t serialized_length() const;
-      static void recv_frame_payload(asio::ip::tcp::socket& sock, frame_payload_base& destination, std::uint32_t payload_size, const std::function<void(const std::error_code& ec)>& cb);
+      static void recv_frame_payload(asio::ip::tcp::socket& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
     };
     //================================================================//
 
     //================================================================//
     class data_frame : public frame_payload_base
     {
+    private:
+      std::uint8_t bytes_required_for_pad_length() const { return (std::uint8_t)(this->flags_ & frame_flag::padded ? 1 : 0); }
     public:
-      data_frame() {}
-      data_frame(const char*const data, std::uint32_t datasz);
+      data_frame() : frame_payload_base(0) {}
+      data_frame(const char*const data, std::uint32_t datasz, std::uint8_t flags);
       ~data_frame() {}
 
       const char*const data() const;
@@ -66,8 +83,8 @@ namespace manifold
     class headers_frame : public frame_payload_base
     {
     public:
-      headers_frame() {}
-      headers_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive);
+      headers_frame() : frame_payload_base(0) {}
+      headers_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive, std::uint8_t flags);
       ~headers_frame() {}
 
       const char*const header_block_fragment() const;
@@ -84,8 +101,8 @@ namespace manifold
     class priority_frame : public frame_payload_base
     {
     public:
-      priority_frame() {}
-      priority_frame(std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive);
+      priority_frame() : frame_payload_base(0) {}
+      priority_frame(std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive, std::uint8_t flags);
       ~priority_frame() {}
 
       std::uint8_t weight() const;
@@ -98,8 +115,8 @@ namespace manifold
     class rst_stream_frame : public frame_payload_base
     {
     public:
-      rst_stream_frame() {}
-      rst_stream_frame(http::errc error_code);
+      rst_stream_frame() : frame_payload_base(0) {}
+      rst_stream_frame(http::errc error_code, std::uint8_t flags);
       ~rst_stream_frame() {}
 
       http::errc error_code() const;
@@ -114,8 +131,8 @@ namespace manifold
       void serialize_settings();
       void deserialize_settings();
     public:
-      settings_frame() {}
-      settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end);
+      settings_frame() : frame_payload_base(0) {}
+      settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end, std::uint8_t flags);
       ~settings_frame() {}
 
 
@@ -129,8 +146,8 @@ namespace manifold
     class push_promise_frame : public frame_payload_base
     {
     public:
-      push_promise_frame() {}
-      push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id);
+      push_promise_frame() : frame_payload_base(0) {}
+      push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id, std::uint8_t flags);
       ~push_promise_frame() {}
 
       const char*const header_block_fragment() const;
@@ -145,8 +162,8 @@ namespace manifold
     class ping_frame : public frame_payload_base
     {
     public:
-      ping_frame() {}
-      ping_frame(std::uint64_t ping_data);
+      ping_frame() : frame_payload_base(0) {}
+      ping_frame(std::uint64_t ping_data, std::uint8_t flags);
       ~ping_frame() {}
 
       std::uint64_t data() const;
@@ -157,8 +174,8 @@ namespace manifold
     class goaway_frame : public frame_payload_base
     {
     public:
-      goaway_frame() {}
-      goaway_frame(std::uint32_t last_stream_id, std::uint32_t error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz);
+      goaway_frame() : frame_payload_base(0) {}
+      goaway_frame(std::uint32_t last_stream_id, std::uint32_t error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz, std::uint8_t flags);
       ~goaway_frame() {}
 
       std::uint32_t last_stream_id() const;
@@ -172,8 +189,8 @@ namespace manifold
     class window_update_frame : public frame_payload_base
     {
     public:
-      window_update_frame() {}
-      window_update_frame(std::uint32_t window_size_increment);
+      window_update_frame() : frame_payload_base(0) {}
+      window_update_frame(std::uint32_t window_size_increment, std::uint8_t flags);
       ~window_update_frame() {}
 
       std::uint32_t window_size_increment() const;
@@ -184,8 +201,8 @@ namespace manifold
     class continuation_frame : public frame_payload_base
     {
     public:
-      continuation_frame() {}
-      continuation_frame(const char*const header_data, std::uint32_t header_data_sz);
+      continuation_frame() : frame_payload_base(0) {}
+      continuation_frame(const char*const header_data, std::uint32_t header_data_sz, std::uint8_t flags);
       ~continuation_frame() {}
 
       const char*const header_block_fragment() const;
@@ -241,7 +258,7 @@ namespace manifold
         http::priority_frame      priority_frame_;
         http::rst_stream_frame    rst_stream_frame_;
         http::settings_frame      settings_frame_;
-        http::push_promise_frame  push_promise_frame_
+        http::push_promise_frame  push_promise_frame_;
         http::ping_frame          ping_frame_;
         http::goaway_frame        goaway_frame_;
         http::window_update_frame window_update_frame_;
@@ -263,21 +280,24 @@ namespace manifold
       //----------------------------------------------------------------//
       void destroy_union();
       void init_meta(frame_type t, std::uint32_t payload_length, std::uint32_t stream_id, std::uint8_t flags);
+      std::uint8_t flags() const;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
       frame();
-      frame(http::data_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
-      frame(http::headers_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
-      frame(http::priority_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
-      frame(http::rst_stream_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
-      frame(http::settings_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
-      frame(http::push_promise_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
-      frame(http::ping_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
-      frame(http::goaway_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
-      frame(http::window_update_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
-      frame(http::continuation_frame&& payload, std::uint32_t stream_id, std::uint8_t flags);
+      frame(http::data_frame&& payload, std::uint32_t stream_id);
+      frame(http::headers_frame&& payload, std::uint32_t stream_id);
+      frame(http::priority_frame&& payload, std::uint32_t stream_id);
+      frame(http::rst_stream_frame&& payload, std::uint32_t stream_id);
+      frame(http::settings_frame&& payload, std::uint32_t stream_id);
+      frame(http::push_promise_frame&& payload, std::uint32_t stream_id);
+      frame(http::ping_frame&& payload, std::uint32_t stream_id);
+      frame(http::goaway_frame&& payload, std::uint32_t stream_id);
+      frame(http::window_update_frame&& payload, std::uint32_t stream_id);
+      frame(http::continuation_frame&& payload, std::uint32_t stream_id);
+      frame(frame&& source) {}
       ~frame();
+      frame& operator=(frame&& source) { return (*this); }
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -286,7 +306,6 @@ namespace manifold
 
       std::uint32_t payload_length();
       frame_type type() const;
-      std::uint8_t flags() const;
       std::uint32_t stream_id() const;
       //----------------------------------------------------------------//
 

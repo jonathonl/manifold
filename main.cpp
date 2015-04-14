@@ -41,9 +41,7 @@ void resolve_handler(const std::error_code &ec,
 
 int main()
 {
-  manifold::Socket s;
 
-  manifold::http::server::request r(manifold::http::request_head(), s);
 
   manifold::http::server srv(ioservice);
   srv.listen(8080, "0.0.0.0");

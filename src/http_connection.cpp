@@ -8,14 +8,21 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    connection::stream_dependency_tree::stream_dependency_tree(stream* stream_ptr, const std::vector<stream_dependency_tree>& children)
-      : stream_ptr_(stream_ptr), children_(children)
+    connection::stream_dependency_tree::stream_dependency_tree(stream* stream_ptr)
+      : stream_ptr_(stream_ptr)
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    stream* connection::stream_dependency_tree::stream_ptr() const
+    connection::stream_dependency_tree::stream_dependency_tree(stream* stream_ptr, const std::vector<stream_dependency_tree>& children)
+      : children_(children), stream_ptr_(stream_ptr)
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    connection::stream* connection::stream_dependency_tree::stream_ptr() const
     {
       return this->stream_ptr_;
     }
@@ -24,14 +31,15 @@ namespace manifold
     //----------------------------------------------------------------//
     const std::vector<connection::stream_dependency_tree>& connection::stream_dependency_tree::children() const
     {
+      return this->children_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     connection::connection(asio::ip::tcp::socket&& sock)
-    : socket_(std::move(sock)), stream_dependency_tree_(0, 16)
+    : socket_(std::move(sock)), stream_dependency_tree_(nullptr)
     {
-      std::seed_seq seed({(std::uint32_t)this, (std::uint32_t)&sock});
+      std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this), static_cast<std::uint32_t>((std::uint64_t)&sock)});
       this->rg_.seed(seed);
 
       std::cout << this->socket_.non_blocking() << ":" __FILE__ << "/" << __LINE__ << std::endl;
@@ -83,13 +91,13 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    stream* connection::get_next_send_stream_ptr(const stream_dependency_tree& current_node)
+    connection::stream* connection::get_next_send_stream_ptr(const stream_dependency_tree& current_node)
     {
       // TODO: enforce a max tree depth of 10 to avoid stack overflow from recursion.
       stream* ret = nullptr;
 
       std::uint64_t weight_sum = 0;
-      std::vector<stream_dependency_tree*> pool;
+      std::vector<const stream_dependency_tree*> pool;
 
       for (auto it = current_node.children().begin(); it != current_node.children().end(); ++it)
       {
@@ -106,8 +114,8 @@ namespace manifold
         std::uint64_t current_sum = 0;
         for (auto it = pool.begin(); it != pool.end(); ++it)
         {
-          stream_dependency_tree* current_pool_node = (*it);
-          current_sum += current_pool_node->stream_ptr()->weight + 1);
+          const stream_dependency_tree* current_pool_node = (*it);
+          current_sum += (current_pool_node->stream_ptr()->weight + 1);
           if (sum_index <= current_sum)
           {
             if (current_pool_node->stream_ptr()->outgoing_frames.size())
@@ -157,7 +165,7 @@ namespace manifold
 
         auto self = shared_from_this();
 
-        stream* prioritized_stream_ptr = this->get_next_send_stream_ptr();
+        stream* prioritized_stream_ptr = this->get_next_send_stream_ptr(this->stream_dependency_tree_);
 
         if (prioritized_stream_ptr)
         {
@@ -166,7 +174,7 @@ namespace manifold
 
           http::frame::send_frame(this->socket_, this->outgoing_frame_, [self](const std::error_code& ec)
           {
-            this->send_loop_running_ = false;
+            self->send_loop_running_ = false;
             if (ec)
             {
               // TODO: Handle error.
@@ -222,7 +230,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::on_rst_stream_frame(std::uint32_t stream_id, std::function<void(const std::error_code& ec)>& fn)
+    void connection::on_rst_stream_frame(std::uint32_t stream_id, const std::function<void(const std::error_code& ec)>& fn)
     {
     }
     //----------------------------------------------------------------//
@@ -249,7 +257,7 @@ namespace manifold
 
       if (it != this->streams_.end())
       {
-        it->second.outgoing_frames.push(http::frame(http::data_frame(data, data_sz), stream_id, ))
+        it->second.outgoing_frames.push(http::frame(http::data_frame(data, data_sz, (end_stream ? frame_flag::end_stream : 0x0)), stream_id));
       }
 
       return ret;

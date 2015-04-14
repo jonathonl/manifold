@@ -10,6 +10,13 @@ namespace manifold
     //****************************************************************//
     // frame_payload_base
     //----------------------------------------------------------------//
+    std::uint8_t frame_payload_base::flags() const
+    {
+      return this->flags_;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     std::uint32_t frame_payload_base::serialized_length() const
     {
       return (std::uint32_t)this->buf_.size();
@@ -17,10 +24,11 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void frame_payload_base::recv_frame_payload(asio::ip::tcp::socket& sock, frame_payload_base& destination, std::uint32_t payload_size, const std::function<void(const std::error_code& ec)>& cb)
+    void frame_payload_base::recv_frame_payload(asio::ip::tcp::socket& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb)
     {
+      destination.flags_ = flags;
       destination.buf_.resize(payload_size);
-      asio::async_read(sock, asio::buffer(destination.buf_.data(), payload_size), cb);
+      asio::async_read(sock, asio::buffer(destination.buf_.data(), payload_size), [cb](const std::error_code& ec, std::size_t bytes_read) { (cb ? cb(ec) : void()); });
     }
     //----------------------------------------------------------------//
     //****************************************************************//
@@ -30,40 +38,43 @@ namespace manifold
     //****************************************************************//
     // data_frame
     //----------------------------------------------------------------//
-    data_frame::data_frame(const char*const data, std::uint32_t datasz)
+    data_frame::data_frame(const char*const data, std::uint32_t datasz, std::uint8_t flags) : frame_payload_base(flags)
     {
-      this->buf_.resize(datasz + 1);
-      this->buf_[0] = '\0'; // pad length
-      memcpy(this->buf_.data() + 1, data, datasz);
+      this->buf_.resize(datasz); // + this->bytes_required_for_pad_length());
+//      if (this->bytes_required_for_pad_length())
+//        this->buf_[0] = '\0'; // pad length
+//      memcpy(this->buf_.data() + this->bytes_required_for_pad_length(), data, datasz);
+      memcpy(this->buf_.data(), data, datasz);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     const char*const data_frame::data() const
     {
-      return this->buf_.data() + 1;
+      return this->buf_.data() + this->bytes_required_for_pad_length();
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     std::uint32_t data_frame::data_length() const
     {
-      return (std::uint32_t)(this->buf_.size() - (this->pad_length() + 1));
+      return (std::uint32_t)(this->buf_.size() - (this->pad_length() + this->bytes_required_for_pad_length()));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     const char*const data_frame::padding() const
     {
-      return this->buf_.data() + 1 + this->data_length();
+      return this->buf_.data() + this->bytes_required_for_pad_length() + this->data_length();
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     std::uint8_t data_frame::pad_length() const
     {
-      std::uint8_t ret;
-      memcpy(&ret, this->buf_.data(), 1);
+      std::uint8_t ret = 0;
+      if (this->bytes_required_for_pad_length())
+        memcpy(&ret, this->buf_.data(), 1);
       return ret;
     }
     //----------------------------------------------------------------//
@@ -72,7 +83,7 @@ namespace manifold
     //****************************************************************//
     // headers_frame
     //----------------------------------------------------------------//
-    headers_frame::headers_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive)
+    headers_frame::headers_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive, std::uint8_t flags) : frame_payload_base(flags)
     {
       this->buf_.resize(6 + header_block_sz);
       this->buf_[0] = '\0'; // pad length
@@ -145,7 +156,7 @@ namespace manifold
     //****************************************************************//
     // priority_frame
     //----------------------------------------------------------------//
-    priority_frame::priority_frame(std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive)
+    priority_frame::priority_frame(std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive, std::uint8_t flags) : frame_payload_base(flags)
     {
       this->buf_.resize(5);
       std::uint32_t tmp = (exclusive ? (0x80000000 ^ stream_dependency_id) : (0x7FFFFFFF & stream_dependency_id));
@@ -186,7 +197,7 @@ namespace manifold
     //****************************************************************//
     // rst_stream_frame
     //----------------------------------------------------------------//
-    rst_stream_frame::rst_stream_frame(http::errc error_code)
+    rst_stream_frame::rst_stream_frame(http::errc error_code, std::uint8_t flags) : frame_payload_base(flags)
     {
       this->buf_.resize(4);
       memcpy(this->buf_.data(), &error_code, 4);
@@ -206,8 +217,8 @@ namespace manifold
     //****************************************************************//
     // settings_frame
     //----------------------------------------------------------------//
-    settings_frame::settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end)
-      : settings_(beg, end)
+    settings_frame::settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end, std::uint8_t flags)
+      : frame_payload_base(flags), settings_(beg, end)
     {
       this->serialize_settings();
     }
@@ -278,7 +289,7 @@ namespace manifold
     //****************************************************************//
     // push_promise_frame
     //----------------------------------------------------------------//
-    push_promise_frame::push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id)
+    push_promise_frame::push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id, std::uint8_t flags) : frame_payload_base(flags)
     {
       this->buf_.resize(5 + header_block_sz);
       this->buf_[0] = '\0'; // pad length
@@ -331,7 +342,7 @@ namespace manifold
     //****************************************************************//
     // ping_frame
     //----------------------------------------------------------------//
-    ping_frame::ping_frame(std::uint64_t ping_data)
+    ping_frame::ping_frame(std::uint64_t ping_data, std::uint8_t flags) : frame_payload_base(flags)
     {
       this->buf_.resize(8);
       memcpy(this->buf_.data(), &ping_data, 8);
@@ -351,7 +362,7 @@ namespace manifold
     //****************************************************************//
     // goaway_frame
     //----------------------------------------------------------------//
-    goaway_frame::goaway_frame(std::uint32_t last_stream_id, std::uint32_t error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz)
+    goaway_frame::goaway_frame(std::uint32_t last_stream_id, std::uint32_t error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz, std::uint8_t flags) : frame_payload_base(flags)
     {
       this->buf_.resize(8 + addl_error_data_sz);
       std::uint32_t tmp = 0x7FFFFFFF & last_stream_id;
@@ -397,7 +408,7 @@ namespace manifold
     //****************************************************************//
     // window_update_frame
     //----------------------------------------------------------------//
-    window_update_frame::window_update_frame(std::uint32_t window_size_increment)
+    window_update_frame::window_update_frame(std::uint32_t window_size_increment, std::uint8_t flags) : frame_payload_base(flags)
     {
       this->buf_.resize(4);
       std::uint32_t tmp = 0x7FFFFFFF & window_size_increment;
@@ -418,7 +429,7 @@ namespace manifold
     //****************************************************************//
     // continuation_frame
     //----------------------------------------------------------------//
-    continuation_frame::continuation_frame(const char*const header_data, std::uint32_t header_data_sz)
+    continuation_frame::continuation_frame(const char*const header_data, std::uint32_t header_data_sz, std::uint8_t flags) : frame_payload_base(flags)
     {
       this->buf_.resize(header_data_sz);
       memcpy(this->buf_.data(), header_data, header_data_sz);
@@ -446,97 +457,97 @@ namespace manifold
     frame::frame()
       //: metadata_{{'\0','\0','\0','\0','\0','\0','\0','\0','\0'}}
     {
-      this->metadata_ = {'\0'};
+      this->metadata_.fill('\0');
       frame_type t = frame_type::invalid_type;
       memcpy(this->metadata_.data() + 3, &t, 1);
     };
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    frame::frame(http::data_frame&& payload, std::uint32_t stream_id, std::uint8_t flags)
+    frame::frame(http::data_frame&& payload, std::uint32_t stream_id)
     {
-      this->init_meta(frame_type::data, payload.serialized_length(), stream_id, flags);
+      this->init_meta(frame_type::data, payload.serialized_length(), stream_id, payload.flags());
       new (&this->payload_.data_frame_) http::data_frame();
       this->payload_.data_frame_ = std::move(payload);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    frame::frame(http::headers_frame&& payload, std::uint32_t stream_id, std::uint8_t flags)
+    frame::frame(http::headers_frame&& payload, std::uint32_t stream_id)
     {
-      this->init_meta(frame_type::headers, payload.serialized_length(), stream_id, flags);
+      this->init_meta(frame_type::headers, payload.serialized_length(), stream_id, payload.flags());
       new (&this->payload_.headers_frame_) http::headers_frame();
       this->payload_.headers_frame_ = std::move(payload);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    frame::frame(http::priority_frame&& payload, std::uint32_t stream_id, std::uint8_t flags)
+    frame::frame(http::priority_frame&& payload, std::uint32_t stream_id)
     {
-      this->init_meta(frame_type::priority, payload.serialized_length(), stream_id, flags);
+      this->init_meta(frame_type::priority, payload.serialized_length(), stream_id, payload.flags());
       new (&this->payload_.priority_frame_) http::priority_frame();
       this->payload_.priority_frame_ = std::move(payload);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    frame::frame(http::rst_stream_frame&& payload, std::uint32_t stream_id, std::uint8_t flags)
+    frame::frame(http::rst_stream_frame&& payload, std::uint32_t stream_id)
     {
-      this->init_meta(frame_type::rst_stream, payload.serialized_length(), stream_id, flags);
+      this->init_meta(frame_type::rst_stream, payload.serialized_length(), stream_id, payload.flags());
       new (&this->payload_.rst_stream_frame_) http::rst_stream_frame();
       this->payload_.rst_stream_frame_ = std::move(payload);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    frame::frame(http::settings_frame&& payload, std::uint32_t stream_id, std::uint8_t flags)
+    frame::frame(http::settings_frame&& payload, std::uint32_t stream_id)
     {
-      this->init_meta(frame_type::settings, payload.serialized_length(), stream_id, flags);
+      this->init_meta(frame_type::settings, payload.serialized_length(), stream_id, payload.flags());
       new (&this->payload_.settings_frame_) http::settings_frame();
       this->payload_.settings_frame_ = std::move(payload);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    frame::frame(http::push_promise_frame&& payload, std::uint32_t stream_id, std::uint8_t flags)
+    frame::frame(http::push_promise_frame&& payload, std::uint32_t stream_id)
     {
-      this->init_meta(frame_type::push_promise, payload.serialized_length(), stream_id, flags);
+      this->init_meta(frame_type::push_promise, payload.serialized_length(), stream_id, payload.flags());
       new (&this->payload_.push_promise_frame_) http::push_promise_frame();
       this->payload_.push_promise_frame_ = std::move(payload);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    frame::frame(http::ping_frame&& payload, std::uint32_t stream_id, std::uint8_t flags)
+    frame::frame(http::ping_frame&& payload, std::uint32_t stream_id)
     {
-      this->init_meta(frame_type::ping, payload.serialized_length(), stream_id, flags);
+      this->init_meta(frame_type::ping, payload.serialized_length(), stream_id, payload.flags());
       new (&this->payload_.ping_frame_) http::ping_frame();
       this->payload_.ping_frame_ = std::move(payload);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    frame::frame(http::goaway_frame&& payload, std::uint32_t stream_id, std::uint8_t flags)
+    frame::frame(http::goaway_frame&& payload, std::uint32_t stream_id)
     {
-      this->init_meta(frame_type::goaway, payload.serialized_length(), stream_id, flags);
+      this->init_meta(frame_type::goaway, payload.serialized_length(), stream_id, payload.flags());
       new (&this->payload_.goaway_frame_) http::goaway_frame();
       this->payload_.goaway_frame_ = std::move(payload);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    frame::frame(http::window_update_frame&& payload, std::uint32_t stream_id, std::uint8_t flags)
+    frame::frame(http::window_update_frame&& payload, std::uint32_t stream_id)
     {
-      this->init_meta(frame_type::window_update, payload.serialized_length(), stream_id, flags);
+      this->init_meta(frame_type::window_update, payload.serialized_length(), stream_id, payload.flags());
       new (&this->payload_.window_update_frame_) http::window_update_frame();
       this->payload_.window_update_frame_ = std::move(payload);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    frame::frame(http::continuation_frame&& payload, std::uint32_t stream_id, std::uint8_t flags)
+    frame::frame(http::continuation_frame&& payload, std::uint32_t stream_id)
     {
-      this->init_meta(frame_type::continuation, payload.serialized_length(), stream_id, flags);
+      this->init_meta(frame_type::continuation, payload.serialized_length(), stream_id, payload.flags());
       new (&this->payload_.continuation_frame_) http::continuation_frame();
       this->payload_.continuation_frame_ = std::move(payload);
     }
@@ -557,128 +568,6 @@ namespace manifold
       memcpy(this->metadata_.data() + 4, &flags, 1);
       memcpy(this->metadata_.data() + 5, &stream_id, 4); // assuming first bit is zero.
     };
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void frame::destroy_union()
-    {
-      if (this->is<http::data_frame>())
-      {
-        this->payload_.data_frame_.~data_frame();
-      }
-      else if (this->is<http::headers_frame>())
-      {
-        this->payload_.headers_frame_.~headers_frame();
-      }
-      else if (this->is<http::priority_frame>())
-      {
-        this->payload_.priority_frame_.~priority_frame();
-      }
-      else if (this->is<http::rst_stream_frame>())
-      {
-        this->payload_.rst_stream_frame_.~rst_stream_frame();
-      }
-      else if (this->is<http::settings_frame>())
-      {
-        this->payload_.settings_frame_.~settings_frame();
-      }
-      else if (this->is<http::push_promise_frame>())
-      {
-        this->payload_.push_promise_frame_.~push_promise_frame();
-      }
-      else if (this->is<http::ping_frame>())
-      {
-        this->payload_.ping_frame_.~ing_frame();
-      }
-      else if (this->is<http::goaway_frame>())
-      {
-        this->payload_.goaway_frame_.~goaway_frame();
-      }
-      else if (this->is<http::window_update_frame>())
-      {
-        this->payload_.window_update_frame_.~window_update_frame();
-      }
-      else if (this->is<http::continuation_frame>())
-      {
-        this->payload_.continuation_frame_.~continuation_frame();
-      }
-      frame_type t = frame_type::invalid_type;
-      memcpy(this->metadata_.data() + 3, &t, 1);
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void frame::recv_frame(asio::ip::tcp::socket& sock, frame& destination, const std::function<void(const std::error_code& ec)>& cb)
-    {
-      destination.destroy_union();
-      asio::async_read(sock, asio::buffer(destination.metadata_.data(), 9), [&sock, &destination, cb](const std::error_code& ec, std::size_t bytes_read)
-      {
-        if (ec)
-        {
-          cb ? cb(ec) : void();
-        }
-        else
-        {
-          if (destination.is<http::data_frame>())
-          {
-            new (&destination.payload_.data_frame_) http::data_frame();
-            frame_payload_base::recv_frame_payload(sock, destination.payload_.data_frame_, destination.payload_length(), cb);
-          }
-          else if (destination.is<http::headers_frame>())
-          {
-            new (&destination.payload_.headers_frame_) http::headers_frame();
-            frame_payload_base::recv_frame_payload(sock, destination.payload_.headers_frame_, destination.payload_length(), cb);
-          }
-          else if (destination.is<http::priority_frame>())
-          {
-            new (&destination.payload_.priority_frame_) http::priority_frame();
-            frame_payload_base::recv_frame_payload(sock, destination.payload_.priority_frame_, destination.payload_length(), cb);
-          }
-          else if (destination.is<http::rst_stream_frame>())
-          {
-            new (&destination.payload_.rst_stream_frame_) http::rst_stream_frame();
-            frame_payload_base::recv_frame_payload(sock, destination.payload_.rst_stream_frame_, destination.payload_length(), cb);
-          }
-          else if (destination.is<http::settings_frame>())
-          {
-            new (&destination.payload_.settings_frame_) http::settings_frame();
-            frame_payload_base::recv_frame_payload(sock, destination.payload_.settings_frame_, destination.payload_length(), cb);
-          }
-          else if (destination.is<http::push_promise_frame>())
-          {
-            new (&destination.payload_.push_promise_frame_) http::push_promise_frame();
-            frame_payload_base::recv_frame_payload(sock, destination.payload_.push_promise_frame_, destination.payload_length(), cb);
-          }
-          else if (destination.is<http::ping_frame>())
-          {
-            new (&destination.payload_.ping_frame_) http::ping_frame();
-            frame_payload_base::recv_frame_payload(sock, destination.payload_.ping_frame_, destination.payload_length(), cb);
-          }
-          else if (destination.is<http::goaway_frame>())
-          {
-            new (&destination.payload_.goaway_frame_) http::goaway_frame();
-            frame_payload_base::recv_frame_payload(sock, destination.payload_.goaway_frame_, destination.payload_length(), cb);
-          }
-          else if (destination.is<http::window_update_frame>())
-          {
-            new (&destination.payload_.window_update_frame_) http::window_update_frame();
-            frame_payload_base::recv_frame_payload(sock, destination.payload_.window_update_frame_, destination.payload_length(), cb);
-          }
-          else if (destination.is<http::continuation_frame>())
-          {
-            new (&destination.payload_.continuation_frame_) http::continuation_frame();
-            frame_payload_base::recv_frame_payload(sock, destination.payload_.continuation_frame_, destination.payload_length(), cb);
-          }
-          else
-          {
-            frame_type t = frame_type::invalid_type;
-            memcpy(destination.metadata_.data() + 3, &t, 1);
-            // TODO: Invalid Frame Error;
-            cb ? cb(std::make_error_code(std::errc::bad_message)) : void();
-          }
-        }
-      });
-    }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
@@ -762,6 +651,128 @@ namespace manifold
     const http::goaway_frame&         frame::goaway_frame()        const { return this->type() == frame_type::goaway         ? this->payload_.goaway_frame_         : frame::default_goaway_frame_        ; }
     const http::window_update_frame&  frame::window_update_frame() const { return this->type() == frame_type::window_update  ? this->payload_.window_update_frame_  : frame::default_window_update_frame_ ; }
     const http::continuation_frame&   frame::continuation_frame()  const { return this->type() == frame_type::continuation   ? this->payload_.continuation_frame_   : frame::default_continuation_frame_  ; }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void frame::destroy_union()
+    {
+      if (this->is<http::data_frame>())
+      {
+        this->payload_.data_frame_.~data_frame();
+      }
+      else if (this->is<http::headers_frame>())
+      {
+        this->payload_.headers_frame_.~headers_frame();
+      }
+      else if (this->is<http::priority_frame>())
+      {
+        this->payload_.priority_frame_.~priority_frame();
+      }
+      else if (this->is<http::rst_stream_frame>())
+      {
+        this->payload_.rst_stream_frame_.~rst_stream_frame();
+      }
+      else if (this->is<http::settings_frame>())
+      {
+        this->payload_.settings_frame_.~settings_frame();
+      }
+      else if (this->is<http::push_promise_frame>())
+      {
+        this->payload_.push_promise_frame_.~push_promise_frame();
+      }
+      else if (this->is<http::ping_frame>())
+      {
+        this->payload_.ping_frame_.~ping_frame();
+      }
+      else if (this->is<http::goaway_frame>())
+      {
+        this->payload_.goaway_frame_.~goaway_frame();
+      }
+      else if (this->is<http::window_update_frame>())
+      {
+        this->payload_.window_update_frame_.~window_update_frame();
+      }
+      else if (this->is<http::continuation_frame>())
+      {
+        this->payload_.continuation_frame_.~continuation_frame();
+      }
+      frame_type t = frame_type::invalid_type;
+      memcpy(this->metadata_.data() + 3, &t, 1);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void frame::recv_frame(asio::ip::tcp::socket& sock, frame& destination, const std::function<void(const std::error_code& ec)>& cb)
+    {
+      destination.destroy_union();
+      asio::async_read(sock, asio::buffer(destination.metadata_.data(), 9), [&sock, &destination, cb](const std::error_code& ec, std::size_t bytes_read)
+      {
+        if (ec)
+        {
+          cb ? cb(ec) : void();
+        }
+        else
+        {
+          if (destination.is<http::data_frame>())
+          {
+            new (&destination.payload_.data_frame_) http::data_frame();
+            frame_payload_base::recv_frame_payload(sock, destination.payload_.data_frame_, destination.payload_length(), destination.flags(), cb);
+          }
+          else if (destination.is<http::headers_frame>())
+          {
+            new (&destination.payload_.headers_frame_) http::headers_frame();
+            frame_payload_base::recv_frame_payload(sock, destination.payload_.headers_frame_, destination.payload_length(), destination.flags(), cb);
+          }
+          else if (destination.is<http::priority_frame>())
+          {
+            new (&destination.payload_.priority_frame_) http::priority_frame();
+            frame_payload_base::recv_frame_payload(sock, destination.payload_.priority_frame_, destination.payload_length(), destination.flags(), cb);
+          }
+          else if (destination.is<http::rst_stream_frame>())
+          {
+            new (&destination.payload_.rst_stream_frame_) http::rst_stream_frame();
+            frame_payload_base::recv_frame_payload(sock, destination.payload_.rst_stream_frame_, destination.payload_length(), destination.flags(), cb);
+          }
+          else if (destination.is<http::settings_frame>())
+          {
+            new (&destination.payload_.settings_frame_) http::settings_frame();
+            frame_payload_base::recv_frame_payload(sock, destination.payload_.settings_frame_, destination.payload_length(), destination.flags(), cb);
+          }
+          else if (destination.is<http::push_promise_frame>())
+          {
+            new (&destination.payload_.push_promise_frame_) http::push_promise_frame();
+            frame_payload_base::recv_frame_payload(sock, destination.payload_.push_promise_frame_, destination.payload_length(), destination.flags(), cb);
+          }
+          else if (destination.is<http::ping_frame>())
+          {
+            new (&destination.payload_.ping_frame_) http::ping_frame();
+            frame_payload_base::recv_frame_payload(sock, destination.payload_.ping_frame_, destination.payload_length(), destination.flags(), cb);
+          }
+          else if (destination.is<http::goaway_frame>())
+          {
+            new (&destination.payload_.goaway_frame_) http::goaway_frame();
+            frame_payload_base::recv_frame_payload(sock, destination.payload_.goaway_frame_, destination.payload_length(), destination.flags(), cb);
+          }
+          else if (destination.is<http::window_update_frame>())
+          {
+            new (&destination.payload_.window_update_frame_) http::window_update_frame();
+            frame_payload_base::recv_frame_payload(sock, destination.payload_.window_update_frame_, destination.payload_length(), destination.flags(), cb);
+          }
+          else if (destination.is<http::continuation_frame>())
+          {
+            new (&destination.payload_.continuation_frame_) http::continuation_frame();
+            frame_payload_base::recv_frame_payload(sock, destination.payload_.continuation_frame_, destination.payload_length(), destination.flags(), cb);
+          }
+          else
+          {
+            frame_type t = frame_type::invalid_type;
+            memcpy(destination.metadata_.data() + 3, &t, 1);
+            // TODO: Invalid Frame Error;
+            cb ? cb(std::make_error_code(std::errc::bad_message)) : void();
+          }
+        }
+      });
+    }
     //----------------------------------------------------------------//
     //****************************************************************//
   }

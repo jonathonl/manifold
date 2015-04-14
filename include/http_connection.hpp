@@ -13,7 +13,6 @@
 #include "asio.hpp"
 #include "http_frame.hpp"
 #include "http_message_head.hpp"
-#include "http_stream_dependency_tree.hpp"
 
 namespace manifold
 {
@@ -95,7 +94,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      stream* get_next_send_stream_ptr(const stream_dependency_tree& current_node = stream_dependency_tree_);
+      stream* get_next_send_stream_ptr(const stream_dependency_tree& current_node);
       static bool check_tree_for_outgoing_frame(const stream_dependency_tree& current_node);
 
       void run_recv_loop();
@@ -121,7 +120,7 @@ namespace manifold
       //----------------------------------------------------------------//
       void on_data_frame(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
       void on_end_frame(std::uint32_t stream_id, const std::function<void()>& fn);
-      void on_rst_stream_frame(std::uint32_t stream_id, std::function<void(const std::error_code& ec)>& fn);
+      void on_rst_stream_frame(std::uint32_t stream_id, const std::function<void(const std::error_code& ec)>& fn);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//

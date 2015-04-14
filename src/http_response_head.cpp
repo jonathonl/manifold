@@ -10,7 +10,7 @@ namespace manifold
     //----------------------------------------------------------------//
     response_head::response_head()
     {
-      this->status_code_ = (unsigned short) status_code::Ok;
+      this->status_code_ = (unsigned short) status_code::ok;
     }
     //----------------------------------------------------------------//
 

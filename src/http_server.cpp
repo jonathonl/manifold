@@ -102,10 +102,10 @@ namespace manifold
 
           if (!ec)
           {
-            auto it = this->connections_.emplace(std::make_shared<connection>(*this, std::move(this->socket_)));
+            auto it = this->connections_.emplace(std::make_shared<connection>(std::move(this->socket_)));
             this->socket_ = asio::ip::tcp::socket(this->io_service_);
             if (it.second)
-              (*it.first)->recvRequest();
+              (*it.first)->run();
           }
           else
           {
@@ -128,7 +128,7 @@ namespace manifold
         if (fn) fn(server::request(http::request_head(), conn, stream_id), server::response(http::response_head(), conn, stream_id));
       });
 
-      conn->on_close([conn]()
+      conn->on_close([conn, this]()
       {
         this->connections_.erase(conn);
       });

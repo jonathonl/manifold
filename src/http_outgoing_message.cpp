@@ -69,7 +69,7 @@ namespace manifold
 
       if (ret)
       {
-        this->connection_->send_end_frame(this->stream_id_, data, data_sz);
+        this->connection_->send_data(this->stream_id_, data, data_sz, true);
         // TODO: Check content length against amount sent;
       }
 
@@ -80,7 +80,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool outgoing_message::end()
     {
-      this->connection_->send_end_frame(this->stream_id_);
+      this->connection_->send_data(this->stream_id_, nullptr, 0, true);
 
       return true; // TODO: Check content length against amount sent;
     }
