@@ -126,7 +126,7 @@ namespace manifold
       //----------------------------------------------------------------//
       void on_window_update(std::uint32_t stream_id, const std::function<void()>& fn);
       bool send_headers(std::uint32_t stream_id, const message_head &head, bool end_stream = false);
-      bool send_data(std::uint32_t stream_id, const char *const data, std::size_t data_sz, bool end_stream = false);
+      bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream = false);
       //----------------------------------------------------------------//
 
 

@@ -38,12 +38,23 @@ namespace manifold
     //****************************************************************//
     // data_frame
     //----------------------------------------------------------------//
-    data_frame::data_frame(const char*const data, std::uint32_t datasz, std::uint8_t flags) : frame_payload_base(flags)
+    data_frame::data_frame(const char*const data, std::uint32_t datasz, bool end_stream, const char*const padding, std::uint8_t paddingsz)
+        : frame_payload_base((end_stream ? frame_flag::end_stream : (std::uint8_t)0x0) | (padding && paddingsz ? frame_flag::padded : (std::uint8_t)0x0))
     {
-      this->buf_.resize(datasz); // + this->bytes_required_for_pad_length());
-//      if (this->bytes_required_for_pad_length())
-//        this->buf_[0] = '\0'; // pad length
-//      memcpy(this->buf_.data() + this->bytes_required_for_pad_length(), data, datasz);
+      if (this->flags_ & frame_flag::padded)
+      {
+        this->buf_.resize(datasz + 1 + paddingsz);
+        this->buf_[0] = paddingsz;
+        memcpy(this->buf_.data() + 1, data, datasz);
+        memcpy(this->buf_.data() + 1 + datasz, padding, paddingsz);
+      }
+      else
+      {
+        this->buf_.resize(datasz);
+        memcpy(this->buf_.data(), data, datasz);
+      }
+
+
       memcpy(this->buf_.data(), data, datasz);
     }
     //----------------------------------------------------------------//
@@ -51,21 +62,27 @@ namespace manifold
     //----------------------------------------------------------------//
     const char*const data_frame::data() const
     {
-      return this->buf_.data() + this->bytes_required_for_pad_length();
+      if (this->flags_ & frame_flag::padded)
+        return this->buf_.data() + 1;
+      else
+        return this->buf_.data();
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     std::uint32_t data_frame::data_length() const
     {
-      return (std::uint32_t)(this->buf_.size() - (this->pad_length() + this->bytes_required_for_pad_length()));
+      return (std::uint32_t)(this->buf_.size() - (this->pad_length() + (this->flags_ & frame_flag::padded ? 1 : 0)));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     const char*const data_frame::padding() const
     {
-      return this->buf_.data() + this->bytes_required_for_pad_length() + this->data_length();
+      if (this->flags_ & frame_flag::padded)
+        return this->buf_.data() + 1 + this->data_length();
+      else
+        return nullptr;
     }
     //----------------------------------------------------------------//
 
@@ -73,7 +90,7 @@ namespace manifold
     std::uint8_t data_frame::pad_length() const
     {
       std::uint8_t ret = 0;
-      if (this->bytes_required_for_pad_length())
+      if (this->flags_ & frame_flag::padded)
         memcpy(&ret, this->buf_.data(), 1);
       return ret;
     }

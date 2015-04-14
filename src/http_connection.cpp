@@ -249,7 +249,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_data(std::uint32_t stream_id, const char *const data, std::size_t data_sz, bool end_stream)
+    bool connection::send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream)
     {
       bool ret = false;
 
@@ -257,7 +257,7 @@ namespace manifold
 
       if (it != this->streams_.end())
       {
-        it->second.outgoing_frames.push(http::frame(http::data_frame(data, data_sz, (end_stream ? frame_flag::end_stream : 0x0)), stream_id));
+        it->second.outgoing_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), stream_id));
       }
 
       return ret;

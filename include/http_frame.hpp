@@ -65,11 +65,9 @@ namespace manifold
     //================================================================//
     class data_frame : public frame_payload_base
     {
-    private:
-      std::uint8_t bytes_required_for_pad_length() const { return (std::uint8_t)(this->flags_ & frame_flag::padded ? 1 : 0); }
     public:
       data_frame() : frame_payload_base(0) {}
-      data_frame(const char*const data, std::uint32_t datasz, std::uint8_t flags);
+      data_frame(const char*const data, std::uint32_t datasz, bool end_stream = false, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
       ~data_frame() {}
 
       const char*const data() const;
