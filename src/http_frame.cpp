@@ -100,43 +100,92 @@ namespace manifold
     //****************************************************************//
     // headers_frame
     //----------------------------------------------------------------//
-    headers_frame::headers_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive, std::uint8_t flags) : frame_payload_base(flags)
+    headers_frame::headers_frame(const char*const header_block, std::uint32_t header_block_sz, bool end_headers, bool end_stream, const char*const padding, std::uint8_t paddingsz)
+        : frame_payload_base(
+            (end_stream ? frame_flag::end_stream : (std::uint8_t)0x0)
+            | (end_headers ? frame_flag::end_headers : (std::uint8_t)0x0)
+            | (padding && paddingsz ? frame_flag::padded : (std::uint8_t)0x0))
     {
-      this->buf_.resize(6 + header_block_sz);
-      this->buf_[0] = '\0'; // pad length
-      std::uint32_t tmp = (exclusive ? (0x80000000 ^ stream_dependency_id) : (0x7FFFFFFF & stream_dependency_id));
-      memcpy(this->buf_.data() + 1, &tmp, 4);
-      memcpy(this->buf_.data() + 5, &weight, 1);
-      memcpy(this->buf_.data() + 6, header_block, header_block_sz);
+      this->buf_.resize(this->bytes_needed_for_pad_length() + header_block_sz + (this->bytes_needed_for_pad_length() ? paddingsz : 0));
+
+      memcpy(this->buf_.data() + this->bytes_needed_for_pad_length(), header_block, header_block_sz);
+      if (this->flags_ & frame_flag::padded)
+      {
+        this->buf_[0] = paddingsz;
+        memcpy(this->buf_.data() + this->bytes_needed_for_pad_length() + header_block_sz, padding, paddingsz);
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    headers_frame::headers_frame(const char*const header_block, std::uint32_t header_block_sz, priority_options priority_ops, bool end_headers, bool end_stream, const char*const padding, std::uint8_t paddingsz)
+        : frame_payload_base(
+        (end_stream ? frame_flag::end_stream : (std::uint8_t)0x0)
+        | (end_headers ? frame_flag::end_headers : (std::uint8_t)0x0)
+        | (frame_flag::priority)
+        | (padding && paddingsz ? frame_flag::padded : (std::uint8_t)0x0))
+    {
+      this->buf_.resize(this->bytes_needed_for_pad_length() + 5 + header_block_sz + (this->bytes_needed_for_pad_length() ? paddingsz : 0));
+      if (this->flags_ & frame_flag::padded)
+      {
+        this->buf_[0] = paddingsz;
+        memcpy(this->buf_.data() + this->bytes_needed_for_pad_length() + 5 + header_block_sz, padding, paddingsz);
+      }
+      std::uint32_t tmp = (priority_ops.exclusive ? (0x80000000 ^ priority_ops.stream_dependency_id) : (0x7FFFFFFF & priority_ops.stream_dependency_id));
+      memcpy(this->buf_.data() + this->bytes_needed_for_pad_length(), &tmp, 4);
+      memcpy(this->buf_.data() + this->bytes_needed_for_pad_length() + 4, &priority_ops.weight, 1);
+      memcpy(this->buf_.data() + this->bytes_needed_for_pad_length() + 5, header_block, header_block_sz);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    std::uint8_t headers_frame::bytes_needed_for_pad_length() const
+    {
+      return (std::uint8_t)(this->flags_ & frame_flag::padded ? 1 : 0);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    std::uint8_t headers_frame::bytes_needed_for_dependency_id_and_exclusive_flag() const
+    {
+      return (std::uint8_t)(this->flags_ & frame_flag::priority ? 4 : 0);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    std::uint8_t headers_frame::bytes_needed_for_weight() const
+    {
+      return (std::uint8_t)(this->flags_ & frame_flag::priority ? 1 : 0);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     const char*const headers_frame::header_block_fragment() const
     {
-      return this->buf_.data() + 6;
+      return (this->buf_.data() + this->bytes_needed_for_pad_length() + this->bytes_needed_for_dependency_id_and_exclusive_flag() + this->bytes_needed_for_weight());
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     std::uint32_t headers_frame::header_block_fragment_length() const
     {
-      return (std::uint32_t)(this->buf_.size() - (this->pad_length() + 6));
+      return (std::uint32_t)(this->buf_.size() - (this->pad_length() + this->bytes_needed_for_pad_length() + this->bytes_needed_for_dependency_id_and_exclusive_flag() + this->bytes_needed_for_weight()));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     const char*const headers_frame::padding() const
     {
-      return this->buf_.data() + 6 + this->header_block_fragment_length();
+      return this->buf_.data() + this->bytes_needed_for_pad_length() + this->bytes_needed_for_dependency_id_and_exclusive_flag() + this->bytes_needed_for_weight() + this->header_block_fragment_length();
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     std::uint8_t headers_frame::pad_length() const
     {
-      std::uint8_t ret;
-      memcpy(&ret, this->buf_.data(), 1);
+      std::uint8_t ret = 0;
+      if (this->flags_ & frame_flag::padded)
+        memcpy(&ret, this->buf_.data(), 1);
       return ret;
     }
     //----------------------------------------------------------------//
@@ -144,8 +193,9 @@ namespace manifold
     //----------------------------------------------------------------//
     std::uint8_t headers_frame::weight() const
     {
-      std::uint8_t ret;
-      memcpy(&ret, this->buf_.data() + 5, 1);
+      std::uint8_t ret = 0;
+      if (this->flags_ & frame_flag::priority)
+        memcpy(&ret, this->buf_.data() + this->bytes_needed_for_pad_length() + 4, 1);
       return ret;
     }
     //----------------------------------------------------------------//
@@ -153,8 +203,9 @@ namespace manifold
     //----------------------------------------------------------------//
     std::uint32_t headers_frame::stream_dependency_id() const
     {
-      std::uint32_t ret;
-      memcpy(&ret, this->buf_.data() + 1, 4);
+      std::uint32_t ret = 0;
+      if (this->flags_ & frame_flag::priority)
+        memcpy(&ret, this->buf_.data() + this->bytes_needed_for_pad_length(), 4);
       return (0x7FFFFFFF & ret);
     }
     //----------------------------------------------------------------//
@@ -162,8 +213,9 @@ namespace manifold
     //----------------------------------------------------------------//
     bool headers_frame::exclusive_stream_dependency() const
     {
-      std::uint8_t tmp;
-      memcpy(&tmp, this->buf_.data() + 1, 1);
+      std::uint8_t tmp = 0;
+      if (this->flags_ & frame_flag::priority)
+        memcpy(&tmp, this->buf_.data() + this->bytes_needed_for_pad_length(), 1);
 
       return (0x80 & tmp) != 0;
     }
@@ -248,8 +300,6 @@ namespace manifold
       std::size_t pos = 0;
       for (auto it = this->settings_.begin(); it != this->settings_.end(); ++it)
       {
-        std::uint16_t key;
-        std::uint32_t value;
         memcpy(&this->buf_[pos], &(it->first),  2);
         memcpy(&this->buf_[pos + 2], &(it->second),  4);
         pos = pos + 6;

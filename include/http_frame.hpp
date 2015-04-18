@@ -78,11 +78,31 @@ namespace manifold
     //================================================================//
 
     //================================================================//
+    struct priority_options
+    {
+      std::uint32_t stream_dependency_id;
+      std::uint8_t weight;
+      bool exclusive;
+      priority_options(std::uint32_t dependency_id, std::uint8_t priority_weight, bool dependency_is_exclusive)
+      {
+        this->stream_dependency_id = dependency_id;
+        this->weight = priority_weight;
+        this->exclusive = dependency_is_exclusive;
+      }
+    };
+    //================================================================//
+
+    //================================================================//
     class headers_frame : public frame_payload_base
     {
+    private:
+      std::uint8_t bytes_needed_for_pad_length() const;
+      std::uint8_t bytes_needed_for_dependency_id_and_exclusive_flag() const;
+      std::uint8_t bytes_needed_for_weight() const;
     public:
       headers_frame() : frame_payload_base(0) {}
-      headers_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive, std::uint8_t flags);
+      headers_frame(const char*const header_block, std::uint32_t header_block_sz, bool end_headers = true, bool end_stream = false, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
+      headers_frame(const char*const header_block, std::uint32_t header_block_sz, priority_options priority_ops, bool end_headers = true, bool end_stream = false, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
       ~headers_frame() {}
 
       const char*const header_block_fragment() const;
@@ -141,7 +161,7 @@ namespace manifold
     //================================================================//
 
     //================================================================//
-    class push_promise_frame : public frame_payload_base
+    class push_promise_frame : public frame_payload_base // TODO: Impl optional padding
     {
     public:
       push_promise_frame() : frame_payload_base(0) {}

@@ -6,12 +6,50 @@
 #include <memory>
 #include <set>
 #include <functional>
+#include <initializer_list>
+#include <forward_list>
+#include <map>
+#include <iostream>
 
 #include "http_connection.hpp"
 #include "http_request_head.hpp"
 #include "http_response_head.hpp"
 #include "http_outgoing_message.hpp"
 #include "http_incoming_message.hpp"
+
+//class remote_match
+//{
+//public:
+//  remote_match(const std::string& k, const std::string& v) {}
+//  remote_match(const std::string& k, std::initializer_list<std::string> or_list) {}
+//};
+//
+//class q
+//{
+//public:
+//  q(std::string tbl) {}
+//  q& match(std::initializer_list<remote_match> match_list)
+//  {
+//    return (*this);
+//  }
+//};
+//
+//void foo()
+//{
+//  //std::map<std::string,std::string> foo = {{"k","v"}};
+//
+//  //std::string str{std::string("foobar"),std::string("fomanchu")};
+//
+//  auto a = q("users")
+//  .match(
+//      {
+//          {"last_name","Doe"},
+//          {"first_name", {"John", "Jane"}},
+//          {"age", {"30","31","32","33","34","35","36","37","38","39","40"}},
+//          {"uuid","AF9E783C"}
+//      });
+//  std::cout << &a << std::endl;
+//};
 
 namespace manifold
 {
