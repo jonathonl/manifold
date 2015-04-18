@@ -120,7 +120,7 @@ namespace manifold
     {
     public:
       priority_frame() : frame_payload_base(0) {}
-      priority_frame(std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive, std::uint8_t flags);
+      priority_frame(std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive);
       ~priority_frame() {}
 
       std::uint8_t weight() const;
@@ -141,6 +141,8 @@ namespace manifold
     };
     //================================================================//
 
+    class ack_flag { };
+
     //================================================================//
     class settings_frame : public frame_payload_base
     {
@@ -150,10 +152,12 @@ namespace manifold
       void deserialize_settings();
     public:
       settings_frame() : frame_payload_base(0) {}
-      settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end, std::uint8_t flags);
+      settings_frame(ack_flag) : frame_payload_base(0x1) {}
+      settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end);
       ~settings_frame() {}
 
 
+      bool is_ack() const { return (bool)(this->flags_ & 0x1); }
       std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator begin();
       std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end();
       std::size_t count();
@@ -165,7 +169,7 @@ namespace manifold
     {
     public:
       push_promise_frame() : frame_payload_base(0) {}
-      push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id, std::uint8_t flags);
+      push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id, bool end_headers = true, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
       ~push_promise_frame() {}
 
       const char*const header_block_fragment() const;
@@ -181,9 +185,10 @@ namespace manifold
     {
     public:
       ping_frame() : frame_payload_base(0) {}
-      ping_frame(std::uint64_t ping_data, std::uint8_t flags);
+      ping_frame(std::uint64_t ping_data, bool ack = false);
       ~ping_frame() {}
 
+      bool is_ack() const { return (bool)(this->flags_ & 0x1); }
       std::uint64_t data() const;
     };
     //================================================================//
@@ -193,7 +198,7 @@ namespace manifold
     {
     public:
       goaway_frame() : frame_payload_base(0) {}
-      goaway_frame(std::uint32_t last_stream_id, std::uint32_t error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz, std::uint8_t flags);
+      goaway_frame(std::uint32_t last_stream_id, std::uint32_t error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz);
       ~goaway_frame() {}
 
       std::uint32_t last_stream_id() const;
@@ -208,7 +213,7 @@ namespace manifold
     {
     public:
       window_update_frame() : frame_payload_base(0) {}
-      window_update_frame(std::uint32_t window_size_increment, std::uint8_t flags);
+      window_update_frame(std::uint32_t window_size_increment);
       ~window_update_frame() {}
 
       std::uint32_t window_size_increment() const;
@@ -220,7 +225,7 @@ namespace manifold
     {
     public:
       continuation_frame() : frame_payload_base(0) {}
-      continuation_frame(const char*const header_data, std::uint32_t header_data_sz, std::uint8_t flags);
+      continuation_frame(const char*const header_data, std::uint32_t header_data_sz);
       ~continuation_frame() {}
 
       const char*const header_block_fragment() const;

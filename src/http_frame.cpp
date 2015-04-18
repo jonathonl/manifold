@@ -176,7 +176,10 @@ namespace manifold
     //----------------------------------------------------------------//
     const char*const headers_frame::padding() const
     {
-      return this->buf_.data() + this->bytes_needed_for_pad_length() + this->bytes_needed_for_dependency_id_and_exclusive_flag() + this->bytes_needed_for_weight() + this->header_block_fragment_length();
+      if (this->flags_ & frame_flag::padded)
+        return this->buf_.data() + 1 + this->bytes_needed_for_dependency_id_and_exclusive_flag() + this->bytes_needed_for_weight() + this->header_block_fragment_length();
+      else
+        return nullptr;
     }
     //----------------------------------------------------------------//
 
@@ -225,7 +228,7 @@ namespace manifold
     //****************************************************************//
     // priority_frame
     //----------------------------------------------------------------//
-    priority_frame::priority_frame(std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive, std::uint8_t flags) : frame_payload_base(flags)
+    priority_frame::priority_frame(std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive) : frame_payload_base(0x0)
     {
       this->buf_.resize(5);
       std::uint32_t tmp = (exclusive ? (0x80000000 ^ stream_dependency_id) : (0x7FFFFFFF & stream_dependency_id));
@@ -286,8 +289,8 @@ namespace manifold
     //****************************************************************//
     // settings_frame
     //----------------------------------------------------------------//
-    settings_frame::settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end, std::uint8_t flags)
-      : frame_payload_base(flags), settings_(beg, end)
+    settings_frame::settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end)
+      : frame_payload_base(0x0), settings_(beg, end)
     {
       this->serialize_settings();
     }
@@ -356,42 +359,64 @@ namespace manifold
     //****************************************************************//
     // push_promise_frame
     //----------------------------------------------------------------//
-    push_promise_frame::push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id, std::uint8_t flags) : frame_payload_base(flags)
+    push_promise_frame::push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id, bool end_headers, const char*const padding, std::uint8_t paddingsz)
+      : frame_payload_base((std::uint8_t)(end_headers ? frame_flag::end_headers : 0x0) | (std::uint8_t)(padding && paddingsz ? frame_flag::padded : 0))
     {
-      this->buf_.resize(5 + header_block_sz);
-      this->buf_[0] = '\0'; // pad length
-      std::uint32_t tmp = (0x7FFFFFFF & promise_stream_id);
-      memcpy(this->buf_.data() + 1, &tmp, 4);
-      memcpy(this->buf_.data() + 5, header_block, header_block_sz);
+      if (this->flags_ & frame_flag::padded)
+      {
+        this->buf_.resize(5 + header_block_sz + paddingsz);
+        this->buf_[0] = paddingsz
+        std::uint32_t tmp = (0x7FFFFFFF & promise_stream_id);
+        memcpy(this->buf_.data() + 1, &tmp, 4);
+        memcpy(this->buf_.data() + 5, header_block, header_block_sz);
+        memcpy(this->buf_.data() + 5 + header_block_sz, padding, paddingsz);
+      }
+      else
+      {
+        this->buf_.resize(4 + header_block_sz);
+        std::uint32_t tmp = (0x7FFFFFFF & promise_stream_id);
+        memcpy(this->buf_.data(), &tmp, 4);
+        memcpy(this->buf_.data() + 4, header_block, header_block_sz);
+      }
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     const char*const push_promise_frame::header_block_fragment() const
     {
-      return (this->buf_.data() + 5);
+      if (this->flags_ & frame_flag::padded)
+        return (this->buf_.data() + 5);
+      else
+        return (this->buf_.data() + 4);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     std::uint32_t push_promise_frame::header_block_fragment_length() const
     {
-      return (std::uint32_t)(this->buf_.size() - (this->pad_length() + 5));
+      if (this->flags_ & frame_flag::padded)
+        return (std::uint32_t)(this->buf_.size() - (this->pad_length() + 5));
+      else
+        return (std::uint32_t)(this->buf_.size() - 4);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     const char*const push_promise_frame::padding() const
     {
-      return (this->buf_.data() + 5 + this->header_block_fragment_length());
+      if (this->flags_ & frame_flag::padded)
+        return (this->buf_.data() + 5 + this->header_block_fragment_length());
+      else
+        return nullptr;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     std::uint8_t push_promise_frame::pad_length() const
     {
-      std::uint8_t ret;
-      memcpy(&ret, this->buf_.data(), 1);
+      std::uint8_t ret = 0;
+      if (this->flags_ & frame_flag::padded)
+        memcpy(&ret, this->buf_.data(), 1);
       return ret;
     }
     //----------------------------------------------------------------//
@@ -400,7 +425,7 @@ namespace manifold
     std::uint32_t push_promise_frame::promised_stream_id() const
     {
       std::uint32_t ret;
-      memcpy(&ret, this->buf_.data() + 1, 4);
+      memcpy(&ret, this->buf_.data() + (this->flags_ & frame_flag::padded ? 1 : 0), 4);
       return (0x7FFFFFFF & ret);
     }
     //----------------------------------------------------------------//
@@ -409,7 +434,7 @@ namespace manifold
     //****************************************************************//
     // ping_frame
     //----------------------------------------------------------------//
-    ping_frame::ping_frame(std::uint64_t ping_data, std::uint8_t flags) : frame_payload_base(flags)
+    ping_frame::ping_frame(std::uint64_t ping_data, bool ack) : frame_payload_base((std::uint8_t)(ack ? 0x1 : 0))
     {
       this->buf_.resize(8);
       memcpy(this->buf_.data(), &ping_data, 8);
@@ -429,7 +454,7 @@ namespace manifold
     //****************************************************************//
     // goaway_frame
     //----------------------------------------------------------------//
-    goaway_frame::goaway_frame(std::uint32_t last_stream_id, std::uint32_t error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz, std::uint8_t flags) : frame_payload_base(flags)
+    goaway_frame::goaway_frame(std::uint32_t last_stream_id, std::uint32_t error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz) : frame_payload_base(0)
     {
       this->buf_.resize(8 + addl_error_data_sz);
       std::uint32_t tmp = 0x7FFFFFFF & last_stream_id;
@@ -475,7 +500,7 @@ namespace manifold
     //****************************************************************//
     // window_update_frame
     //----------------------------------------------------------------//
-    window_update_frame::window_update_frame(std::uint32_t window_size_increment, std::uint8_t flags) : frame_payload_base(flags)
+    window_update_frame::window_update_frame(std::uint32_t window_size_increment) : frame_payload_base(0)
     {
       this->buf_.resize(4);
       std::uint32_t tmp = 0x7FFFFFFF & window_size_increment;
@@ -496,7 +521,7 @@ namespace manifold
     //****************************************************************//
     // continuation_frame
     //----------------------------------------------------------------//
-    continuation_frame::continuation_frame(const char*const header_data, std::uint32_t header_data_sz, std::uint8_t flags) : frame_payload_base(flags)
+    continuation_frame::continuation_frame(const char*const header_data, std::uint32_t header_data_sz) : frame_payload_base(0)
     {
       this->buf_.resize(header_data_sz);
       memcpy(this->buf_.data(), header_data, header_data_sz);
