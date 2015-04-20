@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "asio.hpp"
+//#include "asio/ssl.hpp"
 #include "http_frame.hpp"
 #include "http_message_head.hpp"
 
@@ -42,8 +43,10 @@ namespace manifold
         std::function<void()> on_window_update;
 
         std::queue<frame> incoming_frames;
-        std::queue<frame> outgoing_frames;
+        std::queue<frame> outgoing_non_data_frames;
+        std::queue<frame> outgoing_data_frames;
 
+        std::uint32_t outgoing_window_size = 65535;
         std::uint32_t stream_dependency_id;
         std::uint8_t weight;
       };

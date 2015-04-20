@@ -53,6 +53,10 @@
 
 namespace manifold
 {
+  class tls_options
+  {
+  };
+
   namespace http
   {
     //================================================================//
@@ -89,15 +93,28 @@ namespace manifold
       };
       //================================================================//
     private:
-      std::uint64_t last_connection_handle;
-      std::set<std::shared_ptr<http::connection>> connections_;
+      asio::io_service& io_service_;
+      asio::ip::tcp::resolver tcp_resolver_;
+      bool encrypted_;
+      asio::ip::tcp::socket socket_;
+      //asio::ssl::stream<asio::ip::tcp::socket> tls_socket_;
+      std::int32_t last_stream_id_;
+      std::shared_ptr<http::connection> connection_;
+      //std::shared_ptr<http::connection> tls_connection_;
+
+      std::function<void()> on_connect_;
+      std::function<void(const std::error_code& ec)> on_close_;
+      std::error_code ec_;
+
+      void resolve_handler(const std::error_code &ec, asio::ip::tcp::resolver::iterator it);
     public:
-      client();
+      client(asio::io_service& ioservice, const std::string& host, short port = 80);
+      client(asio::io_service& ioservice, const std::string& host, tls_options options, short port = 443);
       ~client();
-    public:
-      void connect(std::string& host, std::uint16_t port, const std::function<void(const std::error_code& ec, connection_handle conn)>& cb);
-      void on_clost(connection_handle conn, const std::function<void(const std::error_code ec)>& cb);
-      void make_request(connection_handle conn, http::request_head&& req_head, const std::function<void(http::client::request&& req)>& cb);
+      //void connect(std::string& host, std::uint16_t port, const std::function<void(const std::error_code& ec, connection_handle conn)>& cb);
+      void on_connect(const std::function<void()>& cb);
+      void on_close(const std::function<void(const std::error_code ec)>& cb);
+      void make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& cb);
 
 
 //      AsyncConnectionHandle asyncConnect(std::string& host, std::uint16_t port = 0);
@@ -109,7 +126,7 @@ namespace manifold
 //      void close(AsyncConnectionHandle handle);
     };
     //================================================================//
-  }
+  };
 }
 
 #endif // MANIFOLD_HTTP_CLIENT_HPP

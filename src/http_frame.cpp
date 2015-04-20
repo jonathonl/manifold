@@ -365,7 +365,7 @@ namespace manifold
       if (this->flags_ & frame_flag::padded)
       {
         this->buf_.resize(5 + header_block_sz + paddingsz);
-        this->buf_[0] = paddingsz
+        this->buf_[0] = paddingsz;
         std::uint32_t tmp = (0x7FFFFFFF & promise_stream_id);
         memcpy(this->buf_.data() + 1, &tmp, 4);
         memcpy(this->buf_.data() + 5, header_block, header_block_sz);

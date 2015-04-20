@@ -63,15 +63,35 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    client::client()
+    client::client(asio::io_service& ioservice, const std::string& host, short port)
+      : io_service_(ioservice), tcp_resolver_(ioservice), socket_(ioservice)
     {
-      this->last_connection_handle = 0;
+      this->last_stream_id_ = 0;
+      this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), std::bind(&client::resolve_handler, this, std::placeholders::_1, std::placeholders::_2));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     client::~client()
     {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void client::resolve_handler(const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
+    {
+      if (ec)
+      {
+        this->ec_ = ec;
+        this->on_close_ ? this->on_close_(this->ec_) : void();
+      }
+      else
+      {
+        this->socket_.async_connect(*it, [](const std::error_code& ec)
+        {
+
+        });
+      }
     }
     //----------------------------------------------------------------//
   }

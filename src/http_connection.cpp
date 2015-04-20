@@ -75,14 +75,14 @@ namespace manifold
     {
       bool ret = false;
 
-      if (current_node.stream_ptr()->outgoing_frames.size())
+      if (current_node.stream_ptr()->outgoing_non_data_frames.size() || (current_node.stream_ptr()->outgoing_data_frames.size() && current_node.stream_ptr()->outgoing_window_size > 0))
         ret = true;
 
       for (auto it = current_node.children().begin(); !ret && it != current_node.children().end(); ++it)
       {
-        if (it->stream_ptr()->outgoing_frames.size())
-          ret = true;
-        else if (it->children().size())
+//        if (it->stream_ptr()->outgoing_frames.size())
+//          ret = true;
+//        else if (it->children().size())
           ret = check_tree_for_outgoing_frame(*it);
       }
 
@@ -118,7 +118,7 @@ namespace manifold
           current_sum += (current_pool_node->stream_ptr()->weight + 1);
           if (sum_index <= current_sum)
           {
-            if (current_pool_node->stream_ptr()->outgoing_frames.size())
+            if (current_pool_node->stream_ptr()->outgoing_non_data_frames.size() || (current_pool_node->stream_ptr()->outgoing_data_frames.size() && current_pool_node->stream_ptr()->outgoing_window_size > 0))
               ret = current_pool_node->stream_ptr();
             else
               ret = this->get_next_send_stream_ptr(*current_pool_node);
@@ -169,8 +169,17 @@ namespace manifold
 
         if (prioritized_stream_ptr)
         {
-          this->outgoing_frame_ = std::move(prioritized_stream_ptr->outgoing_frames.front());
-          prioritized_stream_ptr->outgoing_frames.pop();
+          if (prioritized_stream_ptr->outgoing_non_data_frames.size())
+          {
+            this->outgoing_frame_ = std::move(prioritized_stream_ptr->outgoing_non_data_frames.front());
+            prioritized_stream_ptr->outgoing_non_data_frames.pop();
+          }
+          else
+          {
+            this->outgoing_frame_ = std::move(prioritized_stream_ptr->outgoing_data_frames.front());
+            prioritized_stream_ptr->outgoing_data_frames.pop();
+          }
+
 
           http::frame::send_frame(this->socket_, this->outgoing_frame_, [self](const std::error_code& ec)
           {
@@ -244,7 +253,20 @@ namespace manifold
     //----------------------------------------------------------------//
     bool connection::send_headers(std::uint32_t stream_id, const message_head &head, bool end_stream)
     {
-      return false;
+      bool ret = false;
+
+      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
+
+      if (it != this->streams_.end())
+      {
+        std::string header_data;
+        http::message_head::serialize(head, header_data);
+        //TODO: break into multiple frames if needed.
+        it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), header_data.size(), end_stream), stream_id));
+        this->run_send_loop();
+      }
+
+      return ret;
     }
     //----------------------------------------------------------------//
 
@@ -257,7 +279,8 @@ namespace manifold
 
       if (it != this->streams_.end())
       {
-        it->second.outgoing_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), stream_id));
+        it->second.outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), stream_id));
+        this->run_send_loop();
       }
 
       return ret;
