@@ -1,6 +1,7 @@
 
 #include <new>
 
+#include "asio/ssl.hpp"
 #include "http_frame.hpp"
 
 namespace manifold
@@ -24,12 +25,15 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void frame_payload_base::recv_frame_payload(asio::ip::tcp::socket& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb)
+    template <typename S>
+    void frame_payload_base::recv_frame_payload(S& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb)
     {
       destination.flags_ = flags;
       destination.buf_.resize(payload_size);
       asio::async_read(sock, asio::buffer(destination.buf_.data(), payload_size), [cb](const std::error_code& ec, std::size_t bytes_read) { (cb ? cb(ec) : void()); });
     }
+    template void frame_payload_base::recv_frame_payload<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
+    template void frame_payload_base::recv_frame_payload<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
     //----------------------------------------------------------------//
     //****************************************************************//
 
@@ -663,10 +667,13 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void frame::send_frame(asio::ip::tcp::socket& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb)
+    template <typename S>
+    void frame::send_frame(S& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb)
     {
 
     }
+    template void frame::send_frame<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb);
+    template void frame::send_frame<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb);
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
@@ -794,7 +801,8 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void frame::recv_frame(asio::ip::tcp::socket& sock, frame& destination, const std::function<void(const std::error_code& ec)>& cb)
+    template<typename S>
+    void frame::recv_frame(S& sock, frame& destination, const std::function<void(const std::error_code& ec)>& cb)
     {
       destination.destroy_union();
       asio::async_read(sock, asio::buffer(destination.metadata_.data(), 9), [&sock, &destination, cb](const std::error_code& ec, std::size_t bytes_read)
@@ -865,6 +873,8 @@ namespace manifold
         }
       });
     }
+    template void frame::recv_frame<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, frame& source, const std::function<void(const std::error_code& ec)>& cb);
+    template void frame::recv_frame<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, frame& source, const std::function<void(const std::error_code& ec)>& cb);
     //----------------------------------------------------------------//
     //****************************************************************//
   }

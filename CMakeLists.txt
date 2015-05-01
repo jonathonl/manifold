@@ -41,4 +41,6 @@ set(SOURCE_FILES
   main.cpp)
 
 add_executable(manifold ${SOURCE_FILES} ${HEADER_FILES})
+target_link_libraries(manifold libssl.dylib)
+target_link_libraries(manifold libcrypto.dylib)
 #target_link_libraries(manifold /opt/local/lib/libboost_system-mt.a)

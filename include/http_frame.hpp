@@ -58,7 +58,9 @@ namespace manifold
 
       std::uint8_t flags() const;
       std::uint32_t serialized_length() const;
-      static void recv_frame_payload(asio::ip::tcp::socket& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
+
+      template <typename S>
+      static void recv_frame_payload(S& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
     };
     //================================================================//
 
@@ -268,8 +270,10 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      static void recv_frame(asio::ip::tcp::socket& sock, frame& destination, const std::function<void(const std::error_code& ec)>& cb);
-      static void send_frame(asio::ip::tcp::socket& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb);
+      template <typename S>
+      static void recv_frame(S& sock, frame& destination, const std::function<void(const std::error_code& ec)>& cb);
+      template <typename S>
+      static void send_frame(S& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb);
       //----------------------------------------------------------------//
     private:
       //----------------------------------------------------------------//

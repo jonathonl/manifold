@@ -36,13 +36,12 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    connection::connection(asio::ip::tcp::socket&& sock)
-    : socket_(std::move(sock)), stream_dependency_tree_(nullptr)
+    connection::connection()
+    : stream_dependency_tree_(nullptr)
     {
-      std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this), static_cast<std::uint32_t>((std::uint64_t)&sock)});
+      std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
       this->rg_.seed(seed);
 
-      std::cout << this->socket_.non_blocking() << ":" __FILE__ << "/" << __LINE__ << std::endl;
 
       // header_table_size      = 0x1, // 4096
       // enable_push            = 0x2, // 1
@@ -134,7 +133,7 @@ namespace manifold
     void connection::run_recv_loop()
     {
       auto self = shared_from_this();
-      http::frame::recv_frame(this->socket_, this->incoming_frame_, [self](const std::error_code& ec)
+      this->recv_frame(this->incoming_frame_, [self](const std::error_code& ec)
       {
         if (ec)
         {
@@ -181,7 +180,7 @@ namespace manifold
           }
 
 
-          http::frame::send_frame(this->socket_, this->outgoing_frame_, [self](const std::error_code& ec)
+          this->send_frame(this->outgoing_frame_, [self](const std::error_code& ec)
           {
             self->send_loop_running_ = false;
             if (ec)

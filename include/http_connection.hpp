@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "asio.hpp"
-//#include "asio/ssl.hpp"
+#include "asio/ssl.hpp"
 #include "http_frame.hpp"
 #include "http_message_head.hpp"
 
@@ -76,7 +76,6 @@ namespace manifold
       //================================================================//
     private:
       //----------------------------------------------------------------//
-      asio::ip::tcp::socket socket_;
       std::map<setting_code,std::uint32_t> settings_;
       bool started_;
       bool send_loop_running_;
@@ -103,10 +102,13 @@ namespace manifold
       void run_recv_loop();
       void run_send_loop();
       //----------------------------------------------------------------//
+    protected:
+      virtual void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb) = 0;
+      virtual void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb) = 0;
     public:
       //----------------------------------------------------------------//
-      connection(asio::ip::tcp::socket&& sock);
-      ~connection();
+      connection();
+      virtual ~connection();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -135,8 +137,56 @@ namespace manifold
 
       //void send(char* buf, std::size_t buf_size, const std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>& handler);
       //void recv(const char* buf, std::size_t buf_size, const std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>& handler);
-    //================================================================//
     };
+    //================================================================//
+
+    //================================================================//
+    class tls_connection : public connection
+    {
+    private:
+      asio::ssl::stream<asio::ip::tcp::socket> socket_;
+    protected:
+      void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb)
+      {
+        frame::recv_frame(this->socket_, destination, cb);
+      }
+      void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb)
+      {
+        frame::send_frame(this->socket_, source, cb);
+      }
+    public:
+      tls_connection(asio::io_service& ioservice, asio::ssl::context& ctx)
+          : socket_(ioservice, ctx), connection()
+      {}
+      ~tls_connection() {}
+
+      asio::ssl::stream<asio::ip::tcp::socket>::lowest_layer_type& socket() { return this->socket_.lowest_layer(); }
+    };
+    //================================================================//
+
+    //================================================================//
+    class non_tls_connection : public connection
+    {
+    private:
+      asio::ip::tcp::socket socket_;
+    protected:
+      void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb)
+      {
+        frame::recv_frame(this->socket_, destination, cb);
+      }
+      void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb)
+      {
+        frame::send_frame(this->socket_, source, cb);
+      }
+    public:
+      non_tls_connection(asio::io_service& ioservice)
+          : socket_(ioservice), connection()
+      {}
+      ~non_tls_connection() {}
+
+      asio::ip::tcp::socket::lowest_layer_type& socket() { return this->socket_; }
+    };
+    //================================================================//
   }
 }
 

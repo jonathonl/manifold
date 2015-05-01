@@ -53,8 +53,14 @@
 
 namespace manifold
 {
-  class tls_options
+  struct tls_options
   {
+  public:
+    asio::ssl::context& context;
+
+    tls_options(asio::ssl::context& ctx) : context(ctx)
+    {
+    }
   };
 
   namespace http
@@ -96,11 +102,10 @@ namespace manifold
       asio::io_service& io_service_;
       asio::ip::tcp::resolver tcp_resolver_;
       bool encrypted_;
+      //asio::ssl::stream<asio::ip::tcp::socket> socket_;
       asio::ip::tcp::socket socket_;
-      //asio::ssl::stream<asio::ip::tcp::socket> tls_socket_;
       std::int32_t last_stream_id_;
       std::shared_ptr<http::connection> connection_;
-      //std::shared_ptr<http::connection> tls_connection_;
 
       std::function<void()> on_connect_;
       std::function<void(const std::error_code& ec)> on_close_;
@@ -109,7 +114,7 @@ namespace manifold
       void resolve_handler(const std::error_code &ec, asio::ip::tcp::resolver::iterator it);
     public:
       client(asio::io_service& ioservice, const std::string& host, short port = 80);
-      client(asio::io_service& ioservice, const std::string& host, tls_options options, short port = 443);
+      client(asio::io_service& ioservice, const std::string& host, const tls_options& ctx, short port = 443);
       ~client();
       //void connect(std::string& host, std::uint16_t port, const std::function<void(const std::error_code& ec, connection_handle conn)>& cb);
       void on_connect(const std::function<void()>& cb);

@@ -67,31 +67,68 @@ namespace manifold
       : io_service_(ioservice), tcp_resolver_(ioservice), socket_(ioservice)
     {
       this->last_stream_id_ = 0;
-      this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), std::bind(&client::resolve_handler, this, std::placeholders::_1, std::placeholders::_2));
+      std::shared_ptr<non_tls_connection> c = std::make_shared<non_tls_connection>(ioservice);
+      this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [this, c](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
+      {
+        if (ec)
+        {
+          this->ec_ = ec;
+          this->on_close_ ? this->on_close_(this->ec_) : void();
+        }
+        else
+        {
+          c->socket().async_connect(*it, [this](const std::error_code& ec)
+          {
+            if (ec)
+            {
+              this->ec_ = ec;
+              this->on_close_ ? this->on_close_(this->ec_) : void();
+            }
+            else
+            {
+              // ...
+            }
+          });
+        }
+      });
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    client::client(asio::io_service& ioservice, const std::string& host, const tls_options& options, short port)
+        : io_service_(ioservice), tcp_resolver_(ioservice), socket_(ioservice)
+    {
+      this->last_stream_id_ = 0;
+      std::shared_ptr<tls_connection> c = std::make_shared<tls_connection>(ioservice, options.context);
+      this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [this, c](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
+      {
+        if (ec)
+        {
+          this->ec_ = ec;
+          this->on_close_ ? this->on_close_(this->ec_) : void();
+        }
+        else
+        {
+          c->socket().async_connect(*it, [this](const std::error_code& ec)
+          {
+            if (ec)
+            {
+              this->ec_ = ec;
+              this->on_close_ ? this->on_close_(this->ec_) : void();
+            }
+            else
+            {
+              // ...
+            }
+          });
+        }
+      });
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     client::~client()
     {
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void client::resolve_handler(const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
-    {
-      if (ec)
-      {
-        this->ec_ = ec;
-        this->on_close_ ? this->on_close_(this->ec_) : void();
-      }
-      else
-      {
-        this->socket_.async_connect(*it, [](const std::error_code& ec)
-        {
-
-        });
-      }
     }
     //----------------------------------------------------------------//
   }

@@ -74,47 +74,48 @@ namespace manifold
     void server::listen(unsigned short port, const std::string& host)
     {
       // Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
-      asio::ip::tcp::resolver resolver(io_service_);
-      asio::ip::tcp::endpoint endpoint = *(resolver.resolve({host, std::to_string(port)}));
-      acceptor_.open(endpoint.protocol());
+      //asio::ip::tcp::resolver resolver(io_service_);
+      //asio::ip::tcp::endpoint endpoint = *(resolver.resolve({host, std::to_string(port)}));
+      auto ep = asio::ip::tcp::endpoint(asio::ip::address::from_string(host), port);
+      acceptor_.open(ep.protocol());
       acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
-      acceptor_.bind(endpoint);
+      acceptor_.bind(ep);
       acceptor_.listen();
 
       this->accept();
-    }
+    };
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void server::accept()
     {
-      acceptor_.async_accept(this->socket_,
-        [this](std::error_code ec)
-        {
-          std::cout << "ACCEPT:" << this->socket_.native_handle() << std::endl;
-          // Check whether the server was stopped by a signal before this
-          // completion handler had a chance to run.
-          if (!acceptor_.is_open())
-          {
-            std::cout << "acceptor not open" << ":" __FILE__ << "/" << __LINE__ << std::endl;
-            return;
-          }
-
-          if (!ec)
-          {
-            auto it = this->connections_.emplace(std::make_shared<connection>(std::move(this->socket_)));
-            this->socket_ = asio::ip::tcp::socket(this->io_service_);
-            if (it.second)
-              (*it.first)->run();
-          }
-          else
-          {
-            std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
-          }
-
-          if (!this->io_service_.stopped())
-            this->accept();
-        });
+//      acceptor_.async_accept(this->socket_,
+//        [this](std::error_code ec)
+//        {
+//          std::cout << "ACCEPT:" << this->socket_.native_handle() << std::endl;
+//          // Check whether the server was stopped by a signal before this
+//          // completion handler had a chance to run.
+//          if (!acceptor_.is_open())
+//          {
+//            std::cout << "acceptor not open" << ":" __FILE__ << "/" << __LINE__ << std::endl;
+//            return;
+//          }
+//
+//          if (!ec)
+//          {
+//            auto it = this->connections_.emplace(std::make_shared<connection>(std::move(this->socket_)));
+//            this->socket_ = asio::ip::tcp::socket(this->io_service_);
+//            if (it.second)
+//              (*it.first)->run();
+//          }
+//          else
+//          {
+//            std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
+//          }
+//
+//          if (!this->io_service_.stopped())
+//            this->accept();
+//        });
     }
     //----------------------------------------------------------------//
 
