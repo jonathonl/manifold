@@ -1,4 +1,5 @@
 
+#include <memory>
 #include <array>
 #include <iostream>
 
@@ -55,12 +56,23 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::server(asio::io_service& ioService)
+    server::server(asio::io_service& ioService, unsigned short port, const std::string& host)
       : io_service_(ioService),
-        acceptor_(io_service_),
-        socket_(io_service_)
+        acceptor_(io_service_)
     {
+      this->port_ = port;
+      this->host_ = host;
+    }
+    //----------------------------------------------------------------//
 
+    //----------------------------------------------------------------//
+    server::server(asio::io_service& ioService, ssl_options options, unsigned short port, const std::string& host)
+      : io_service_(ioService),
+      acceptor_(io_service_),
+      ssl_context_(new asio::ssl::context(options.method))
+    {
+      this->port_ = port;
+      this->host_ = host;
     }
     //----------------------------------------------------------------//
 
@@ -71,51 +83,96 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void server::listen(unsigned short port, const std::string& host)
+    void server::listen(const std::function<void(server::request&& req, server::response&& res)>& handler)
     {
+      this->request_handler_ = handler;
       // Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
       //asio::ip::tcp::resolver resolver(io_service_);
       //asio::ip::tcp::endpoint endpoint = *(resolver.resolve({host, std::to_string(port)}));
-      auto ep = asio::ip::tcp::endpoint(asio::ip::address::from_string(host), port);
+      auto ep = asio::ip::tcp::endpoint(asio::ip::address::from_string(this->host_), this->port_);
       acceptor_.open(ep.protocol());
       acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
       acceptor_.bind(ep);
       acceptor_.listen();
 
-      this->accept();
+      if (this->ssl_context_)
+        this->accept(*this->ssl_context_);
+      else
+        this->accept();
     };
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void server::accept()
     {
-//      acceptor_.async_accept(this->socket_,
-//        [this](std::error_code ec)
-//        {
-//          std::cout << "ACCEPT:" << this->socket_.native_handle() << std::endl;
-//          // Check whether the server was stopped by a signal before this
-//          // completion handler had a chance to run.
-//          if (!acceptor_.is_open())
-//          {
-//            std::cout << "acceptor not open" << ":" __FILE__ << "/" << __LINE__ << std::endl;
-//            return;
-//          }
-//
-//          if (!ec)
-//          {
-//            auto it = this->connections_.emplace(std::make_shared<connection>(std::move(this->socket_)));
-//            this->socket_ = asio::ip::tcp::socket(this->io_service_);
-//            if (it.second)
-//              (*it.first)->run();
-//          }
-//          else
-//          {
-//            std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
-//          }
-//
-//          if (!this->io_service_.stopped())
-//            this->accept();
-//        });
+      std::shared_ptr<connection> conn;
+      conn = std::make_shared<non_tls_connection>(this->io_service_);
+      acceptor_.async_accept(conn->socket(), [this, conn](std::error_code ec)
+      {
+
+        if (!acceptor_.is_open())
+        {
+          std::cout << "acceptor not open" << ":" __FILE__ << "/" << __LINE__ << std::endl;
+          return;
+        }
+
+        if (!ec)
+        {
+          auto it = this->connections_.emplace(conn);
+          if (it.second)
+            (*it.first)->run();
+        }
+        else
+        {
+          std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
+        }
+
+        if (!this->io_service_.stopped())
+          this->accept();
+      });
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void server::accept(asio::ssl::context& ctx)
+    {
+      std::shared_ptr<tls_connection> conn;
+      conn = std::make_shared<tls_connection>(this->io_service_, ctx);
+      acceptor_.async_accept(conn->socket(), [this, conn, &ctx](std::error_code ec)
+      {
+
+        if (!acceptor_.is_open())
+        {
+          std::cout << "acceptor not open" << ":" __FILE__ << "/" << __LINE__ << std::endl;
+          return;
+        }
+
+        if (ec)
+        {
+        }
+        else
+        {
+          conn->ssl_stream().async_handshake(asio::ssl::stream_base::server, [this, conn] (const std::error_code& ec)
+          {
+            if (ec)
+            {
+              std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
+            }
+            else
+            {
+              auto it = this->connections_.emplace(conn);
+              if (it.second)
+                (*it.first)->run();
+            }
+          });
+        }
+
+
+
+
+        if (!this->io_service_.stopped())
+          this->accept(ctx);
+      });
     }
     //----------------------------------------------------------------//
 
@@ -124,9 +181,7 @@ namespace manifold
     {
       conn->on_new_stream([this, conn](std::int32_t stream_id, std::list<std::pair<std::string,std::string>>&& headers, std::int32_t stream_dependency_id)
       {
-        std::function<void(server::request&& req, server::response&& res)> fn = this->stream_handlers_.begin()->second;
-
-        if (fn) fn(server::request(http::request_head(), conn, stream_id), server::response(http::response_head(), conn, stream_id));
+        this->request_handler_ ? this->request_handler_(server::request(http::request_head(), conn, stream_id), server::response(http::response_head(), conn, stream_id)) : void();
       });
 
       conn->on_close([conn, this]()
@@ -135,13 +190,5 @@ namespace manifold
       });
     }
     //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void server::register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler)
-    {
-      this->stream_handlers_.push_back(std::make_pair(expression, handler));
-    }
-    //----------------------------------------------------------------//
-
   }
 }

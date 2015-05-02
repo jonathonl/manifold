@@ -37,7 +37,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     connection::connection()
-    : stream_dependency_tree_(nullptr)
+    : stream_dependency_tree_(&this->root_stream_)
     {
       std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
       this->rg_.seed(seed);
@@ -74,7 +74,7 @@ namespace manifold
     {
       bool ret = false;
 
-      if (current_node.stream_ptr()->outgoing_non_data_frames.size() || (current_node.stream_ptr()->outgoing_data_frames.size() && current_node.stream_ptr()->outgoing_window_size > 0))
+      if (current_node.stream_ptr()->outgoing_non_data_frames.size() || (current_node.stream_ptr()->outgoing_data_frames.size() && current_node.stream_ptr()->outgoing_window_size > 0 && this->connection_level_outgoing_window_size() > 0))
         ret = true;
 
       for (auto it = current_node.children().begin(); !ret && it != current_node.children().end(); ++it)
@@ -95,32 +95,36 @@ namespace manifold
       // TODO: enforce a max tree depth of 10 to avoid stack overflow from recursion.
       stream* ret = nullptr;
 
-      std::uint64_t weight_sum = 0;
-      std::vector<const stream_dependency_tree*> pool;
-
-      for (auto it = current_node.children().begin(); it != current_node.children().end(); ++it)
+      if (current_node.stream_ptr()->outgoing_non_data_frames.size() || (current_node.stream_ptr()->outgoing_data_frames.size() && current_node.stream_ptr()->outgoing_window_size > 0 && this->connection_level_outgoing_window_size() > 0))
       {
-        if (check_tree_for_outgoing_frame(*it))
-        {
-          pool.push_back(&(*it));
-          weight_sum += (it->stream_ptr()->weight + 1);
-        }
+        ret = current_node.stream_ptr();
       }
-
-      if (pool.size())
+      else
       {
-        std::uint64_t sum_index = (this->rg_() % weight_sum) + 1;
-        std::uint64_t current_sum = 0;
-        for (auto it = pool.begin(); it != pool.end(); ++it)
+        std::uint64_t weight_sum = 0;
+        std::vector<const stream_dependency_tree*> pool;
+
+        for (auto it = current_node.children().begin(); it != current_node.children().end(); ++it)
         {
-          const stream_dependency_tree* current_pool_node = (*it);
-          current_sum += (current_pool_node->stream_ptr()->weight + 1);
-          if (sum_index <= current_sum)
+          if (this->check_tree_for_outgoing_frame(*it))
           {
-            if (current_pool_node->stream_ptr()->outgoing_non_data_frames.size() || (current_pool_node->stream_ptr()->outgoing_data_frames.size() && current_pool_node->stream_ptr()->outgoing_window_size > 0))
-              ret = current_pool_node->stream_ptr();
-            else
+            pool.push_back(&(*it));
+            weight_sum += (it->stream_ptr()->weight + 1);
+          }
+        }
+
+        if (pool.size())
+        {
+          std::uint64_t sum_index = (this->rg_() % weight_sum) + 1;
+          std::uint64_t current_sum = 0;
+          for (auto it = pool.begin(); it != pool.end(); ++it)
+          {
+            const stream_dependency_tree* current_pool_node = (*it);
+            current_sum += (current_pool_node->stream_ptr()->weight + 1);
+            if (sum_index <= current_sum)
+            {
               ret = this->get_next_send_stream_ptr(*current_pool_node);
+            }
           }
         }
       }
@@ -132,7 +136,7 @@ namespace manifold
     //----------------------------------------------------------------//
     void connection::run_recv_loop()
     {
-      auto self = shared_from_this();
+      std::shared_ptr<connection> self = this->shared_from_this();
       this->recv_frame(this->incoming_frame_, [self](const std::error_code& ec)
       {
         if (ec)

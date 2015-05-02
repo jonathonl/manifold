@@ -48,6 +48,7 @@ namespace manifold
         std::queue<frame> outgoing_data_frames;
 
         std::uint32_t outgoing_window_size = 65535;
+        std::uint32_t incoming_window_size = 65535;
         std::uint32_t stream_dependency_id;
         std::uint8_t weight;
       };
@@ -91,14 +92,18 @@ namespace manifold
 
       //----------------------------------------------------------------//
       std::map<std::uint32_t,stream> streams_;
+      stream root_stream_; // used for connection level frames
       http::frame incoming_frame_;
       http::frame outgoing_frame_;
       stream_dependency_tree stream_dependency_tree_;
+      std::uint32_t connection_level_outgoing_window_size() const { return this->root_stream_.outgoing_window_size; }
+      std::uint32_t connection_level_incoming_window_size() const { return this->root_stream_.incoming_window_size; }
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       stream* get_next_send_stream_ptr(const stream_dependency_tree& current_node);
-      static bool check_tree_for_outgoing_frame(const stream_dependency_tree& current_node);
+      bool check_tree_for_outgoing_frame(const stream_dependency_tree& current_node);
+
 
       void run_recv_loop();
       void run_send_loop();
@@ -135,6 +140,10 @@ namespace manifold
       bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream = false);
       //----------------------------------------------------------------//
 
+      //----------------------------------------------------------------//
+      virtual asio::ip::tcp::socket::lowest_layer_type& socket() = 0;
+      //----------------------------------------------------------------//
+
 
       //void send(char* buf, std::size_t buf_size, const std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>& handler);
       //void recv(const char* buf, std::size_t buf_size, const std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>& handler);
@@ -145,23 +154,25 @@ namespace manifold
     class tls_connection : public connection
     {
     private:
-      asio::ssl::stream<asio::ip::tcp::socket> socket_;
+      asio::ssl::stream<asio::ip::tcp::socket> socket_stream_;
     protected:
       void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb)
       {
-        frame::recv_frame(this->socket_, destination, cb);
+        frame::recv_frame(this->socket_stream_, destination, cb);
       }
       void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb)
       {
-        frame::send_frame(this->socket_, source, cb);
+        frame::send_frame(this->socket_stream_, source, cb);
       }
     public:
       tls_connection(asio::io_service& ioservice, asio::ssl::context& ctx)
-          : socket_(ioservice, ctx), connection()
+        : socket_stream_(ioservice, ctx)
       {}
       ~tls_connection() {}
 
-      asio::ssl::stream<asio::ip::tcp::socket>::lowest_layer_type& socket() { return this->socket_.lowest_layer(); }
+      asio::ip::tcp::socket::lowest_layer_type& socket() { return this->socket_stream_.lowest_layer(); }
+      asio::ssl::stream<asio::ip::tcp::socket>& ssl_stream() { return this->socket_stream_; }
+
     };
     //================================================================//
 
@@ -181,7 +192,7 @@ namespace manifold
       }
     public:
       non_tls_connection(asio::io_service& ioservice)
-          : socket_(ioservice), connection()
+          : socket_(ioservice)
       {}
       ~non_tls_connection() {}
 

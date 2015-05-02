@@ -53,16 +53,6 @@
 
 namespace manifold
 {
-  struct tls_options
-  {
-  public:
-    asio::ssl::context& context;
-
-    tls_options(asio::ssl::context& ctx) : context(ctx)
-    {
-    }
-  };
-
   namespace http
   {
     //================================================================//
@@ -98,13 +88,23 @@ namespace manifold
         void on_response(const std::function<void(http::client::response&& resp)>& cb);
       };
       //================================================================//
+
+      //================================================================//
+      struct ssl_options
+      {
+      public:
+        asio::ssl::context::method method;
+        ssl_options(asio::ssl::context::method meth) : method(meth)
+        {
+        }
+      };
+      //================================================================//
     private:
       asio::io_service& io_service_;
       asio::ip::tcp::resolver tcp_resolver_;
-      bool encrypted_;
-      //asio::ssl::stream<asio::ip::tcp::socket> socket_;
-      asio::ip::tcp::socket socket_;
       std::int32_t last_stream_id_;
+
+      std::unique_ptr<asio::ssl::context> ssl_context_;
       std::shared_ptr<http::connection> connection_;
 
       std::function<void()> on_connect_;
@@ -114,21 +114,13 @@ namespace manifold
       void resolve_handler(const std::error_code &ec, asio::ip::tcp::resolver::iterator it);
     public:
       client(asio::io_service& ioservice, const std::string& host, short port = 80);
-      client(asio::io_service& ioservice, const std::string& host, const tls_options& ctx, short port = 443);
+      client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, short port = 443);
       ~client();
       //void connect(std::string& host, std::uint16_t port, const std::function<void(const std::error_code& ec, connection_handle conn)>& cb);
       void on_connect(const std::function<void()>& cb);
       void on_close(const std::function<void(const std::error_code ec)>& cb);
       void make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& cb);
 
-
-//      AsyncConnectionHandle asyncConnect(std::string& host, std::uint16_t port = 0);
-//
-//      void request(ConnectionHandle handle, std::function<void(request& request)>&& requestFn, std::function<void(response& response)>&& responseFn);
-//      void request(AsyncConnectionHandle handle, std::function<void(request& request)>&& requestFn, std::function<void(response& response)>&& responseFn);
-//
-//      void close(ConnectionHandle handle);
-//      void close(AsyncConnectionHandle handle);
     };
     //================================================================//
   };

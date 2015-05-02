@@ -43,8 +43,8 @@ int main()
 {
 
 
-  manifold::http::server srv(ioservice);
-  srv.listen(8080, "0.0.0.0");
+  manifold::http::server srv(ioservice, 8080, "0.0.0.0");
+  srv.listen(nullptr);
 
   auto i = ioservice.run();
 
