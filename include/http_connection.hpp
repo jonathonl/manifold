@@ -1,4 +1,5 @@
 #pragma once
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 #ifndef MANIFOLD_HTTP_CONNECTION_HPP
 #define MANIFOLD_HTTP_CONNECTION_HPP
