@@ -1,110 +1,123 @@
-#include <array>
-#include <string>
-#include <iostream>
-#include <thread>
 
 #include "asio.hpp"
 #include "http_server.hpp"
+#include "http_client.hpp"
+#include "http_router.hpp"
 
-asio::io_service ioservice;
-asio::ip::tcp::resolver resolv{ioservice};
-asio::ip::tcp::socket tcp_socket{ioservice};
-std::array<char, 4096> bytes;
 
-void read_handler(const std::error_code &ec,
-  std::size_t bytes_transferred)
+
+using namespace manifold;
+
+//================================================================//
+class my_request_class
 {
-  if (!ec)
+private:
+  http::client& client_;
+  std::unique_ptr<http::client::request> request_;
+  std::unique_ptr<http::client::response> response_;
+public:
+  my_request_class(http::client& c) : client_(c) {}
+  void handle_response(http::client::response &&res)
   {
-    std::cout.write(bytes.data(), bytes_transferred);
-    tcp_socket.async_read_some(asio::buffer(bytes), read_handler);
-  }
-}
+    this->response_ = std::unique_ptr<http::client::response>(new http::client::response(std::move(res)));
 
-void connect_handler(const std::error_code &ec)
-{
-  if (!ec)
+    this->response_->on_data([](const char *const data, std::size_t datasz)
+    {
+
+    });
+
+    this->response_->on_end([]()
+    {
+
+    });
+  }
+  void send()
   {
-    std::string r =
-      "GET / http/1.1\r\nHost: theboostcpplibraries.com\r\n\r\n";
-    asio::write(tcp_socket, asio::buffer(r));
-    tcp_socket.async_read_some(asio::buffer(bytes), read_handler);
+    this->client_.make_request(http::request_head("/foobar", "post", {{"content-type","application/x-www-form-urlencoded"}}), [this](http::client::request&& req)
+    {
+      this->request_ = std::unique_ptr<http::client::request>(new http::client::request(std::move(req)));
+
+      this->request_->on_response(std::bind(&my_request_class::handle_response, this, std::placeholders::_1));
+
+
+      this->request_->end(std::string("name=value&name2=value2"));
+    });
   }
-}
+};
+//================================================================//
 
-void resolve_handler(const std::error_code &ec,
-  asio::ip::tcp::resolver::iterator it)
-{
-  if (!ec)
-    tcp_socket.async_connect(*it, connect_handler);
-}
-
+//################################################################//
 int main()
 {
+  asio::io_service ioservice;
+
+  //----------------------------------------------------------------//
+  // Server Test
+
+  http::router app;
+  app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
+  {
+    auto req_ptr = std::make_shared<http::server::request>(std::move(req));
+    auto res_ptr = std::make_shared<http::server::response>(std::move(res));
+
+    req_ptr->on_data([](const char*const data, std::size_t datasz)
+    {
+
+    });
+
+    req_ptr->on_end([res_ptr]()
+    {
+      res_ptr->end(std::string("Hello World"));
+    });
+
+  });
+
+  http::server srv(ioservice, 8080, "0.0.0.0");
+  srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  // Client to Local Server Test
+
+  http::client c1(ioservice, "localhost", 8080);
+  my_request_class r(c1);
+  r.send();
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  // Client to Google Test
+
+  http::client c2(ioservice, "www.google.com", http::client::ssl_options());
+
+  c2.make_request(http::request_head(), [](http::client::request&& req)
+  {
+    auto req_ptr = std::make_shared<http::client::request>(std::move(req));
+
+    req_ptr->on_response([](http::client::response &&res)
+    {
+      auto res_ptr = std::make_shared<http::client::response>(std::move(res));
+
+      res_ptr->on_data([](const char *const data, std::size_t datasz)
+      {
+
+      });
+
+      res_ptr->on_end([]()
+      {
+
+      });
+
+    });
 
 
-  manifold::http::server srv(ioservice, 8080, "0.0.0.0");
-  srv.listen(nullptr);
+    req_ptr->end();
+  });
+  //----------------------------------------------------------------//
 
-  auto i = ioservice.run();
 
-//  for (int i = 0; i < 15; ++i)
-//  {
-//
-//    std::this_thread::sleep_for(std::chrono::seconds(1));
-//  }
+
+  ioservice.run();
+
+  return 0;
 }
-
-
-
-
-
-
-
-
-//using namespace std;
-//using namespace manifold;
-//int main()
-//{
-//  boost::asio::io_service io_service;
-//
-//  for( int x = 0; x < 42; ++x )
-//  {
-//    io_service.poll();
-//    std::cout << "Counter: " << x << std::endl;
-//
-//
-//  }
-//
-//  return 0;
-//
-//
-////  std::string name = "          my name   \t";
-////  std::string value = " foo";
-////  std::cout << "\"" << name << "\"" << std::endl;
-////  std::cout << "\"" << value << "\"" << std::endl;
-////  name.erase(0, name.find_first_not_of(" \t\f\v"));
-////  name.erase(name.find_last_not_of(" \t\f\v")+1);
-////  value.erase(0, value.find_first_not_of(" \t\f\v"));
-////  value.erase(value.find_last_not_of(" \t\f\v")+1);
-////  std::cout << "\"" << name << "\"" << std::endl;
-////  std::cout << "\"" << value << "\"" << std::endl;
-////
-////  http::response_head res;
-////  res.status_code(http::status_code::Ok);
-//
-//
-//
-////  struct addrinfo hints, *res;
-////
-////  memset(&hints, 0, sizeof hints);
-////  hints.ai_family = (int)Socket::Family::Unspecified;
-////  hints.ai_socktype = (int)Socket::Type::Stream;
-////
-////  Socket s = TCP::connect(80, "rfactor.net", std::chrono::seconds(15));
-////  TCP::recvline(s, nullptr, 8);
-////
-////  s.close();
-//
-//  return 0;
-//}
+//################################################################//

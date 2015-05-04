@@ -22,7 +22,8 @@ set(HEADER_FILES
   include/http_incoming_message.hpp
   include/http_outgoing_message.hpp
   include/http_client.hpp
-  include/http_server.hpp)
+  include/http_server.hpp
+  include/http_router.hpp)
 
 set(SOURCE_FILES
   src/socket.cpp
@@ -38,7 +39,7 @@ set(SOURCE_FILES
   src/http_outgoing_message.cpp
   src/http_client.cpp
   src/http_server.cpp
-  tests/test.cpp)
+  src/http_router.cpp)
 
 add_library(manifold SHARED ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(manifold libssl.dylib)
@@ -48,7 +49,7 @@ add_library(manifold-static STATIC ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(manifold-static libssl.dylib)
 target_link_libraries(manifold-static libcrypto.dylib)
 
-add_executable(manifold-test ${SOURCE_FILES} ${HEADER_FILES})
+add_executable(manifold-test tests/test.cpp ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(manifold-test libssl.dylib)
 target_link_libraries(manifold-test libcrypto.dylib)
 #target_link_libraries(manifold /opt/local/lib/libboost_system-mt.a)

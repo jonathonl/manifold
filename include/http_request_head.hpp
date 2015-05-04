@@ -25,7 +25,8 @@ namespace manifold
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      request_head();
+      request_head(const std::string& url = "/", const std::string& method = "get", std::list<std::pair<std::string,std::string>>&& headers = std::list<std::pair<std::string,std::string>>());
+      request_head(const std::string& url, http::method meth, std::list<std::pair<std::string,std::string>>&& headers = std::list<std::pair<std::string,std::string>>());
       ~request_head();
       //----------------------------------------------------------------//
 
