@@ -1,4 +1,4 @@
-
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #include <new>
 
 #include "asio/ssl.hpp"
@@ -34,6 +34,16 @@ namespace manifold
     }
     template void frame_payload_base::recv_frame_payload<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
     template void frame_payload_base::recv_frame_payload<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename S>
+    void frame_payload_base::send_frame_payload(S& sock, const frame_payload_base& source, const std::function<void(const std::error_code& ec)>& cb)
+    {
+      asio::async_write(sock, asio::buffer(source.buf_.data(), source.buf_.size()), [cb](const std::error_code& ec, std::size_t bytes_transfered) { (cb ? cb(ec) : void()); });
+    }
+    template void frame_payload_base::send_frame_payload<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, const frame_payload_base& source, const std::function<void(const std::error_code& ec)>& cb);
+    template void frame_payload_base::send_frame_payload<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, const frame_payload_base& source, const std::function<void(const std::error_code& ec)>& cb);
     //----------------------------------------------------------------//
     //****************************************************************//
 
@@ -667,16 +677,6 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename S>
-    void frame::send_frame(S& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb)
-    {
-
-    }
-    template void frame::send_frame<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb);
-    template void frame::send_frame<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb);
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
     std::uint32_t frame::payload_length()
     {
       std::uint32_t ret = 0;
@@ -875,6 +875,40 @@ namespace manifold
     }
     template void frame::recv_frame<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, frame& source, const std::function<void(const std::error_code& ec)>& cb);
     template void frame::recv_frame<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, frame& source, const std::function<void(const std::error_code& ec)>& cb);
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename S>
+    void frame::send_frame(S& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb)
+    {
+      asio::async_write(sock, asio::buffer(source.metadata_, source.metadata_.size()), [&sock, &source, cb](const std::error_code& ec, std::size_t bytes_transfered)
+      {
+        if (ec)
+        {
+          cb ? cb(ec) : void();
+        }
+        else
+        {
+          if (source.is<http::data_frame>()) frame_payload_base::send_frame_payload(sock, source.payload_.data_frame_, cb);
+          else if (source.is<http::headers_frame>()) frame_payload_base::send_frame_payload(sock, source.payload_.headers_frame_, cb);
+          else if (source.is<http::priority_frame>()) frame_payload_base::send_frame_payload(sock, source.payload_.priority_frame_, cb);
+          else if (source.is<http::rst_stream_frame>()) frame_payload_base::send_frame_payload(sock, source.payload_.rst_stream_frame_, cb);
+          else if (source.is<http::settings_frame>()) frame_payload_base::send_frame_payload(sock, source.payload_.settings_frame_, cb);
+          else if (source.is<http::push_promise_frame>()) frame_payload_base::send_frame_payload(sock, source.payload_.push_promise_frame_, cb);
+          else if (source.is<http::ping_frame>()) frame_payload_base::send_frame_payload(sock, source.payload_.ping_frame_, cb);
+          else if (source.is<http::goaway_frame>()) frame_payload_base::send_frame_payload(sock, source.payload_.goaway_frame_, cb);
+          else if (source.is<http::window_update_frame>()) frame_payload_base::send_frame_payload(sock, source.payload_.window_update_frame_, cb);
+          else if (source.is<http::continuation_frame>()) frame_payload_base::send_frame_payload(sock, source.payload_.continuation_frame_, cb);
+          else
+          {
+            // TODO: Invalid Frame Error;
+            cb ? cb(std::make_error_code(std::errc::bad_message)) : void();
+          }
+        }
+      });
+    }
+    template void frame::send_frame<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb);
+    template void frame::send_frame<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb);
     //----------------------------------------------------------------//
     //****************************************************************//
   }

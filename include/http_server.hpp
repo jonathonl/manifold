@@ -61,28 +61,49 @@ namespace manifold
         //----------------------------------------------------------------//
       };
       //================================================================//
+
+      //================================================================//
+      struct ssl_options
+      {
+      public:
+        asio::ssl::context::method method;
+        std::vector<char> pfx;
+        std::vector<char> key;
+        std::vector<char> passphrase;
+        std::vector<char> cert;
+        std::vector<char> ca;
+        ssl_options(asio::ssl::context::method meth) : method(meth)
+        {
+        }
+      };
+      //================================================================//
     private:
       //----------------------------------------------------------------//
       asio::io_service& io_service_;
       asio::ip::tcp::acceptor acceptor_;
-      asio::ip::tcp::socket socket_;
+      std::unique_ptr<asio::ssl::context> ssl_context_;
+      unsigned short port_;
+      std::string host_;
       std::set<std::shared_ptr<http::connection>> connections_;
-      std::list<std::pair<std::regex,std::function<void(server::request&& req, server::response&& res)>>> stream_handlers_;
+      std::function<void(server::request&& req, server::response&& res)> request_handler_;
+      //std::list<std::pair<std::regex,std::function<void(server::request&& req, server::response&& res)>>> stream_handlers_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       void accept();
+      void accept(asio::ssl::context& ctx);
       void manage_connection(const std::shared_ptr<http::connection>& conn);
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      server(asio::io_service& ioService);
+      server(asio::io_service& ioService, unsigned short port = 80, const std::string& host = "0.0.0.0");
+      server(asio::io_service& ioService, ssl_options options, unsigned short port = 443, const std::string& host = "0.0.0.0");
       ~server();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void listen(unsigned short port, const std::string& host = "");
-      void register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler);
+      void listen(const std::function<void(server::request&& req, server::response&& res)>& handler);
+      //void register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler);
       //----------------------------------------------------------------//
     };
     //================================================================//

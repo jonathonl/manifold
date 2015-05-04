@@ -61,6 +61,8 @@ namespace manifold
 
       template <typename S>
       static void recv_frame_payload(S& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
+      template <typename S>
+      static void send_frame_payload(S& sock, const frame_payload_base& source, const std::function<void(const std::error_code& ec)>& cb);
     };
     //================================================================//
 

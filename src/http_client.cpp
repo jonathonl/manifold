@@ -1,3 +1,4 @@
+
 #include "tcp.hpp"
 #include "http_client.hpp"
 
@@ -64,7 +65,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     client::client(asio::io_service& ioservice, const std::string& host, short port)
-      : io_service_(ioservice), tcp_resolver_(ioservice), socket_(ioservice)
+      : io_service_(ioservice), tcp_resolver_(ioservice)
     {
       this->last_stream_id_ = 0;
       std::shared_ptr<non_tls_connection> c = std::make_shared<non_tls_connection>(ioservice);
@@ -95,11 +96,11 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    client::client(asio::io_service& ioservice, const std::string& host, const tls_options& options, short port)
-        : io_service_(ioservice), tcp_resolver_(ioservice), socket_(ioservice)
+    client::client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, short port)
+        : io_service_(ioservice), tcp_resolver_(ioservice), ssl_context_(new asio::ssl::context(options.method))
     {
       this->last_stream_id_ = 0;
-      std::shared_ptr<tls_connection> c = std::make_shared<tls_connection>(ioservice, options.context);
+      std::shared_ptr<tls_connection> c = std::make_shared<tls_connection>(ioservice, *this->ssl_context_);
       this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [this, c](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
       {
         if (ec)
