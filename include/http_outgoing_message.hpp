@@ -33,6 +33,11 @@ namespace manifold
       bool send(const char*const data, std::size_t data_sz);
       void on_drain(const std::function<void()>& fn);
       bool end(const char*const data, std::size_t data_sz);
+      template <typename BufferT>
+      bool end(const BufferT& dataBuffer)
+      {
+        return this->end(dataBuffer.data(), dataBuffer.size());
+      }
       bool end();
       //----------------------------------------------------------------//
     };

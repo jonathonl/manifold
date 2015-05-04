@@ -94,7 +94,7 @@ namespace manifold
       {
       public:
         asio::ssl::context::method method;
-        ssl_options(asio::ssl::context::method meth) : method(meth)
+        ssl_options(asio::ssl::context::method meth = asio::ssl::context::method::sslv2) : method(meth)
         {
         }
       };
@@ -119,11 +119,11 @@ namespace manifold
       //void connect(std::string& host, std::uint16_t port, const std::function<void(const std::error_code& ec, connection_handle conn)>& cb);
       void on_connect(const std::function<void()>& cb);
       void on_close(const std::function<void(const std::error_code ec)>& cb);
-      void make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& cb);
+      void make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& cb) {}
 
     };
     //================================================================//
-  };
+  }
 }
 
 #endif // MANIFOLD_HTTP_CLIENT_HPP

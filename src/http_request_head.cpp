@@ -8,6 +8,7 @@ namespace manifold
 {
   namespace http
   {
+    //----------------------------------------------------------------//
     std::string method_enum_to_string(method method)
     {
       std::string ret;
@@ -24,10 +25,21 @@ namespace manifold
 
       return ret;
     }
+    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    request_head::request_head()
+    request_head::request_head(const std::string& url, const std::string& method, std::list<std::pair<std::string,std::string>>&& headers)
+      : method_(method), url_(url)
     {
+      this->headers_ = std::move(headers);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    request_head::request_head(const std::string& url, http::method method, std::list<std::pair<std::string,std::string>>&& headers)
+        : method_(method_enum_to_string(method)), url_(url)
+    {
+      this->headers_ = std::move(headers);
     }
     //----------------------------------------------------------------//
 
