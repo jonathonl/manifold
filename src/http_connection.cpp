@@ -70,19 +70,25 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    bool connection::stream_has_sendable_frame(const stream& stream_to_check)
+    {
+      return (stream_to_check.outgoing_non_data_frames.size()
+        || (stream_to_check.outgoing_data_frames.size() && stream_to_check.outgoing_window_size > 0 && this->connection_level_outgoing_window_size() > 0)
+        || (stream_to_check.outgoing_data_frames.size() && stream_to_check.outgoing_data_frames.front().payload_length() == 0));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     bool connection::check_tree_for_outgoing_frame(const stream_dependency_tree& current_node)
     {
       bool ret = false;
 
-      if (current_node.stream_ptr()->outgoing_non_data_frames.size() || (current_node.stream_ptr()->outgoing_data_frames.size() && current_node.stream_ptr()->outgoing_window_size > 0 && this->connection_level_outgoing_window_size() > 0))
+      if (this->stream_has_sendable_frame(*current_node.stream_ptr()))
         ret = true;
 
       for (auto it = current_node.children().begin(); !ret && it != current_node.children().end(); ++it)
       {
-//        if (it->stream_ptr()->outgoing_frames.size())
-//          ret = true;
-//        else if (it->children().size())
-          ret = check_tree_for_outgoing_frame(*it);
+        ret = check_tree_for_outgoing_frame(*it);
       }
 
       return ret;
@@ -95,7 +101,7 @@ namespace manifold
       // TODO: enforce a max tree depth of 10 to avoid stack overflow from recursion.
       stream* ret = nullptr;
 
-      if (current_node.stream_ptr()->outgoing_non_data_frames.size() || (current_node.stream_ptr()->outgoing_data_frames.size() && current_node.stream_ptr()->outgoing_window_size > 0 && this->connection_level_outgoing_window_size() > 0))
+      if (this->stream_has_sendable_frame(*current_node.stream_ptr()))
       {
         ret = current_node.stream_ptr();
       }
@@ -147,6 +153,100 @@ namespace manifold
         {
           if (self->incoming_frame_.stream_id())
           {
+            auto it = self->streams_.find(self->incoming_frame_.stream_id());
+            if (it == self->streams_.end())
+            {
+              if (self->incoming_frame_.is<headers_frame>() || self->incoming_frame_.is<push_promise_frame>())
+              {
+              }
+              else
+              {
+                // TODO: Some other frames may be allowed after a stream is removed (eg, window_update).
+              }
+            }
+            else
+            {
+              stream& current_stream = self->streams_[self->incoming_frame_.stream_id()];
+              if (self->incoming_frame_.is<window_update_frame>())
+              {
+                current_stream.outgoing_window_size += self->incoming_frame_.window_update_frame().window_size_increment();
+              }
+              else if (self->incoming_frame_.is<data_frame>())
+              {
+                self->streams_[self->incoming_frame_.stream_id()].incoming_data_frames.push(std::move(self->incoming_frame_));
+                if (current_stream.on_data_frame)
+                {
+                  while (current_stream.incoming_data_frames.size())
+                  {
+                    current_stream.on_data_frame(current_stream.incoming_data_frames.front().data_frame().data(), current_stream.incoming_data_frames.front().data_frame().data_length());
+
+                    if (current_stream.incoming_data_frames.front().data_frame().flags() & frame_flag::end_stream)
+                    {
+                      current_stream.end_stream_frame_received= true;
+                      if (current_stream.on_end_frame)
+                        current_stream.on_end_frame();
+                    }
+
+                    current_stream.incoming_data_frames.pop();
+                  }
+                }
+              }
+              else if (self->incoming_frame_.is<headers_frame>())
+              {
+                if (current_stream.incoming_header_and_continuation_frames.size())
+                {
+                  // TODO: connection error
+                }
+                else
+                {
+                  current_stream.incoming_header_and_continuation_frames.push(std::move(self->incoming_frame_));
+
+                  if (self->incoming_frame_.headers_frame().has_end_stream_flag())
+                    current_stream.end_stream_frame_received= true;
+
+                  if (self->incoming_frame_.headers_frame().has_end_headers_flag())
+                  {
+                    while (current_stream.incoming_header_and_continuation_frames.size())
+                    {
+                      // TODO: decompress into message head object.
+                      current_stream.incoming_header_and_continuation_frames.pop();
+                    }
+
+                    // TODO: call on_headers function
+
+                    if (current_stream.end_stream_frame_received && current_stream.on_end_frame)
+                      current_stream.on_end_frame();
+                  }
+                }
+              }
+              else if (self->incoming_frame_.is<continuation_frame>())
+              {
+                if (!current_stream.incoming_header_and_continuation_frames.size())
+                {
+                  // TODO: connection error
+                }
+                else
+                {
+                  current_stream.incoming_header_and_continuation_frames.push(std::move(self->incoming_frame_));
+
+                  if (self->incoming_frame_.continuation_frame().has_end_headers_flag())
+                  {
+                    while (current_stream.incoming_header_and_continuation_frames.size())
+                    {
+                      // TODO: decompress into message head object.
+                      current_stream.incoming_header_and_continuation_frames.pop();
+                    }
+
+                    // TODO: call on_headers function
+
+                    if (current_stream.end_stream_frame_received && current_stream.on_end_frame)
+                      current_stream.on_end_frame();
+                  }
+                }
+              }
+
+            }
+
             //self->streams_[self->incoming_frame_.stream_id()].frames_.push_back(std::move(self->incoming_frame_));
           }
           else

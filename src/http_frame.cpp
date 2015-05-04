@@ -677,7 +677,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::uint32_t frame::payload_length()
+    std::uint32_t frame::payload_length() const
     {
       std::uint32_t ret = 0;
       memcpy(&ret, this->metadata_.data(), 3);

@@ -43,14 +43,18 @@ namespace manifold
         std::function<void()> on_end_frame;
         std::function<void()> on_window_update;
 
-        std::queue<frame> incoming_frames;
+        std::queue<frame> incoming_header_and_continuation_frames;
+        std::queue<message_head> incoming_message_heads;
+        std::queue<frame> incoming_data_frames;
         std::queue<frame> outgoing_non_data_frames;
         std::queue<frame> outgoing_data_frames;
 
         std::uint32_t outgoing_window_size = 65535;
         std::uint32_t incoming_window_size = 65535;
-        std::uint32_t stream_dependency_id;
-        std::uint8_t weight;
+        std::uint32_t stream_dependency_id = 0;
+        std::uint8_t weight = 16;
+
+        bool end_stream_frame_received = false;
       };
       //================================================================//
 
@@ -103,6 +107,7 @@ namespace manifold
       //----------------------------------------------------------------//
       stream* get_next_send_stream_ptr(const stream_dependency_tree& current_node);
       bool check_tree_for_outgoing_frame(const stream_dependency_tree& current_node);
+      bool stream_has_sendable_frame(const stream& stream_to_check);
 
 
       void run_recv_loop();

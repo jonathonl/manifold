@@ -78,6 +78,9 @@ namespace manifold
       std::uint32_t data_length() const;
       const char*const padding() const;
       std::uint8_t pad_length() const;
+
+      bool has_end_stream_flag() const { return this->flags_ & frame_flag::end_stream; }
+      bool has_padded_flag() const  { return this->flags_ & frame_flag::padded; }
     };
     //================================================================//
 
@@ -116,6 +119,11 @@ namespace manifold
       std::uint8_t weight() const;
       std::uint32_t stream_dependency_id() const;
       bool exclusive_stream_dependency() const;
+
+      bool has_end_stream_flag() const { return this->flags_ & frame_flag::end_stream; }
+      bool has_end_headers_flag() const { return this->flags_ & frame_flag::end_headers; }
+      bool has_padded_flag() const  { return this->flags_ & frame_flag::padded; }
+      bool has_priority_flag() const { return this->flags_ & frame_flag::priority; }
     };
     //================================================================//
 
@@ -161,7 +169,7 @@ namespace manifold
       ~settings_frame() {}
 
 
-      bool is_ack() const { return (bool)(this->flags_ & 0x1); }
+      bool has_ack_flag() const { return (bool)(this->flags_ & 0x1); }
       std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator begin();
       std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end();
       std::size_t count();
@@ -234,6 +242,8 @@ namespace manifold
 
       const char*const header_block_fragment() const;
       std::uint32_t header_block_fragment_length() const;
+
+      bool has_end_headers_flag() const { return this->flags_ & frame_flag::end_headers; }
     };
     //================================================================//
 
@@ -324,16 +334,16 @@ namespace manifold
       frame(http::goaway_frame&& payload, std::uint32_t stream_id);
       frame(http::window_update_frame&& payload, std::uint32_t stream_id);
       frame(http::continuation_frame&& payload, std::uint32_t stream_id);
-      frame(frame&& source) {}
+      frame(frame&& source) {} // TODO:
       ~frame();
-      frame& operator=(frame&& source) { return (*this); }
+      frame& operator=(frame&& source) { return (*this); } // TODO:
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       template <typename T>
       bool is() const;
 
-      std::uint32_t payload_length();
+      std::uint32_t payload_length() const;
       frame_type type() const;
       std::uint32_t stream_id() const;
       //----------------------------------------------------------------//
