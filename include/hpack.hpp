@@ -36,7 +36,7 @@ namespace manifold
     {
     };
     //================================================================//
-  };
+  }
 }
 
 #endif // MANIFOLD_HPACK_CONTEXT_HPP

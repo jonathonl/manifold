@@ -7,7 +7,7 @@
 #include <list>
 
 #include "socket.hpp"
-#include "hpack_context.hpp"
+#include "hpack.hpp"
 
 namespace manifold
 {
