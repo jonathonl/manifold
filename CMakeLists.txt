@@ -23,7 +23,8 @@ set(HEADER_FILES
   include/http_outgoing_message.hpp
   include/http_client.hpp
   include/http_server.hpp
-  include/http_router.hpp)
+  include/http_router.hpp
+  include/hpack_context.hpp)
 
 set(SOURCE_FILES
   src/socket.cpp
@@ -39,7 +40,8 @@ set(SOURCE_FILES
   src/http_outgoing_message.cpp
   src/http_client.cpp
   src/http_server.cpp
-  src/http_router.cpp)
+  src/http_router.cpp
+  src/hpack_context.cpp)
 
 add_library(manifold SHARED ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(manifold libssl.dylib)
