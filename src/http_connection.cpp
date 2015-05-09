@@ -358,16 +358,16 @@ namespace manifold
     {
       bool ret = false;
 
-      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
-
-      if (it != this->streams_.end())
-      {
-        std::string header_data;
-        http::message_head::serialize(head, header_data);
-        //TODO: break into multiple frames if needed.
-        it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), header_data.size(), end_stream), stream_id));
-        this->run_send_loop();
-      }
+//      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
+//
+//      if (it != this->streams_.end())
+//      {
+//        std::string header_data;
+//        http::message_head::serialize(head, header_data);
+//        //TODO: break into multiple frames if needed.
+//        it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), header_data.size(), end_stream), stream_id));
+//        this->run_send_loop();
+//      }
 
       return ret;
     }

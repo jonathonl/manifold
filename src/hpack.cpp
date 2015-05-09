@@ -1,4 +1,6 @@
 
+#include <cmath>
+
 #include "hpack.hpp"
 
 namespace manifold
@@ -69,9 +71,86 @@ namespace manifold
     /* 60 */    {"via"                         , ""             },
     /* 61 */    {"www-authenticate"            , ""             }}};
 
+    void encoder::encode_integer(prefix_mask prfx_mask, std::uint64_t input, std::string& output)
+    {
+      if (input < (std::uint8_t)prfx_mask)
+      {
+        output.push_back((std::uint8_t)prfx_mask & (std::uint8_t)input);
+      }
+      else
+      {
+        output.push_back((std::uint8_t)prfx_mask);
 
+        input = input - (std::uint8_t)prfx_mask;
 
+        while (input >= 128)
+        {
+          output.push_back((std::uint8_t)(input % 128 + 128));
+          input = input / 128;
+        }
 
+        output.push_back((std::uint8_t)input);
+      }
 
-  };
+    }
+
+    void encoder::encode(const std::list<std::pair<std::string,std::string>>& headers, std::string& output)
+    {
+    }
+
+    // TODO: Decide whether to deal with pos greather than input size.
+    std::uint64_t decoder::decode_integer(prefix_mask prfx_mask, const std::string& input, std::size_t& pos)
+    {
+
+      std::uint64_t ret = (std::uint8_t)prfx_mask & input[pos];
+      if (ret == (std::uint8_t)prfx_mask)
+      {
+        std::uint64_t m = 0;
+
+        do
+        {
+          pos++;
+          ret = ret + ((input[pos] & 127) * (std::uint64_t)std::pow(2,m));
+          m = m + 7;
+        }
+        while ((input[pos] & 128) == 128);
+      }
+      return ret;
+    }
+
+    bool decoder::decode(const std::string& input, std::list<std::pair<std::string,std::string>>& headers)
+    {
+      bool ret = true;
+
+      for (std::size_t pos = 0; ret && pos < input.size(); )
+      {
+        if (input[pos] & 0x80)
+        {
+          // Indexed Header Field Representation
+        }
+        else if ((input[pos] & 0xC0) == 0x40)
+        {
+          // Literal Header Field with Incremental Indexing
+        }
+        else if ((input[pos] & 0xF0) == 0x0)
+        {
+          // Literal Header Field without Indexing
+        }
+        else if ((input[pos] & 0xF0) == 0x10)
+        {
+          // Literal Header Field never Indexed
+        }
+        else if ((input[pos] & 0xE0) == 0x20)
+        {
+          // Dynamic Table Size Update
+        }
+        else
+        {
+          ret = false;
+        }
+      }
+
+      return ret;
+    }
+  }
 }

@@ -30,6 +30,7 @@ namespace manifold
     public:
       //----------------------------------------------------------------//
       message_head();
+      message_head(std::list<std::pair<std::string,std::string>>&& raw_headers);
       virtual ~message_head();
       //----------------------------------------------------------------//
 
@@ -40,18 +41,20 @@ namespace manifold
       void multi_header(std::string&& name, std::list<std::string>&& values);
       std::string header(const std::string& name) const;
       std::list<std::string> multi_header(const std::string& name) const;
-      const std::string& http_version() const;
-      void http_version(const std::string& version); // TODO: Make this an enum.
+      const std::list<std::pair<std::string,std::string>>& raw_headers() const;
+
+//      const std::string& http_version() const;
+//      void http_version(const std::string& version); // TODO: Make this an enum.
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      virtual void start_line(const std::string& value) = 0;
-      virtual std::string start_line() const = 0;
+//      virtual void start_line(const std::string& value) = 0;
+//      virtual std::string start_line() const = 0;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      static void serialize(const message_head& source, std::string& destination);
-      static bool deserialize(const std::string& source, message_head& destination);
+      //static void serialize(const message_head& source, std::string& destination);
+      //static bool deserialize(const std::string& source, message_head& destination);
       //----------------------------------------------------------------//
     };
     //================================================================//

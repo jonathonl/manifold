@@ -16,6 +16,13 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    message_head::message_head(std::list<std::pair<std::string,std::string>>&& raw_headers)
+      : headers_(std::move(raw_headers))
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     message_head::~message_head()
     {
     }
@@ -128,81 +135,88 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::string& message_head::http_version() const
+    const std::list<std::pair<std::string,std::string>>& message_head::raw_headers() const
     {
-      return this->version_;
+      return this->headers_;
     }
     //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    void  message_head::http_version(const std::string& version)
-    {
-      this->version_ = version;
-    }
-    //----------------------------------------------------------------//
+//    //----------------------------------------------------------------//
+//    const std::string& message_head::http_version() const
+//    {
+//      return this->version_;
+//    }
+//    //----------------------------------------------------------------//
+//
+//    //----------------------------------------------------------------//
+//    void  message_head::http_version(const std::string& version)
+//    {
+//      this->version_ = version;
+//    }
+//    //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    void message_head::serialize(const message_head& source, std::string& destination)
-    {
-      destination = source.start_line() + "\r\n";
-      for (auto it = source.headers_.begin(); it != source.headers_.end(); ++it)
-      {
-        destination += it->first;
-        destination += ": ";
-        destination += it->second;
-        destination += "\r\n";
-      }
-      destination += "\r\n";
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    bool message_head::deserialize(const std::string& source, message_head& destination)
-    {
-      bool ret = false;
-      std::size_t pos = 0;
-      pos = source.find("\r\n", pos);
-      if (pos != std::string::npos)
-      {
-        destination.start_line(source.substr(0, pos));
-        pos += 2;
-
-        while (!ret && pos != source.size())
-        {
-          std::size_t endPos = source.find("\r\n", pos);
-          if (endPos == std::string::npos)
-          {
-            break;
-          }
-          else if (endPos == pos)
-          {
-            ret = true;
-          }
-          else
-          {
-            const char * delim = ":";
-            const char* colonPtr = std::search(&source[pos], &source[pos] + endPos, delim, delim + 1);
-            if (colonPtr == &source[pos] + endPos)
-            {
-              break;
-            }
-            else
-            {
-              std::string name(&source[pos], colonPtr - &source[pos]);
-              ++colonPtr;
-              std::string value(colonPtr, &source[endPos] - colonPtr);
-
-              destination.header(std::move(name), std::move(value)); // header set_method trims.
-
-              pos = endPos + 2;
-            }
-          }
-        }
-
-      }
-
-      return ret;
-    }
-    //----------------------------------------------------------------//
+//    //----------------------------------------------------------------//
+//    void message_head::serialize(const message_head& source, std::string& destination)
+//    {
+//      destination = source.start_line() + "\r\n";
+//      for (auto it = source.headers_.begin(); it != source.headers_.end(); ++it)
+//      {
+//        destination += it->first;
+//        destination += ": ";
+//        destination += it->second;
+//        destination += "\r\n";
+//      }
+//      destination += "\r\n";
+//    }
+//    //----------------------------------------------------------------//
+//
+//    //----------------------------------------------------------------//
+//    bool message_head::deserialize(const std::string& source, message_head& destination)
+//    {
+//      bool ret = false;
+//      std::size_t pos = 0;
+//      pos = source.find("\r\n", pos);
+//      if (pos != std::string::npos)
+//      {
+//        destination.start_line(source.substr(0, pos));
+//        pos += 2;
+//
+//        while (!ret && pos != source.size())
+//        {
+//          std::size_t endPos = source.find("\r\n", pos);
+//          if (endPos == std::string::npos)
+//          {
+//            break;
+//          }
+//          else if (endPos == pos)
+//          {
+//            ret = true;
+//          }
+//          else
+//          {
+//            const char * delim = ":";
+//            const char* colonPtr = std::search(&source[pos], &source[pos] + endPos, delim, delim + 1);
+//            if (colonPtr == &source[pos] + endPos)
+//            {
+//              break;
+//            }
+//            else
+//            {
+//              std::string name(&source[pos], colonPtr - &source[pos]);
+//              ++colonPtr;
+//              std::string value(colonPtr, &source[endPos] - colonPtr);
+//
+//              destination.header(std::move(name), std::move(value)); // header set_method trims.
+//
+//              pos = endPos + 2;
+//            }
+//          }
+//        }
+//
+//      }
+//
+//      return ret;
+//    }
+//    //----------------------------------------------------------------//
   }
 }
