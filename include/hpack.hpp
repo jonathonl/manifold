@@ -34,7 +34,7 @@ namespace manifold
     };
 
     extern const std::array<std::pair<std::string,std::string>, 61> static_table;
-    //extern const std::unordered_map<std::pair<std::string,std::string>, std::size_t> static_table_reverse_lookup_map;
+    extern const std::unordered_multimap<std::string, std::size_t> static_table_reverse_lookup_map;
 
     enum class prefix_mask : std::uint8_t
     {
@@ -90,11 +90,13 @@ namespace manifold
     class encoder : public context
     {
     private:
+      struct find_result { std::size_t name_index = 0; std::size_t name_and_value_index = 0; };
       std::queue<std::size_t> table_size_updates_;
       //std::multimap<std::pair<std::string,std::string>, std::size_t> dynamic_table_reverse_lookup_map_;
 
       static void encode_integer(prefix_mask prfx_mask, std::uint64_t input, std::string& output);
       static void huffman_encode(std::string::const_iterator begin, std::string::const_iterator end, std::string& output);
+      find_result find(const header_field& header_to_find);
     public:
       encoder(std::size_t max_table_size)
         : context(max_table_size) {}

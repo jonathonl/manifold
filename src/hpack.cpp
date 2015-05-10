@@ -4,22 +4,22 @@
 
 #include "hpack.hpp"
 
-//namespace std
-//{
-//  template <>
-//  struct hash<std::pair<std::string,std::string>>
-//  {
-//    std::size_t operator()(const std::pair<std::string,std::string>& k) const
-//    {
-//      // Compute individual hash values for first,
-//      // second and third and combine them using XOR
-//      // and bit shifting:
-//
-//      return ((std::hash<std::string>()(k.first) ^ (std::hash<std::string>()(k.second) << 1)) >> 1);
-//    }
-//  };
-//
-//}
+namespace std
+{
+  template <>
+  struct hash<std::pair<std::string,std::string>>
+  {
+    std::size_t operator()(const std::pair<std::string,std::string>& k) const
+    {
+      // Compute individual hash values for first,
+      // second and third and combine them using XOR
+      // and bit shifting:
+
+      return ((std::hash<std::string>()(k.first) ^ (std::hash<std::string>()(k.second) << 1)) >> 1);
+    }
+  };
+
+}
 
 namespace manifold
 {
@@ -90,70 +90,70 @@ namespace manifold
       /* 61 */    {"www-authenticate"            , ""             }}};
     //----------------------------------------------------------------//
 
-//    //----------------------------------------------------------------//
-//    const std::unordered_map<std::pair<std::string,std::string>, std::size_t> static_table_reverse_lookup_map{
-//      {{":authority"                  , ""             }, 1 },
-//      {{":method"                     , "GET"          }, 2 },
-//      {{":method"                     , "POST"         }, 3 },
-//      {{":path"                       , "/"            }, 4 },
-//      {{":path"                       , "/index.html"  }, 5 },
-//      {{":scheme"                     , "http"         }, 6 },
-//      {{":scheme"                     , "https"        }, 7 },
-//      {{":status"                     , "200"          }, 8 },
-//      {{":status"                     , "204"          }, 9 },
-//      {{":status"                     , "206"          }, 10},
-//      {{":status"                     , "304"          }, 11},
-//      {{":status"                     , "400"          }, 12},
-//      {{":status"                     , "404"          }, 13},
-//      {{":status"                     , "500"          }, 14},
-//      {{"accept-charset"              , ""             }, 15},
-//      {{"accept-encoding"             , "gzip, deflate"}, 16},
-//      {{"accept-language"             , ""             }, 17},
-//      {{"accept-ranges"               , ""             }, 18},
-//      {{"accept"                      , ""             }, 19},
-//      {{"access-control-allow-origin" , ""             }, 20},
-//      {{"age"                         , ""             }, 21},
-//      {{"allow"                       , ""             }, 22},
-//      {{"authorization"               , ""             }, 23},
-//      {{"cache-control"               , ""             }, 24},
-//      {{"content-disposition"         , ""             }, 25},
-//      {{"content-encoding"            , ""             }, 26},
-//      {{"content-language"            , ""             }, 27},
-//      {{"content-length"              , ""             }, 28},
-//      {{"content-location"            , ""             }, 29},
-//      {{"content-range"               , ""             }, 30},
-//      {{"content-type"                , ""             }, 31},
-//      {{"cookie"                      , ""             }, 32},
-//      {{"date"                        , ""             }, 33},
-//      {{"etag"                        , ""             }, 34},
-//      {{"expect"                      , ""             }, 35},
-//      {{"expires"                     , ""             }, 36},
-//      {{"from"                        , ""             }, 37},
-//      {{"host"                        , ""             }, 38},
-//      {{"if-match"                    , ""             }, 39},
-//      {{"if-modified-since"           , ""             }, 40},
-//      {{"if-none-match"               , ""             }, 41},
-//      {{"if-range"                    , ""             }, 42},
-//      {{"if-unmodified-since"         , ""             }, 43},
-//      {{"last-modified"               , ""             }, 44},
-//      {{"link"                        , ""             }, 45},
-//      {{"location"                    , ""             }, 46},
-//      {{"max-forwards"                , ""             }, 47},
-//      {{"proxy-authenticate"          , ""             }, 48},
-//      {{"proxy-authorization"         , ""             }, 49},
-//      {{"range"                       , ""             }, 50},
-//      {{"referer"                     , ""             }, 51},
-//      {{"refresh"                     , ""             }, 52},
-//      {{"retry-after"                 , ""             }, 53},
-//      {{"server"                      , ""             }, 54},
-//      {{"set-cookie"                  , ""             }, 55},
-//      {{"strict-transport-security"   , ""             }, 56},
-//      {{"transfer-encoding"           , ""             }, 57},
-//      {{"user-agent"                  , ""             }, 58},
-//      {{"vary"                        , ""             }, 59},
-//      {{"via"                         , ""             }, 60},
-//      {{"www-authenticate"            , ""             }, 61}};
-//    //----------------------------------------------------------------//
+    //----------------------------------------------------------------//
+    const std::unordered_multimap<std::string, std::size_t> static_table_reverse_lookup_map{
+      {":authority"                  ,  1 },  // ""
+      {":method"                     ,  2 },  // "GET"
+      {":method"                     ,  3 },  // "POST"
+      {":path"                       ,  4 },  // "/"
+      {":path"                       ,  5 },  // "/index.html"
+      {":scheme"                     ,  6 },  // "http"
+      {":scheme"                     ,  7 },  // "https"
+      {":status"                     ,  8 },  // "200"
+      {":status"                     ,  9 },  // "204"
+      {":status"                     ,  10},  // "206"
+      {":status"                     ,  11},  // "304"
+      {":status"                     ,  12},  // "400"
+      {":status"                     ,  13},  // "404"
+      {":status"                     ,  14},  // "500"
+      {"accept-charset"              ,  15},  // ""
+      {"accept-encoding"             ,  16},  // "gzip, deflate"
+      {"accept-language"             ,  17},  // ""
+      {"accept-ranges"               ,  18},  // ""
+      {"accept"                      ,  19},  // ""
+      {"access-control-allow-origin" ,  20},  // ""
+      {"age"                         ,  21},  // ""
+      {"allow"                       ,  22},  // ""
+      {"authorization"               ,  23},  // ""
+      {"cache-control"               ,  24},  // ""
+      {"content-disposition"         ,  25},  // ""
+      {"content-encoding"            ,  26},  // ""
+      {"content-language"            ,  27},  // ""
+      {"content-length"              ,  28},  // ""
+      {"content-location"            ,  29},  // ""
+      {"content-range"               ,  30},  // ""
+      {"content-type"                ,  31},  // ""
+      {"cookie"                      ,  32},  // ""
+      {"date"                        ,  33},  // ""
+      {"etag"                        ,  34},  // ""
+      {"expect"                      ,  35},  // ""
+      {"expires"                     ,  36},  // ""
+      {"from"                        ,  37},  // ""
+      {"host"                        ,  38},  // ""
+      {"if-match"                    ,  39},  // ""
+      {"if-modified-since"           ,  40},  // ""
+      {"if-none-match"               ,  41},  // ""
+      {"if-range"                    ,  42},  // ""
+      {"if-unmodified-since"         ,  43},  // ""
+      {"last-modified"               ,  44},  // ""
+      {"link"                        ,  45},  // ""
+      {"location"                    ,  46},  // ""
+      {"max-forwards"                ,  47},  // ""
+      {"proxy-authenticate"          ,  48},  // ""
+      {"proxy-authorization"         ,  49},  // ""
+      {"range"                       ,  50},  // ""
+      {"referer"                     ,  51},  // ""
+      {"refresh"                     ,  52},  // ""
+      {"retry-after"                 ,  53},  // ""
+      {"server"                      ,  54},  // ""
+      {"set-cookie"                  ,  55},  // ""
+      {"strict-transport-security"   ,  56},  // ""
+      {"transfer-encoding"           ,  57},  // ""
+      {"user-agent"                  ,  58},  // ""
+      {"vary"                        ,  59},  // ""
+      {"via"                         ,  60},  // ""
+      {"www-authenticate"            ,  61}}; // ""
+    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void context::table_evict()
@@ -210,11 +210,105 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    encoder::find_result encoder::find(const header_field& header_to_find)
+    {
+      find_result ret;
+      auto static_table_find_range = static_table_reverse_lookup_map.equal_range(header_to_find.name);
+      if (static_table_find_range.first != static_table_find_range.second)
+      {
+        ret.name_index = static_table_find_range.first->second;
+        for( auto it = static_table_find_range.first; ret.name_and_value_index == 0 && it != static_table_find_range.second; ++it)
+        {
+          if (header_to_find.value == this->at(it->second).second)
+          {
+            ret.name_and_value_index = it->second;
+          }
+        }
+      }
+
+      if (ret.name_and_value_index == 0)
+      {
+        std::size_t current_index = static_table.size() + 1;
+        for (auto it = this->dynamic_table_.begin(); ret.name_and_value_index == 0 && it != this->dynamic_table_.end(); ++it,++current_index)
+        {
+          if (it->first == header_to_find.name)
+          {
+            if (ret.name_index == 0)
+            {
+              ret.name_index = current_index;
+            }
+
+            if (it->second == header_to_find.value)
+            {
+              ret.name_and_value_index = current_index;
+            }
+          }
+        }
+      }
+
+      return ret;
+    };
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     void encoder::encode(const std::list<header_field>& headers, std::string& output)
     {
-      for (std::list<header_field>::const_iterator it = headers.begin(); it != headers.end(); ++it)
+      while (this->table_size_updates_.size())
       {
+        output.push_back((char)0x20);
+        this->max_dynamic_table_size_ = this->table_size_updates_.front();
+        encode_integer(prefix_mask::five_bit, this->max_dynamic_table_size_, output);
+        while (this->current_dynamic_table_size_ > this->max_dynamic_table_size_)
+          this->table_evict();
 
+        this->table_size_updates_.pop();
+      }
+
+      for (std::list<header_field>::const_iterator header_itr= headers.begin(); header_itr != headers.end(); ++header_itr)
+      {
+        find_result res = this->find(*header_itr);
+
+        if (res.name_and_value_index)
+        {
+          output.push_back((char)0x80);
+          encode_integer(prefix_mask::seven_bit, res.name_and_value_index, output);
+        }
+        else
+        {
+          prefix_mask pfx_mask;
+          if (header_itr->cache == header_field_cacheability::yes)
+          {
+            pfx_mask = prefix_mask::six_bit;
+            output.push_back((char)0x40);
+            this->table_insert(std::pair<std::string,std::string>(header_itr->name, header_itr->value));
+          }
+          else if (header_itr->cache == header_field_cacheability::never)
+          {
+            pfx_mask = prefix_mask::four_bit;
+            output.push_back((char)0);
+          }
+          else
+          {
+            pfx_mask = prefix_mask::four_bit;
+            output.push_back((char)0x10);
+          }
+
+          if (res.name_index)
+          {
+            encode_integer(pfx_mask, res.name_index, output);
+          }
+          else
+          {
+            output.push_back((char)0x0); // no huffman.
+            encode_integer(prefix_mask::seven_bit, header_itr->name.size(), output);
+            output += header_itr->name;
+          }
+
+          output.push_back((char)0x0); // no huffman.
+          encode_integer(prefix_mask::seven_bit, header_itr->value.size(), output);
+          output += header_itr->value;
+
+        }
       }
     }
     //----------------------------------------------------------------//
