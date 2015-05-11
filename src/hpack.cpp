@@ -189,11 +189,11 @@ namespace manifold
     {
       if (input < (std::uint8_t)prfx_mask)
       {
-        output.push_back((std::uint8_t)prfx_mask & (std::uint8_t)input);
+        output.back() |= ((std::uint8_t)prfx_mask & (std::uint8_t)input);
       }
       else
       {
-        output.push_back((std::uint8_t)prfx_mask);
+        output.back() |= (std::uint8_t)prfx_mask;
 
         input = input - (std::uint8_t)prfx_mask;
 
@@ -317,7 +317,7 @@ namespace manifold
     // TODO: Decide whether to deal with pos greather than input size.
     std::uint64_t decoder::decode_integer(prefix_mask prfx_mask, std::string::const_iterator& itr)
     {
-
+      auto a = (std::uint8_t)*itr;
       std::uint64_t ret = (std::uint8_t)prfx_mask & *itr;
       if (ret == (std::uint8_t)prfx_mask)
       {
@@ -331,6 +331,7 @@ namespace manifold
         }
         while ((*itr & 128) == 128);
       }
+      ++itr;
       return ret;
     }
     //----------------------------------------------------------------//
@@ -407,7 +408,7 @@ namespace manifold
           // Indexed Header Field Representation
           //
           std::uint64_t table_index = decode_integer(prefix_mask::seven_bit, itr);
-          if (table_index <= this->header_list_length())
+          if (table_index && table_index <= this->header_list_length())
           {
             const std::pair<std::string,std::string>& p = this->at(table_index);
             headers.emplace_back(p.first, p.second);

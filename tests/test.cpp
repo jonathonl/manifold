@@ -52,8 +52,32 @@ int main()
   asio::io_service ioservice;
 
   //----------------------------------------------------------------//
-  // Server Test
+  // HPack Test
+  //
+  hpack::encoder enc(4096);
+  hpack::decoder dec(4096);
 
+  std::list<hpack::header_field> sendHeaders;
+  std::list<hpack::header_field> recvHeaders;
+
+  sendHeaders.push_back(hpack::header_field(":path","/"));
+  sendHeaders.push_back(hpack::header_field(":method","GET"));
+  sendHeaders.push_back(hpack::header_field("content-type","application/json; charset=utf8"));
+  sendHeaders.push_back(hpack::header_field("content-length","30"));
+  sendHeaders.push_back(hpack::header_field("custom-header","foobar; baz"));
+
+
+  std::string serializedHeaders;
+  enc.encode(sendHeaders, serializedHeaders);
+  dec.decode(serializedHeaders.begin(), serializedHeaders.end(), recvHeaders);
+
+  for (auto it : recvHeaders)
+    std::cout << it.name << ": " << it.value << std::endl;
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  // Server Test
+  //
   http::router app;
   app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
   {
@@ -78,7 +102,7 @@ int main()
 
   //----------------------------------------------------------------//
   // Client to Local Server Test
-
+  //
   http::client c1(ioservice, "localhost", 8080);
   my_request_class r(c1);
   r.send();
@@ -86,7 +110,7 @@ int main()
 
   //----------------------------------------------------------------//
   // Client to Google Test
-
+  //
   http::client c2(ioservice, "www.google.com", http::client::ssl_options());
 
   c2.make_request(http::request_head(), [](http::client::request&& req)

@@ -81,7 +81,7 @@ namespace manifold
       void table_insert(std::pair<std::string,std::string>&& entry);
     public:
       context(std::size_t max_table_size)
-        : max_dynamic_table_size_(max_table_size) {}
+        : max_dynamic_table_size_(max_table_size), current_dynamic_table_size_(0) {}
       virtual ~context() {}
     };
     //================================================================//
