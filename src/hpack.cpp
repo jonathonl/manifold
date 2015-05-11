@@ -276,13 +276,13 @@ namespace manifold
         else
         {
           prefix_mask pfx_mask;
-          if (header_itr->cache == header_field_cacheability::yes)
+          if (header_itr->cache == cacheability::yes)
           {
             pfx_mask = prefix_mask::six_bit;
             output.push_back((char)0x40);
             this->table_insert(std::pair<std::string,std::string>(header_itr->name, header_itr->value));
           }
-          else if (header_itr->cache == header_field_cacheability::never)
+          else if (header_itr->cache == cacheability::never)
           {
             pfx_mask = prefix_mask::four_bit;
             output.push_back((char)0);
@@ -363,7 +363,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool decoder::decode_nvp(std::size_t table_index, header_field_cacheability cache_header, std::string::const_iterator& itr, std::list<header_field>& headers)
+    bool decoder::decode_nvp(std::size_t table_index, cacheability cache_header, std::string::const_iterator& itr, std::list<header_field>& headers)
     {
       bool ret = true;
       std::string n;
@@ -421,21 +421,21 @@ namespace manifold
           // Literal Header Field with Incremental Indexing
           //
           std::uint64_t table_index = decode_integer(prefix_mask::six_bit, itr);
-          ret = this->decode_nvp(table_index, header_field_cacheability::yes, itr, headers);
+          ret = this->decode_nvp(table_index, cacheability::yes, itr, headers);
         }
         else if ((*itr & 0xF0) == 0x0)
         {
           // Literal Header Field without Indexing
           //
           std::uint64_t table_index = decode_integer(prefix_mask::four_bit, itr);
-          ret = this->decode_nvp(table_index, header_field_cacheability::no, itr, headers);
+          ret = this->decode_nvp(table_index, cacheability::no, itr, headers);
         }
         else if ((*itr & 0xF0) == 0x10)
         {
           // Literal Header Field never Indexed
           //
           std::uint64_t table_index = decode_integer(prefix_mask::four_bit, itr);
-          ret = this->decode_nvp(table_index, header_field_cacheability::never, itr, headers);
+          ret = this->decode_nvp(table_index, cacheability::never, itr, headers);
         }
         else if ((*itr & 0xE0) == 0x20)
         {

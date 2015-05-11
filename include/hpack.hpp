@@ -15,7 +15,7 @@ namespace manifold
 {
   namespace hpack
   {
-    enum class header_field_cacheability
+    enum class cacheability
     {
       yes = 1,
       no,
@@ -26,10 +26,10 @@ namespace manifold
     {
       std::string name;
       std::string value;
-      header_field_cacheability cache;
-      header_field(std::string&& n, std::string&& v, header_field_cacheability cache_field = header_field_cacheability::yes)
+      cacheability cache;
+      header_field(std::string&& n, std::string&& v, cacheability cache_field = cacheability::yes)
         : name(std::move(n)), value(std::move(v)), cache(cache_field) {}
-      header_field(const std::string& n, const std::string& v, header_field_cacheability cache_field = header_field_cacheability::yes)
+      header_field(const std::string& n, const std::string& v, cacheability cache_field = cacheability::yes)
         : name(n), value(v), cache(cache_field) {}
     };
 
@@ -111,7 +111,7 @@ namespace manifold
     private:
       static std::uint64_t decode_integer(prefix_mask prfx_mask, std::string::const_iterator& itr);
       static bool decode_string_literal(std::string::const_iterator& itr, std::string& output);
-      bool decode_nvp(std::size_t table_index, header_field_cacheability cache_header, std::string::const_iterator& itr, std::list<header_field>& headers);
+      bool decode_nvp(std::size_t table_index, cacheability cache_header, std::string::const_iterator& itr, std::list<header_field>& headers);
       static void huffman_decode(std::string::const_iterator begin, std::string::const_iterator end, std::string& output) {}
     public:
       decoder(std::size_t max_table_size)
