@@ -7,25 +7,25 @@ In progress.
 HPACK compression can be used independently.
 
 ```C++
-std::size_t default_table_size = 4096;
-hpack::encoder enc(default_table_size);
-hpack::decoder dec(default_table_size);
+std::size_t http2_default_table_size = 4096;
+hpack::encoder enc(http2_default_table_size);
+hpack::decoder dec(http2_default_table_size);
 
-std::list<hpack::header_field> sendHeaders;
-std::list<hpack::header_field> recvHeaders;
+std::list<hpack::header_field> send_headers{
+    {":path","/"},
+    {":method","GET"},
+    {"content-type","application/json; charset=utf8"},
+    {"content-length","30"},
+    {"custom-header","foobar; baz"},
+    {"custom-header2","NOT INDEXED", hpack::cacheability::no}};
 
-sendHeaders.push_back(hpack::header_field(":path","/"));
-sendHeaders.push_back(hpack::header_field(":method","GET"));
-sendHeaders.push_back(hpack::header_field("content-type","application/json; charset=utf8"));
-sendHeaders.push_back(hpack::header_field("content-length","30"));
-sendHeaders.push_back(hpack::header_field("custom-header","foobar; baz"));
-sendHeaders.push_back(hpack::header_field("custom-header2","NOT INDEXED", hpack::cacheability::no));
+std::list<hpack::header_field> recv_headers;
 
 // Encoders can use table size updates to clear dynamic table.
 enc.add_table_size_update(0);
 enc.add_table_size_update(4096);
 
-std::string serializedHeaders;
-enc.encode(sendHeaders, serializedHeaders);
-dec.decode(serializedHeaders.begin(), serializedHeaders.end(), recvHeaders);
+std::string serialized_headers;
+enc.encode(send_headers, serialized_headers);
+dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers);
 ```
