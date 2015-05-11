@@ -6,7 +6,7 @@ In progress.
 ## HPACK Usage
 HPACK compression can be used independently.
 
-
+```C++
     std::size_t default_table_size = 4096;
     hpack::encoder enc(default_table_size);
     hpack::decoder dec(default_table_size);
@@ -28,3 +28,4 @@ HPACK compression can be used independently.
     std::string serializedHeaders;
     enc.encode(sendHeaders, serializedHeaders);
     dec.decode(serializedHeaders.begin(), serializedHeaders.end(), recvHeaders);
+```
