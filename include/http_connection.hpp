@@ -77,6 +77,7 @@ namespace manifold
         //----------------------------------------------------------------//
         stream* stream_ptr() const;
         const std::vector<stream_dependency_tree>& children() const;
+        void insert_child(stream_dependency_tree&& child);
         //----------------------------------------------------------------//
       };
       //================================================================//
@@ -141,7 +142,9 @@ namespace manifold
 
       //----------------------------------------------------------------//
       void on_window_update(std::uint32_t stream_id, const std::function<void()>& fn);
-      bool send_headers(std::uint32_t stream_id, const message_head &head, bool end_stream = false);
+      bool create_stream(std::uint32_t stream_id);
+      bool send_headers(std::uint32_t stream_id, const message_head &head, bool end_headers = false, bool end_stream = false);
+      bool send_countinuation(std::uint32_t stream_id, const message_head &head, bool end_headers = false);
       bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream = false);
       //----------------------------------------------------------------//
 

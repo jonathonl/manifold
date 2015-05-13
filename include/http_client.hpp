@@ -82,7 +82,7 @@ namespace manifold
         request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
         ~request();
 
-        const request_head& head() const;
+        request_head& head();
 
         void on_push_promise(const std::function<void(http::client::request&& request)>& cb);
         void on_response(const std::function<void(http::client::response&& resp)>& cb);
@@ -106,6 +106,7 @@ namespace manifold
 
       std::unique_ptr<asio::ssl::context> ssl_context_;
       std::shared_ptr<http::connection> connection_;
+      std::queue<client::request> waiting_for_connection_queue_;
 
       std::function<void()> on_connect_;
       std::function<void(const std::error_code& ec)> on_close_;
@@ -120,6 +121,7 @@ namespace manifold
       void on_connect(const std::function<void()>& cb);
       void on_close(const std::function<void(const std::error_code ec)>& cb);
       void make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& cb) {}
+      void make_request(const std::function<void(http::client::request&& req)>& cb);
 
     };
     //================================================================//

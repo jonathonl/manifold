@@ -36,6 +36,13 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    void connection::stream_dependency_tree::insert_child(connection::stream_dependency_tree&& child)
+    {
+      this->children_.push_back(std::move(child));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     connection::connection()
     : stream_dependency_tree_(&this->root_stream_)
     {
@@ -354,7 +361,24 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_headers(std::uint32_t stream_id, const message_head &head, bool end_stream)
+    bool connection::create_stream(std::uint32_t stream_id) //TODO: allow for dependency other than root.
+    {
+      bool ret = false;
+
+      std::pair<std::map<std::uint32_t,stream>::iterator,bool> insert_res = this->streams_.emplace(stream_id, stream());
+      if (insert_res.second)
+      {
+        this->stream_dependency_tree_.insert_child(stream_dependency_tree((&insert_res.first->second)));
+
+        ret = true;
+      }
+
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool connection::send_headers(std::uint32_t stream_id, const message_head &head, bool end_headers,           bool end_stream)
     {
       bool ret = false;
 

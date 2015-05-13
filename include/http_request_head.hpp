@@ -21,7 +21,7 @@ namespace manifold
     private:
       //----------------------------------------------------------------//
       std::string method_;
-      std::string url_;
+      std::string path_;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
@@ -35,8 +35,8 @@ namespace manifold
       void method(const std::string& value);
       void method(http::method value);
       bool method_is(http::method methodToCheck) const;
-      const std::string& url() const;
-      void url(const std::string& value);
+      const std::string& path() const;
+      void path(const std::string& value);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//

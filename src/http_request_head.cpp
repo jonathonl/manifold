@@ -29,7 +29,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     request_head::request_head(const std::string& url, const std::string& method, std::list<std::pair<std::string,std::string>>&& headers)
-      : method_(method), url_(url)
+      : method_(method), path_(url)
     {
       this->headers_ = std::move(headers);
     }
@@ -37,7 +37,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     request_head::request_head(const std::string& url, http::method method, std::list<std::pair<std::string,std::string>>&& headers)
-        : method_(method_enum_to_string(method)), url_(url)
+        : method_(method_enum_to_string(method)), path_(url)
     {
       this->headers_ = std::move(headers);
     }
@@ -79,16 +79,16 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::string& request_head::url() const
+    const std::string& request_head::path() const
     {
-      return this->url_;
+      return this->path_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void request_head::url(const std::string& value)
+    void request_head::path(const std::string& value)
     {
-      this->url_ = value;
+      this->path_= value;
     }
     //----------------------------------------------------------------//
 
@@ -97,7 +97,7 @@ namespace manifold
     {
       std::stringstream ss(value);
       std::getline(ss, this->method_, ' ');
-      std::getline(ss, this->url_, ' ');
+      std::getline(ss, this->path_, ' ');
       std::getline(ss, this->version_);
     }
     //----------------------------------------------------------------//
@@ -105,7 +105,7 @@ namespace manifold
     //----------------------------------------------------------------//
     std::string request_head::start_line() const
     {
-      return this->method_ + " " + this->url_ + " " + this->version_;
+      return this->method_ + " " + this->path_ + " " + this->version_;
     }
     //----------------------------------------------------------------//
   }

@@ -160,7 +160,7 @@ namespace manifold
     {
       this->current_dynamic_table_size_ -= (32 + this->dynamic_table_.back().first.size() + this->dynamic_table_.back().second.size());
       this->dynamic_table_.pop_back();
-      assert(this->dynamic_table_.size() == 0 && this->current_dynamic_table_size_ > 0);
+      assert(this->dynamic_table_.size() > 0 || this->current_dynamic_table_size_ == 0);
     }
     //----------------------------------------------------------------//
 
@@ -175,12 +175,15 @@ namespace manifold
     void context::table_insert(std::pair<std::string,std::string>&& entry)
     {
       std::size_t entry_size = 32 + entry.first.size() + entry.second.size();
-      while ((entry_size + this->current_dynamic_table_size_) > this->max_dynamic_table_size_)
+      while ((entry_size + this->current_dynamic_table_size_) > this->max_dynamic_table_size_ && this->dynamic_table_.size() != 0)
         this->table_evict();
 
       // Entrys that are larger than max table size leave the table empty.
       if ((entry_size + this->current_dynamic_table_size_) <= this->max_dynamic_table_size_)
+      {
+        this->current_dynamic_table_size_ += entry_size;
         this->dynamic_table_.push_front(std::move(entry));
+      }
     }
     //----------------------------------------------------------------//
 
@@ -386,8 +389,8 @@ namespace manifold
         ret = this->decode_string_literal(itr, v);
         if (ret)
         {
-
-          this->table_insert(std::pair<std::string,std::string>(n, v));
+          if (cache_header == cacheability::yes)
+            this->table_insert(std::pair<std::string,std::string>(n, v));
           headers.emplace_back(std::move(n), std::move(v), cache_header);
         }
       }

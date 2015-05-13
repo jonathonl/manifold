@@ -67,10 +67,14 @@ namespace manifold
           --index;
           if (index < static_table.size())
             return static_table[index];
-          else if (index < this->dynamic_table_.size())
-            return this->dynamic_table_[index];
           else
-            throw std::out_of_range("Table index out of range.");
+          {
+            index -= static_table.size();
+            if (index < this->dynamic_table_.size())
+              return this->dynamic_table_[index];
+            else
+              throw std::out_of_range("Table index out of range.");
+          }
         }
       }
 

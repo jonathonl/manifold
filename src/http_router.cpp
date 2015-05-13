@@ -28,7 +28,7 @@ namespace manifold
       bool both_matched = false;
       bool path_matched = false;
 
-      std::string request_path = req.head().url(); // TODO: make url class and get path without query string
+      std::string request_path =req.head().path(); // TODO: make url class and get path without query string
       std::string request_method = req.head().method();
       std::smatch sm;
 

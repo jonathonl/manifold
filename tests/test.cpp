@@ -12,11 +12,24 @@ using namespace manifold;
 class my_request_class
 {
 private:
-  http::client& client_;
   std::unique_ptr<http::client::request> request_;
   std::unique_ptr<http::client::response> response_;
 public:
-  my_request_class(http::client& c) : client_(c) {}
+  my_request_class() {}
+
+  void handle_request(http::client::request&& req)
+  {
+    this->request_ = std::unique_ptr<http::client::request>(new http::client::request(std::move(req)));
+    this->request_->head().path("/foobar");
+    this->request_->head().method();
+    this->request_->head().header("content-type","application/x-www-form-urlencoded");
+
+    this->request_->on_response(std::bind(&my_request_class::handle_response, this, std::placeholders::_1));
+
+
+    this->request_->end(std::string("name=value&name2=value2"));
+  }
+
   void handle_response(http::client::response &&res)
   {
     this->response_ = std::unique_ptr<http::client::response>(new http::client::response(std::move(res)));
@@ -29,18 +42,6 @@ public:
     this->response_->on_end([]()
     {
 
-    });
-  }
-  void send()
-  {
-    this->client_.make_request(http::request_head("/foobar", "post", {{"content-type","application/x-www-form-urlencoded"}}), [this](http::client::request&& req)
-    {
-      this->request_ = std::unique_ptr<http::client::request>(new http::client::request(std::move(req)));
-
-      this->request_->on_response(std::bind(&my_request_class::handle_response, this, std::placeholders::_1));
-
-
-      this->request_->end(std::string("name=value&name2=value2"));
     });
   }
 };
@@ -65,18 +66,31 @@ int main()
     {"content-length","30"},
     {"custom-header","foobar; baz"},
     {"custom-header2","NOT INDEXED", hpack::cacheability::no}};
+  std::list<hpack::header_field> send_headers2{
+    {":path","/"},
+    {":method","GET"},
+    {"custom-header","foobar; baz3"},
+    {"custom-header2","NOT INDEXED", hpack::cacheability::never}};
 
   std::list<hpack::header_field> recv_headers;
-
-  // Encoders can use table size updates to clear dynamic table.
-  enc.add_table_size_update(0);
-  enc.add_table_size_update(4096);
+  std::list<hpack::header_field> recv_headers2;
 
   std::string serialized_headers;
   enc.encode(send_headers, serialized_headers);
   dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers);
 
   for (auto it : recv_headers)
+    std::cout << it.name << ": " << it.value << std::endl;
+  std::cout << std::endl;
+
+  // Encoders can use table size updates to clear dynamic table.
+  enc.add_table_size_update(0);
+  enc.add_table_size_update(4096);
+
+  serialized_headers = "";
+  enc.encode(send_headers2, serialized_headers);
+  dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers2);
+  for (auto it : recv_headers2)
     std::cout << it.name << ": " << it.value << std::endl;
   //----------------------------------------------------------------//
 
@@ -109,8 +123,9 @@ int main()
   // Client to Local Server Test
   //
   http::client c1(ioservice, "localhost", 8080);
-  my_request_class r(c1);
-  r.send();
+  my_request_class r;
+  c1.make_request(std::bind(&my_request_class::handle_request, &r, std::placeholders::_1));
+
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//

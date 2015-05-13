@@ -28,4 +28,7 @@ enc.add_table_size_update(4096);
 std::string serialized_headers;
 enc.encode(send_headers, serialized_headers);
 dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers);
+
+for (auto it : recv_headers)
+    std::cout << it.name << ": " << it.value << std::endl;
 ```

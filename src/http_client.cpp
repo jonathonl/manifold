@@ -21,7 +21,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const request_head& client::request::head() const
+    request_head& client::request::head()
     {
       return this->head_;
     }
@@ -130,6 +130,31 @@ namespace manifold
     //----------------------------------------------------------------//
     client::~client()
     {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void client::make_request(const std::function<void(http::client::request&& req)>& cb)
+    {
+      if (!cb)
+        throw std::invalid_argument("Callback cannot be null.");
+      auto next_stream_id = 1; //this->get_next_stream_id();
+      if (!next_stream_id)
+      {
+        //TODO: handle error;
+      }
+      else
+      {
+        if (this->connection_)
+        {
+          this->connection_->create_stream(next_stream_id);
+          cb(client::request(http::request_head(), this->connection_, next_stream_id));
+        }
+        else
+        {
+          this->waiting_for_connection_queue_.emplace(http::request_head(), this->connection_, next_stream_id);
+        }
+      }
     }
     //----------------------------------------------------------------//
   }
