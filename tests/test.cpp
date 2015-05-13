@@ -1,4 +1,6 @@
 
+#include <memory>
+
 #include "asio.hpp"
 #include "http_server.hpp"
 #include "http_client.hpp"
@@ -12,17 +14,16 @@ using namespace manifold;
 class my_request_class
 {
 private:
-  std::unique_ptr<http::client::request> request_;
-  std::unique_ptr<http::client::response> response_;
+  std::shared_ptr<http::client::request> request_;
+  std::shared_ptr<http::client::response> response_;
 public:
   my_request_class() {}
 
+
+
   void handle_request(http::client::request&& req)
   {
-    this->request_ = std::unique_ptr<http::client::request>(new http::client::request(std::move(req)));
-    this->request_->head().path("/foobar");
-    this->request_->head().method();
-    this->request_->head().header("content-type","application/x-www-form-urlencoded");
+    this->request_ = std::make_shared<http::client::request>(std::move(req));
 
     this->request_->on_response(std::bind(&my_request_class::handle_response, this, std::placeholders::_1));
 
@@ -32,7 +33,7 @@ public:
 
   void handle_response(http::client::response &&res)
   {
-    this->response_ = std::unique_ptr<http::client::response>(new http::client::response(std::move(res)));
+    this->response_ = std::make_shared<http::client::response>(std::move(res));
 
     this->response_->on_data([](const char *const data, std::size_t datasz)
     {
@@ -124,37 +125,43 @@ int main()
   //
   http::client c1(ioservice, "localhost", 8080);
   my_request_class r;
-  c1.make_request(std::bind(&my_request_class::handle_request, &r, std::placeholders::_1));
-
+  c1.on_connect([&c1, &r]()
+  {
+    c1.make_request(http::request_head("/foobar", "GET", {{"content-type","application/x-www-form-urlencoded"}}), std::bind(&my_request_class::handle_request, &r, std::placeholders::_1));
+  });
+  c1.on_close([](const std::error_code& ec) { std::cerr << ec.message() << std::endl; });
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
   // Client to Google Test
   //
   http::client c2(ioservice, "www.google.com", http::client::ssl_options());
-
-  c2.make_request(http::request_head(), [](http::client::request&& req)
+  c2.on_connect([&c2]()
   {
-    auto req_ptr = std::make_shared<http::client::request>(std::move(req));
-
-    req_ptr->on_response([](http::client::response &&res)
+    c2.make_request(http::request_head(), [](http::client::request&& req)
     {
-      auto res_ptr = std::make_shared<http::client::response>(std::move(res));
-
-      res_ptr->on_data([](const char *const data, std::size_t datasz)
+      auto req_ptr = std::make_shared<http::client::request>(std::move(req));
+      req_ptr->on_response([](http::client::response &&res)
       {
+        auto res_ptr = std::make_shared<http::client::response>(std::move(res));
+        res_ptr->on_data([](const char *const data, std::size_t datasz)
+        {
+          // ...
+        });
 
+        res_ptr->on_end([]()
+        {
+          // ...
+        });
       });
 
-      res_ptr->on_end([]()
-      {
-
-      });
-
+      req_ptr->end();
     });
+  });
 
-
-    req_ptr->end();
+  c2.on_close([](const std::error_code& ec)
+  {
+    std::cerr << ec.message() << std::endl;
   });
   //----------------------------------------------------------------//
 

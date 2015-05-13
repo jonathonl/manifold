@@ -59,7 +59,7 @@ namespace manifold
     class client
     {
     public:
-      typedef std::uint64_t connection_handle;
+      static const std::uint32_t max_stream_id = 0x7FFFFFFF;
       //================================================================//
       class response : public incoming_message
       {
@@ -82,7 +82,7 @@ namespace manifold
         request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
         ~request();
 
-        request_head& head();
+        const request_head& head() const;
 
         void on_push_promise(const std::function<void(http::client::request&& request)>& cb);
         void on_response(const std::function<void(http::client::response&& resp)>& cb);
@@ -102,27 +102,25 @@ namespace manifold
     private:
       asio::io_service& io_service_;
       asio::ip::tcp::resolver tcp_resolver_;
-      std::int32_t last_stream_id_;
+      std::uint32_t last_stream_id_;
 
       std::unique_ptr<asio::ssl::context> ssl_context_;
       std::shared_ptr<http::connection> connection_;
-      std::queue<client::request> waiting_for_connection_queue_;
+      std::queue<std::pair<client::request, std::function<void(http::client::request&& req)>>> pending_requests_;
 
       std::function<void()> on_connect_;
       std::function<void(const std::error_code& ec)> on_close_;
       std::error_code ec_;
 
-      void resolve_handler(const std::error_code &ec, asio::ip::tcp::resolver::iterator it);
+      std::uint32_t get_next_stream_id();
     public:
       client(asio::io_service& ioservice, const std::string& host, short port = 80);
       client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, short port = 443);
       ~client();
-      //void connect(std::string& host, std::uint16_t port, const std::function<void(const std::error_code& ec, connection_handle conn)>& cb);
+
       void on_connect(const std::function<void()>& cb);
       void on_close(const std::function<void(const std::error_code ec)>& cb);
-      void make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& cb) {}
-      void make_request(const std::function<void(http::client::request&& req)>& cb);
-
+      std::uint32_t make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& cb);
     };
     //================================================================//
   }
