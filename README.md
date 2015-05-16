@@ -3,6 +3,34 @@ A lightweight http/2 library.
 
 In progress.
 
+## Server Usage
+
+```C++
+http::router app;
+app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
+{
+  auto req_ptr = std::make_shared<http::server::request>(std::move(req));
+  auto res_ptr = std::make_shared<http::server::response>(std::move(res));
+
+  auto req_entity = std::make_shared<std::string>();
+  req_ptr->on_data([req_entity](const char*const data, std::size_t datasz)
+  {
+    req_entity->append(data, datasz);
+  });
+
+  req_ptr->on_end([res_ptr, req_entity]()
+  {
+    res_ptr->end("Received: " + *req_entity);
+  });
+});
+
+http::server srv(ioservice, 8080, "0.0.0.0");
+srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+
+http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
+ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+```
+
 ## HPACK Usage
 HPACK compression can be used independently.
 
