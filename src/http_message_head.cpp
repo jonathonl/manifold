@@ -9,27 +9,65 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    message_head::message_head()
+    header_block::header_block()
     {
 
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    message_head::message_head(std::list<std::pair<std::string,std::string>>&& raw_headers)
+    header_block::header_block(std::list<hpack::header_field>&& raw_headers)
       : headers_(std::move(raw_headers))
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    message_head::~message_head()
+    header_block::~header_block()
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void message_head::header(const std::string& name, const std::string& value)
+    void header_block::pseudo_header(const std::string& name, const std::string& value)
+    {
+      std::string n(name);
+      std::string v(value);
+      this->pseudo_header(std::move(n), std::move(v));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void header_block::pseudo_header(std::string&& name, std::string&& value)
+    {
+      const std::string whitespace(" \t\f\v\r\n");
+      value.erase(0, value.find_first_not_of(whitespace));
+      value.erase(value.find_last_not_of(whitespace)+1);
+
+      auto first_non_pseudo_header_itr = this->headers_.begin();
+      for ( ; first_non_pseudo_header_itr != this->headers_.end(); ++first_non_pseudo_header_itr)
+      {
+        if (first_non_pseudo_header_itr->name.size() && first_non_pseudo_header_itr->name.front() != ':')
+          break;
+      }
+
+      for (auto it = this->headers_.begin(); it != first_non_pseudo_header_itr;)
+      {
+        if (it->name == name)
+        {
+          this->headers_.erase(it);
+          it = first_non_pseudo_header_itr; // Breaking here because multiple psuedo headers prevented.
+        }
+        else
+          ++it;
+      }
+
+      this->headers_.insert(first_non_pseudo_header_itr, hpack::header_field(std::move(name), std::move(value)));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void header_block::header(const std::string& name, const std::string& value)
     {
       std::string n(name);
       std::string v(value);
@@ -38,11 +76,11 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void message_head::header(std::string&& name, std::string&& value)
+    void header_block::header(std::string&& name, std::string&& value)
     {
       // trim
       const std::string whitespace(" \t\f\v\r\n");
-      name.erase(0, name.find_first_not_of(whitespace));
+      name.erase(0, name.find_first_not_of(":" + whitespace));
       name.erase(name.find_last_not_of(whitespace)+1);
       value.erase(0, value.find_first_not_of(whitespace));
       value.erase(value.find_last_not_of(whitespace)+1);
@@ -52,17 +90,17 @@ namespace manifold
 
       for (auto it = this->headers_.begin(); it != this->headers_.end();)
       {
-        if (it->first == name)
+        if (it->name == name)
           it = this->headers_.erase(it);
         else
           ++it;
       }
-      this->headers_.push_back(std::pair<std::string,std::string>(std::move(name), std::move(value)));
+      this->headers_.push_back(hpack::header_field(std::move(name), std::move(value)));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void message_head::multi_header(const std::string& name, const std::list<std::string>& values)
+    void header_block::multi_header(const std::string& name, const std::list<std::string>& values)
     {
       std::string n(name);
       std::list<std::string> v(values);
@@ -71,11 +109,11 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void message_head::multi_header(std::string&& name, std::list<std::string>&& values)
+    void header_block::multi_header(std::string&& name, std::list<std::string>&& values)
     {
       // trim
       const std::string whitespace(" \t\f\v\r\n");
-      name.erase(0, name.find_first_not_of(whitespace));
+      name.erase(0, name.find_first_not_of(":" + whitespace));
       name.erase(name.find_last_not_of(whitespace)+1);
 
       // make name lowercase
@@ -83,7 +121,7 @@ namespace manifold
 
       for (auto it = this->headers_.begin(); it != this->headers_.end();)
       {
-        if (it->first == name)
+        if (it->name == name)
           it = this->headers_.erase(it);
         else
           ++it;
@@ -94,14 +132,14 @@ namespace manifold
         value.erase(0, value.find_first_not_of(whitespace));
         value.erase(value.find_last_not_of(whitespace)+1);
 
-        this->headers_.push_back(std::pair<std::string,std::string>(std::move(name), std::move(value)));
+        this->headers_.push_back(hpack::header_field(std::move(name), std::move(value)));
       });
 
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string message_head::header(const std::string& name) const
+    std::string header_block::header(const std::string& name) const
     {
       std::string ret;
       std::string nameToLower(name);
@@ -109,8 +147,8 @@ namespace manifold
 
       for (auto it = this->headers_.rbegin(); ret.empty() && it != this->headers_.rend(); ++it)
       {
-        if (it->first == nameToLower)
-          ret = it->second;
+        if (it->name == nameToLower)
+          ret = it->value;
       }
 
       return ret;
@@ -118,7 +156,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::list<std::string> message_head::multi_header(const std::string& name) const
+    std::list<std::string> header_block::multi_header(const std::string& name) const
     {
       std::list<std::string> ret;
       std::string nameToLower(name);
@@ -126,8 +164,8 @@ namespace manifold
 
       for (auto it = this->headers_.begin(); it != this->headers_.end(); ++it)
       {
-        if (it->first == nameToLower)
-          ret.push_back(it->second);
+        if (it->name == nameToLower)
+          ret.push_back(it->value);
       }
 
       return ret;
@@ -135,88 +173,38 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::list<std::pair<std::string,std::string>>& message_head::raw_headers() const
+    const std::list<hpack::header_field>& header_block::raw_headers() const
     {
       return this->headers_;
     }
     //----------------------------------------------------------------//
 
 //    //----------------------------------------------------------------//
-//    const std::string& message_head::http_version() const
+//    const std::string& header_block::http_version() const
 //    {
 //      return this->version_;
 //    }
 //    //----------------------------------------------------------------//
 //
 //    //----------------------------------------------------------------//
-//    void  message_head::http_version(const std::string& version)
+//    void  header_block::http_version(const std::string& version)
 //    {
 //      this->version_ = version;
 //    }
 //    //----------------------------------------------------------------//
 
-//    //----------------------------------------------------------------//
-//    void message_head::serialize(const message_head& source, std::string& destination)
-//    {
-//      destination = source.start_line() + "\r\n";
-//      for (auto it = source.headers_.begin(); it != source.headers_.end(); ++it)
-//      {
-//        destination += it->first;
-//        destination += ": ";
-//        destination += it->second;
-//        destination += "\r\n";
-//      }
-//      destination += "\r\n";
-//    }
-//    //----------------------------------------------------------------//
-//
-//    //----------------------------------------------------------------//
-//    bool message_head::deserialize(const std::string& source, message_head& destination)
-//    {
-//      bool ret = false;
-//      std::size_t pos = 0;
-//      pos = source.find("\r\n", pos);
-//      if (pos != std::string::npos)
-//      {
-//        destination.start_line(source.substr(0, pos));
-//        pos += 2;
-//
-//        while (!ret && pos != source.size())
-//        {
-//          std::size_t endPos = source.find("\r\n", pos);
-//          if (endPos == std::string::npos)
-//          {
-//            break;
-//          }
-//          else if (endPos == pos)
-//          {
-//            ret = true;
-//          }
-//          else
-//          {
-//            const char * delim = ":";
-//            const char* colonPtr = std::search(&source[pos], &source[pos] + endPos, delim, delim + 1);
-//            if (colonPtr == &source[pos] + endPos)
-//            {
-//              break;
-//            }
-//            else
-//            {
-//              std::string name(&source[pos], colonPtr - &source[pos]);
-//              ++colonPtr;
-//              std::string value(colonPtr, &source[endPos] - colonPtr);
-//
-//              destination.header(std::move(name), std::move(value)); // header set_method trims.
-//
-//              pos = endPos + 2;
-//            }
-//          }
-//        }
-//
-//      }
-//
-//      return ret;
-//    }
-//    //----------------------------------------------------------------//
+    //----------------------------------------------------------------//
+    void header_block::serialize(hpack::encoder& enc, const header_block& source, std::string& destination)
+    {
+      enc.encode(source.headers_, destination);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool header_block::deserialize(hpack::decoder& dec, const std::string& source, header_block& destination)
+    {
+      dec.decode(source.begin(), source.end(), destination.headers_);
+    }
+    //----------------------------------------------------------------//
   }
 }

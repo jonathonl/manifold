@@ -44,7 +44,7 @@ namespace manifold
         std::function<void()> on_window_update;
 
         std::queue<frame> incoming_header_and_continuation_frames;
-        std::queue<message_head> incoming_message_heads;
+        std::queue<header_block> incoming_message_heads;
         std::queue<frame> incoming_data_frames;
         std::queue<frame> outgoing_non_data_frames;
         std::queue<frame> outgoing_data_frames;
@@ -84,6 +84,8 @@ namespace manifold
     private:
       //----------------------------------------------------------------//
       std::map<setting_code,std::uint32_t> settings_;
+      hpack::encoder hpack_encoder_;
+      hpack::decoder hpack_decoder_;
       bool started_;
       bool send_loop_running_;
       std::minstd_rand rg_;
@@ -138,13 +140,14 @@ namespace manifold
       void on_data_frame(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
       void on_end_frame(std::uint32_t stream_id, const std::function<void()>& fn);
       void on_rst_stream_frame(std::uint32_t stream_id, const std::function<void(const std::error_code& ec)>& fn);
-      //----------------------------------------------------------------//
+      void on_push_promise(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn);
+        //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       void on_window_update(std::uint32_t stream_id, const std::function<void()>& fn);
       bool create_stream(std::uint32_t stream_id);
-      bool send_headers(std::uint32_t stream_id, const message_head &head, bool end_headers = false, bool end_stream = false);
-      bool send_countinuation(std::uint32_t stream_id, const message_head &head, bool end_headers = false);
+      bool send_headers(std::uint32_t stream_id, const header_block&head, bool end_headers = false, bool end_stream = false);
+      bool send_countinuation(std::uint32_t stream_id, const header_block&head, bool end_headers = false);
       bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream = false);
       //----------------------------------------------------------------//
 

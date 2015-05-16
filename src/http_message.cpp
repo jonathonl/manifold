@@ -7,12 +7,10 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    message::message(message_head& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
+    message::message(header_block& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
       : head_(head),
         connection_(conn),
-        stream_id_(stream_id),
-        transfer_encoding_(transfer_encoding::Unknown),
-        content_length_(0)
+        stream_id_(stream_id)
     {
     }
     //----------------------------------------------------------------//

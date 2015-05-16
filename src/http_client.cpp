@@ -30,7 +30,10 @@ namespace manifold
     //----------------------------------------------------------------//
     void client::request::on_push_promise(const std::function<void(http::client::request&& request)>& cb)
     {
-      //TODO: impl
+      this->connection_->on_push_promise(this->stream_id_, [this, cb](http::header_block&& headers)
+      {
+        http::client::request r(http::request_head(), this->connection_, this->stream_id_);
+      });
     }
     //----------------------------------------------------------------//
 
@@ -147,11 +150,11 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::uint32_t client::make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& cb)
+    std::uint32_t client::make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& fn)
     {
       std::uint32_t next_stream_id = 0;
       //TODO: this method needs better error handling.
-      if (!cb)
+      if (!fn)
         throw std::invalid_argument("Callback cannot be null.");
 
       if (this->connection_)
@@ -160,8 +163,9 @@ namespace manifold
         if (next_stream_id)
         {
           this->connection_->create_stream(next_stream_id);
-          this->connection_->send_headers(next_stream_id, req_head, true, (req_head.method() == "GET" || req_head.method() == "HEAD"));
-          cb(client::request(std::move(req_head), this->connection_, next_stream_id));
+          client::request r(std::move(req_head), this->connection_, next_stream_id);
+          r.send_headers(req_head.method() == "GET" || req_head.method() == "HEAD");
+          fn(std::move(r));
         }
       }
       return next_stream_id;
@@ -169,20 +173,20 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void client::on_connect(const std::function<void()>& cb)
+    void client::on_connect(const std::function<void()>& fn)
     {
       bool had_previous_handler = (bool)this->on_connect_;
-      this->on_connect_ = cb;
+      this->on_connect_ = fn;
       if (!had_previous_handler && this->connection_ && this->on_connect_)
         this->on_connect_();
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void client::on_close(const std::function<void(const std::error_code ec)>& cb)
+    void client::on_close(const std::function<void(const std::error_code ec)>& fn)
     {
       bool had_previous_handler = (bool)this->on_close_;
-      this->on_close_ = cb;
+      this->on_close_ = fn;
       // TODO: Add is_closed() to connection class.
       /*if (!had_previous_handler && this->connection_ && this->connection_.is_closed() && this->on_close_)
         this->on_close_(this->ec_);*/

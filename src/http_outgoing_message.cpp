@@ -9,10 +9,10 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    outgoing_message::outgoing_message(message_head& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
+    outgoing_message::outgoing_message(header_block& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
       : message(head, conn, stream_id),
-        bytesSent_(0),
-        headersSent_(false)
+        bytes_sent_(0),
+        headers_sent_(false)
     {
     }
     //----------------------------------------------------------------//
@@ -24,13 +24,15 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool outgoing_message::send_head()
+    bool outgoing_message::send_headers(bool end_stream)
     {
       bool ret = false;
 
-      if (!this->headersSent_)
+      if (!this->headers_sent_)
       {
-        ret = this->connection_->send_headers(this->stream_id_, this->head_);
+        ret = this->connection_->send_headers(this->stream_id_, this->head_, true, end_stream);
+        this->headers_sent_= true;
+        this->ended_ = end_stream;
       }
 
       return ret;
@@ -41,12 +43,12 @@ namespace manifold
     bool outgoing_message::send(const char*const data, std::size_t data_sz)
     {
       bool ret = true;
-      if (!this->headersSent_)
-        ret = this->send_head();
+      if (!this->headers_sent_)
+        ret =this->send_headers();
 
       if (ret)
       {
-        ret = this->connection_->send_data(this->stream_id_, data, data_sz);
+        ret = this->connection_->send_data(this->stream_id_, data, data_sz, false);
       }
 
       return ret;
@@ -61,16 +63,22 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool outgoing_message::end(const char*const data, std::size_t data_sz)
+    bool outgoing_message::end(const char*const data, std::size_t data_sz, const http::header_block& trailers)
     {
       bool ret = true;
-      if (!this->headersSent_)
-        ret = this->send_head();
-
-      if (ret)
+      if (!this->ended_)
       {
-        this->connection_->send_data(this->stream_id_, data, data_sz, true);
-        // TODO: Check content length against amount sent;
+        if (!this->headers_sent_)
+          ret =this->send_headers();
+
+        if (ret)
+        {
+          this->connection_->send_data(this->stream_id_, data, data_sz, trailers.empty());
+          // TODO: Check content length against amount sent;
+          if (!trailers.empty())
+            this->connection_->send_headers(this->stream_id_, trailers, true, true);
+          this->ended_ = true;
+        }
       }
 
       return ret;
@@ -78,11 +86,9 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool outgoing_message::end()
+    bool outgoing_message::end(const http::header_block& trailers)
     {
-      this->connection_->send_data(this->stream_id_, nullptr, 0, true);
-
-      return true; // TODO: Check content length against amount sent;
+      return this->end(nullptr, 0, trailers);
     }
     //----------------------------------------------------------------//
 
@@ -223,7 +229,7 @@ namespace manifold
 //      bool ret = false;
 //
 //      std::string headerString;
-//      http::message_head::serialize(this->head_, headerString);
+//      http::header_block::serialize(this->head_, headerString);
 //
 //      if (!TCP::sendAll(this->socket_, headerString.data(), headerString.size()))
 //      {

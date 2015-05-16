@@ -65,13 +65,9 @@ namespace manifold
     //================================================================//
 
     //================================================================//
-    class response_head : public message_head
+    class response_head : public header_block
     {
     private:
-      //----------------------------------------------------------------//
-      unsigned short status_code_;
-      std::string reason_phrase_;
-      //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
       response_head();
@@ -82,13 +78,6 @@ namespace manifold
       unsigned short status_code() const;
       void status_code(unsigned short value);
       void status_code(http::status_code value);
-      const std::string& reason_phrase() const;
-      void reason_phrase(const std::string& value);
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-      void start_line(const std::string& value);
-      std::string start_line() const;
       //----------------------------------------------------------------//
     };
     //================================================================//

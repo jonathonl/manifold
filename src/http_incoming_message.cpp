@@ -10,7 +10,7 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    incoming_message::incoming_message(message_head& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
+    incoming_message::incoming_message(header_block& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
       : message(head, conn, stream_id), bytesReceived_(0), bytesRemainingInChunk_(0)
     {
     }

@@ -28,8 +28,8 @@ namespace manifold
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      //incoming_message(const message_head& head, Socket&& sock);
-      incoming_message(message_head& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+      //incoming_message(const header_block& head, Socket&& sock);
+      incoming_message(header_block& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
       virtual ~incoming_message();
       //----------------------------------------------------------------//
 

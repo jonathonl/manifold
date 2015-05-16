@@ -1,5 +1,7 @@
 
 #include <memory>
+#include <fstream>
+#include <cstdio>
 
 #include "asio.hpp"
 #include "http_server.hpp"
@@ -11,15 +13,64 @@
 using namespace manifold;
 
 //================================================================//
+void handle_push_promise(http::client::request&& req, std::uint32_t dependency_stream_id)
+{
+
+}
+//================================================================//
+
+//================================================================//
+class client_stream_wrapper
+{
+private:
+  http::client::request req_;
+  std::unique_ptr<http::client::response> resp_;
+
+  std::function<void()> on_response_headers_fn_;
+
+  void set_response(http::client::response&& r)
+  {
+    this->resp_ = std::unique_ptr<http::client::response>(new http::client::response(std::move(r)));
+  }
+public:
+  client_stream_wrapper()
+    : req_(http::request_head(), nullptr, 0)
+  {}
+  client_stream_wrapper(http::client::request&& req)
+    : req_(std::move(req))
+  {
+    req_.on_response(std::bind(&client_stream_wrapper::set_response, this, std::placeholders::_1));
+  }
+
+  void on_data();
+  void on_end();
+  void on_close();
+  void on_drain();
+  void send();
+  void end();
+  void reset_stream();
+
+
+};
+//================================================================//
+
+//================================================================//
 class my_request_class
 {
 private:
+  http::client& c_;
   std::shared_ptr<http::client::request> request_;
   std::shared_ptr<http::client::response> response_;
 public:
-  my_request_class() {}
+  my_request_class(http::client& c) : c_(c)
+  {
+    this->c_.on_connect(std::bind(&my_request_class::run, this));
+  }
 
-
+  void run()
+  {
+    this->c_.make_request(http::request_head("/foobar", "GET", {{"content-type","application/x-www-form-urlencoded"}}), std::bind(&my_request_class::handle_request, this, std::placeholders::_1));
+  }
 
   void handle_request(http::client::request&& req)
   {
@@ -35,15 +86,22 @@ public:
   {
     this->response_ = std::make_shared<http::client::response>(std::move(res));
 
-    this->response_->on_data([](const char *const data, std::size_t datasz)
+    if (this->response_->head().status_code() < 200 || this->response_->head().status_code() >= 300)
     {
-
-    });
-
-    this->response_->on_end([]()
+      this->request_->reset_stream();
+    }
+    else
     {
+      this->response_->on_data([](const char *const data, std::size_t datasz)
+      {
 
-    });
+      });
+
+      this->response_->on_end([]()
+      {
+
+      });
+    }
   }
 };
 //================================================================//
@@ -124,12 +182,7 @@ int main()
   // Client to Local Server Test
   //
   http::client c1(ioservice, "localhost", 8080);
-  my_request_class r;
-  c1.on_connect([&c1, &r]()
-  {
-    c1.make_request(http::request_head("/foobar", "GET", {{"content-type","application/x-www-form-urlencoded"}}), std::bind(&my_request_class::handle_request, &r, std::placeholders::_1));
-  });
-  c1.on_close([](const std::error_code& ec) { std::cerr << ec.message() << std::endl; });
+  my_request_class r(c1);
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
@@ -138,31 +191,53 @@ int main()
   http::client c2(ioservice, "www.google.com", http::client::ssl_options());
   c2.on_connect([&c2]()
   {
-    c2.make_request(http::request_head(), [](http::client::request&& req)
+    std::uint32_t stream_id = c2.make_request(http::request_head(), [](http::client::request&& req)
     {
       auto req_ptr = std::make_shared<http::client::request>(std::move(req));
-      req_ptr->on_response([](http::client::response &&res)
+
+      // Create file stream for response.
+      auto ofs = std::make_shared<std::ofstream>("./reponse_file.txt.tmp");
+
+      // Set on response handler.
+      req_ptr->on_response([&ofs, req_ptr](http::client::response &&res)
       {
         auto res_ptr = std::make_shared<http::client::response>(std::move(res));
-        res_ptr->on_data([](const char *const data, std::size_t datasz)
-        {
-          // ...
-        });
 
-        res_ptr->on_end([]()
+        if (res.head().status_code() != 200)
         {
-          // ...
-        });
+          req_ptr->reset_stream();
+        }
+        else
+        {
+          // Write response data to file.
+          res_ptr->on_data([ofs](const char *const data, std::size_t datasz)
+          {
+            ofs->write(data, datasz);
+          });
+
+          // Close and rename file when done.
+          res_ptr->on_end([ofs]()
+          {
+            ofs->close();
+            std::rename("./response_file.txt.tmp","./resonse_file.txt");
+          });
+        }
       });
+
+      //
+      req_ptr->on_stream_reset([ofs](const std::error_code& ec)
+      {
+        ofs->close();
+        std::remove("./response_file.txt.tmp");
+      });
+
+      req_ptr->on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req_ptr->stream_id()));
 
       req_ptr->end();
     });
   });
 
-  c2.on_close([](const std::error_code& ec)
-  {
-    std::cerr << ec.message() << std::endl;
-  });
+  c2.on_close([](const std::error_code& ec) { std::cerr << ec.message() << std::endl; });
   //----------------------------------------------------------------//
 
 

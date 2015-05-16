@@ -108,6 +108,7 @@ namespace manifold
       std::shared_ptr<http::connection> connection_;
       std::queue<std::pair<client::request, std::function<void(http::client::request&& req)>>> pending_requests_;
 
+      std::function<void(http::client::request&& req)> on_push_promise_;
       std::function<void()> on_connect_;
       std::function<void(const std::error_code& ec)> on_close_;
       std::error_code ec_;
@@ -118,8 +119,8 @@ namespace manifold
       client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, short port = 443);
       ~client();
 
-      void on_connect(const std::function<void()>& cb);
-      void on_close(const std::function<void(const std::error_code ec)>& cb);
+      void on_connect(const std::function<void()>& fn);
+      void on_close(const std::function<void(const std::error_code ec)>& fn);
       std::uint32_t make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& cb);
     };
     //================================================================//

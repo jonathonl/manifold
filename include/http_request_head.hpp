@@ -16,32 +16,27 @@ namespace manifold
     //================================================================//
 
     //================================================================//
-    class request_head : public message_head
+    class request_head : public header_block
     {
     private:
-      //----------------------------------------------------------------//
-      std::string method_;
-      std::string path_;
-      //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      request_head(const std::string& url = "/", const std::string& method = "get", std::list<std::pair<std::string,std::string>>&& headers = std::list<std::pair<std::string,std::string>>());
-      request_head(const std::string& url, http::method meth, std::list<std::pair<std::string,std::string>>&& headers = std::list<std::pair<std::string,std::string>>());
+      request_head(const std::string& url = "/", const std::string& method = "get", std::list<hpack::header_field>&& headers = {});
+      request_head(const std::string& url, http::method meth, std::list<hpack::header_field>&& headers = {});
       ~request_head();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      const std::string& method() const;
+      std::string method() const;
       void method(const std::string& value);
       void method(http::method value);
       bool method_is(http::method methodToCheck) const;
-      const std::string& path() const;
+      std::string path() const;
       void path(const std::string& value);
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-      void start_line(const std::string& value);
-      std::string start_line() const;
+      std::string scheme() const;
+      void scheme(const std::string& value);
+      std::string authority() const;
+      void authority(const std::string& value);
       //----------------------------------------------------------------//
     };
     //================================================================//

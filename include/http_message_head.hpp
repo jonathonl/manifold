@@ -8,6 +8,7 @@
 
 #include "socket.hpp"
 #include "hpack.hpp"
+#include "http_frame.hpp"
 
 namespace manifold
 {
@@ -16,22 +17,22 @@ namespace manifold
     // Reference URL: http://tools.ietf.org/html/rfc2616#section-4.4
 
     //================================================================//
-    enum class transfer_encoding { Unknown = 0, Identity, Chunked };
-    //================================================================//
-
-    //================================================================//
-    class message_head
+    class header_block
     {
     protected:
       //----------------------------------------------------------------//
-      std::string version_;
-      std::list<std::pair<std::string,std::string>> headers_;
+      std::list<hpack::header_field> headers_;
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      void pseudo_header(const std::string& name, const std::string& value);
+      void pseudo_header(std::string&& name, std::string&& value);
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      message_head();
-      message_head(std::list<std::pair<std::string,std::string>>&& raw_headers);
-      virtual ~message_head();
+      header_block();
+      header_block(std::list<hpack::header_field>&& raw_headers);
+      virtual ~header_block();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -41,8 +42,15 @@ namespace manifold
       void multi_header(std::string&& name, std::list<std::string>&& values);
       std::string header(const std::string& name) const;
       std::list<std::string> multi_header(const std::string& name) const;
-      const std::list<std::pair<std::string,std::string>>& raw_headers() const;
+      const std::list<hpack::header_field>& raw_headers() const;
+      //----------------------------------------------------------------//
 
+      //----------------------------------------------------------------//
+      bool empty() const { return this->headers_.empty(); }
+      std::size_t size() const { return this->headers_.size(); }
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
 //      const std::string& http_version() const;
 //      void http_version(const std::string& version); // TODO: Make this an enum.
       //----------------------------------------------------------------//
@@ -53,8 +61,8 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      //static void serialize(const message_head& source, std::string& destination);
-      //static bool deserialize(const std::string& source, message_head& destination);
+      static void serialize(hpack::encoder& enc, const header_block& source, std::string& destination);
+      static bool deserialize(hpack::decoder& dec, const std::string& source, header_block& destination);
       //----------------------------------------------------------------//
     };
     //================================================================//

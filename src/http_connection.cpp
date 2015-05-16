@@ -44,7 +44,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     connection::connection()
-    : stream_dependency_tree_(&this->root_stream_)
+    : hpack_encoder_(4096), hpack_decoder_(4096), stream_dependency_tree_(&this->root_stream_)
     {
       std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
       this->rg_.seed(seed);
@@ -355,6 +355,12 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    void connection::on_push_promise(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn)
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     void connection::on_window_update(std::uint32_t stream_id, const std::function<void()>& fn)
     {
     }
@@ -378,20 +384,61 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_headers(std::uint32_t stream_id, const message_head &head, bool end_headers,           bool end_stream)
+    bool connection::send_headers(std::uint32_t stream_id, const header_block&head, bool end_headers, bool end_stream)
     {
       bool ret = false;
 
-//      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
-//
-//      if (it != this->streams_.end())
-//      {
-//        std::string header_data;
-//        http::message_head::serialize(head, header_data);
-//        //TODO: break into multiple frames if needed.
-//        it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), header_data.size(), end_stream), stream_id));
-//        this->run_send_loop();
-//      }
+      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
+
+      if (it == this->streams_.end())
+      {
+        // TODO: Handle error
+      }
+      else
+      {
+        std::string header_data;
+        http::header_block::serialize(this->hpack_encoder_, head, header_data);
+        const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
+        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->settings_[setting_code::max_frame_size])
+        {
+          // TODO: Handle error
+        }
+        else
+        {
+          it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream), stream_id));
+          this->run_send_loop();
+        }
+      }
+
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool connection::send_countinuation(std::uint32_t stream_id, const header_block&head, bool end_headers)
+    {
+      bool ret = false;
+
+      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
+
+      if (it == this->streams_.end())
+      {
+        // TODO: Handle error
+      }
+      else
+      {
+        std::string header_data;
+        http::header_block::serialize(this->hpack_encoder_, head, header_data);
+        if (header_data.size() > this->settings_[setting_code::max_frame_size])
+        {
+          // TODO: Handle error
+        }
+        else
+        {
+          it->second.outgoing_non_data_frames.push(http::frame(http::continuation_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers), stream_id));
+          this->run_send_loop();
+        }
+      }
 
       return ret;
     }
@@ -444,7 +491,7 @@ namespace manifold
 //        {
 //
 //          http::request_head requestHead;
-//          http::message_head::deserialize(std::string(self->incomingHeadBuffer_.data(), bytes_transferred), requestHead);
+//          http::header_block::deserialize(std::string(self->incomingHeadBuffer_.data(), bytes_transferred), requestHead);
 //
 //          std::cout << requestHead.url() << ":" __FILE__ << "/" << __LINE__ << std::endl;
 //

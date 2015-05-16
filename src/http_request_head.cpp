@@ -28,18 +28,20 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    request_head::request_head(const std::string& url, const std::string& method, std::list<std::pair<std::string,std::string>>&& headers)
-      : method_(method), path_(url)
+    request_head::request_head(const std::string& path, const std::string& method, std::list<hpack::header_field>&& headers)
     {
       this->headers_ = std::move(headers);
+      this->path(path);
+      this->method(method);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    request_head::request_head(const std::string& url, http::method method, std::list<std::pair<std::string,std::string>>&& headers)
-        : method_(method_enum_to_string(method)), path_(url)
+    request_head::request_head(const std::string& path, http::method method, std::list<hpack::header_field>&& headers)
     {
       this->headers_ = std::move(headers);
+      this->path(path);
+      this->method(method);
     }
     //----------------------------------------------------------------//
 
@@ -50,62 +52,74 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::string& request_head::method() const
+    std::string request_head::method() const
     {
-      return this->method_;
+      return this->header(":method");
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void request_head::method(const std::string& value)
     {
-      this->method_ = value;
-      std::for_each(this->method_.begin(), this->method_.end(), ::toupper);
+      std::string tmp(value);
+      std::for_each(tmp.begin(), tmp.end(), ::toupper);
+      this->pseudo_header(":method", std::move(tmp));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void request_head::method(http::method value)
     {
-      this->method_ = method_enum_to_string(value);
+      this->pseudo_header(":method", std::move(method_enum_to_string(value)));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     bool request_head::method_is(http::method methodToCheck) const
     {
-      return (this->method_ == method_enum_to_string(methodToCheck));
+      return (this->method() == method_enum_to_string(methodToCheck));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::string& request_head::path() const
+    std::string request_head::path() const
     {
-      return this->path_;
+      return this->header(":path");
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void request_head::path(const std::string& value)
     {
-      this->path_= value;
+      this->pseudo_header(":path", value);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void request_head::start_line(const std::string& value)
+    std::string request_head::scheme() const
     {
-      std::stringstream ss(value);
-      std::getline(ss, this->method_, ' ');
-      std::getline(ss, this->path_, ' ');
-      std::getline(ss, this->version_);
+      return this->header(":scheme");
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string request_head::start_line() const
+    void request_head::scheme(const std::string& value)
     {
-      return this->method_ + " " + this->path_ + " " + this->version_;
+      this->pseudo_header(":scheme", value);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    std::string request_head::authority() const
+    {
+      return this->header(":authority");
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void request_head::authority(const std::string& value)
+    {
+      this->pseudo_header(":authority", value);
     }
     //----------------------------------------------------------------//
   }

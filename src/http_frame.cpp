@@ -132,7 +132,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    headers_frame::headers_frame(const char*const header_block, std::uint32_t header_block_sz, priority_options priority_ops, bool end_headers, bool end_stream, const char*const padding, std::uint8_t paddingsz)
+    headers_frame::headers_frame(const char*const header_block, std::uint32_t header_block_sz, bool end_headers, bool end_stream, priority_options priority_ops, const char*const padding, std::uint8_t paddingsz)
         : frame_payload_base(
         (end_stream ? frame_flag::end_stream : (std::uint8_t)0x0)
         | (end_headers ? frame_flag::end_headers : (std::uint8_t)0x0)
@@ -535,7 +535,7 @@ namespace manifold
     //****************************************************************//
     // continuation_frame
     //----------------------------------------------------------------//
-    continuation_frame::continuation_frame(const char*const header_data, std::uint32_t header_data_sz) : frame_payload_base(0)
+    continuation_frame::continuation_frame(const char*const header_data, std::uint32_t header_data_sz, bool end_headers) : frame_payload_base(end_headers ? frame_flag::end_headers : (std::uint8_t)0)
     {
       this->buf_.resize(header_data_sz);
       memcpy(this->buf_.data(), header_data, header_data_sz);

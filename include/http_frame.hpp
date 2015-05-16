@@ -108,8 +108,8 @@ namespace manifold
       std::uint8_t bytes_needed_for_weight() const;
     public:
       headers_frame() : frame_payload_base(0) {}
-      headers_frame(const char*const header_block, std::uint32_t header_block_sz, bool end_headers = true, bool end_stream = false, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
-      headers_frame(const char*const header_block, std::uint32_t header_block_sz, priority_options priority_ops, bool end_headers = true, bool end_stream = false, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
+      headers_frame(const char*const header_block, std::uint32_t header_block_sz, bool end_headers, bool end_stream, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
+      headers_frame(const char*const header_block, std::uint32_t header_block_sz, bool end_headers, bool end_stream, priority_options priority_ops, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
       ~headers_frame() {}
 
       const char*const header_block_fragment() const;
@@ -181,7 +181,7 @@ namespace manifold
     {
     public:
       push_promise_frame() : frame_payload_base(0) {}
-      push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id, bool end_headers = true, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
+      push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id, bool end_headers, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
       ~push_promise_frame() {}
 
       const char*const header_block_fragment() const;
@@ -237,7 +237,7 @@ namespace manifold
     {
     public:
       continuation_frame() : frame_payload_base(0) {}
-      continuation_frame(const char*const header_data, std::uint32_t header_data_sz);
+      continuation_frame(const char*const header_data, std::uint32_t header_data_sz, bool end_headers);
       ~continuation_frame() {}
 
       const char*const header_block_fragment() const;
