@@ -3,7 +3,7 @@ A lightweight http/2 library.
 
 In progress.
 
-## Server Usage
+## Server
 
 ```C++
 asio::io_service ioservice;
@@ -35,7 +35,42 @@ ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std:
 ioservice.run();
 ```
 
-## HPACK Usage
+## Client
+
+```C++
+http::client conn(ioservice, "www.google.com", http::client::ssl_options());
+conn.on_connect([&conn]()
+{
+  conn.make_request(http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}}), [](http::client::request&& req)
+  {
+    auto request = std::make_shared<http::client::request>(std::move(req));
+
+    request->on_response([request](http::client::response&& resp)
+    {
+      auto response = std::make_shared<http::client::response>(std::move(resp));
+
+      if (!response->head().is_successful_status())
+        request->reset_stream();
+      else
+      {
+        response->on_data([](const char *const data, std::size_t datasz)
+        {
+          // ...
+        });
+
+        response->on_end([]()
+        {
+          // ...
+        });
+      }
+    });
+
+    request->end("name=value&name2=value2");
+  });
+});
+```
+
+## HPACK
 HPACK compression can be used independently.
 
 ```C++
