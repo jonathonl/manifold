@@ -38,6 +38,8 @@ ioservice.run();
 ## Client
 
 ```C++
+asio::io_service ioservice;
+
 http::client conn(ioservice, "www.google.com", http::client::ssl_options());
 conn.on_connect([&conn]()
 {
@@ -68,6 +70,8 @@ conn.on_connect([&conn]()
     request->end("name=value&name2=value2");
   });
 });
+
+ioservice.run();
 ```
 
 ## HPACK
