@@ -40,7 +40,7 @@ ioservice.run();
 ```C++
 asio::io_service ioservice;
 
-http::client conn(ioservice, "www.google.com", http::client::ssl_options());
+http::client conn(ioservice, "www.example.com", http::client::ssl_options());
 conn.on_connect([&conn]()
 {
   conn.make_request(http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}}), [](http::client::request&& req)
