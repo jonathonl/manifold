@@ -30,6 +30,8 @@ namespace manifold
       http_1_1_required   = 0xd
     };
     //**********************************************************************//
+
+    errc int_to_errc(std::uint32_t error_code);
   }
 }
 

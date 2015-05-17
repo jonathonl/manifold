@@ -9,6 +9,30 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------------//
+    errc int_to_errc(std::uint32_t error_code)
+    {
+      switch (error_code)
+      {
+        case (std::uint32_t)errc::no_error:            return errc::no_error;
+        case (std::uint32_t)errc::protocol_error:      return errc::protocol_error;
+        case (std::uint32_t)errc::internal_error:      return errc::internal_error;
+        case (std::uint32_t)errc::flow_control_error:  return errc::flow_control_error;
+        case (std::uint32_t)errc::settings_timeout:    return errc::settings_timeout;
+        case (std::uint32_t)errc::stream_closed:       return errc::stream_closed;
+        case (std::uint32_t)errc::frame_size_error:    return errc::frame_size_error;
+        case (std::uint32_t)errc::refused_stream:      return errc::refused_stream;
+        case (std::uint32_t)errc::cancel:              return errc::cancel;
+        case (std::uint32_t)errc::compression_error:   return errc::compression_error;
+        case (std::uint32_t)errc::connect_error:       return errc::connect_error;
+        case (std::uint32_t)errc::enhance_your_calm:   return errc::enhance_your_calm;
+        case (std::uint32_t)errc::inadequate_security: return errc::inadequate_security;
+        case (std::uint32_t)errc::http_1_1_required:   return errc::http_1_1_required;
+        default: return errc::internal_error;
+      }
+    }
+    //----------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------//
     error_category_t::error_category_t(): std::error_category()
     {
     }

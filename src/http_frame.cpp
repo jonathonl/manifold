@@ -293,9 +293,9 @@ namespace manifold
     //----------------------------------------------------------------//
     http::errc rst_stream_frame::error_code() const
     {
-      http::errc ret;
-      memcpy(&ret, this->buf_.data(), 4);
-      return ret;
+      std::uint32_t tmp;
+      memcpy(&tmp, this->buf_.data(), 4);
+      return int_to_errc(tmp);
     }
     //----------------------------------------------------------------//
     //****************************************************************//
@@ -490,9 +490,9 @@ namespace manifold
     //----------------------------------------------------------------//
     http::errc goaway_frame::error_code() const
     {
-      http::errc ret;
-      memcpy(&ret, this->buf_.data() + 4, 4);
-      return ret;
+      std::uint32_t tmp;
+      memcpy(&tmp, this->buf_.data() + 4, 4);
+      return int_to_errc(tmp);
     }
     //----------------------------------------------------------------//
 

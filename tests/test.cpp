@@ -69,7 +69,7 @@ public:
 
   void run()
   {
-    this->c_.make_request(http::request_head("/foobar", "GET", {{"content-type","application/x-www-form-urlencoded"}}), std::bind(&my_request_class::handle_request, this, std::placeholders::_1));
+    this->c_.make_request(http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}}), std::bind(&my_request_class::handle_request, this, std::placeholders::_1));
   }
 
   void handle_request(http::client::request&& req)
@@ -86,7 +86,7 @@ public:
   {
     this->response_ = std::move(res);
 
-    if (this->response_.head().status_code() < 200 || this->response_.head().status_code() >= 300)
+    if (!this->response_.head().is_successful_status())
     {
       this->request_.reset_stream();
     }
@@ -201,6 +201,33 @@ int main()
   http::client c2(ioservice, "www.google.com", http::client::ssl_options());
   c2.on_connect([&c2]()
   {
+    c2.make_request(http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}}), [](http::client::request&& req)
+    {
+      auto request = std::make_shared<http::client::request>(std::move(req));
+
+      request->on_response([request](http::client::response&& resp)
+      {
+        auto response = std::make_shared<http::client::response>(std::move(resp));
+        if (!response->head().is_successful_status())
+          request->reset_stream();
+        else
+        {
+          response->on_data([](const char *const data, std::size_t datasz)
+          {
+            // ...
+          });
+
+          response->on_end([]()
+          {
+            // ...
+          });
+        }
+      });
+
+      request->end("name=value&name2=value2");
+    });
+
+
     std::uint32_t stream_id = c2.make_request(http::request_head(), [](http::client::request&& req)
     {
       auto req_ptr = std::make_shared<http::client::request>(std::move(req));
