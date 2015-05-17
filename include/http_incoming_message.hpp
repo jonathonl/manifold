@@ -26,10 +26,14 @@ namespace manifold
       //ssize_t recvChunkedEntity(char* buff, std::size_t buffSize);
       //ssize_t recvKnownLengthEntity(char* buff, std::size_t buffSize);
       //----------------------------------------------------------------//
+    protected:
+      //----------------------------------------------------------------//
+      virtual header_block& message_head() = 0;
+      //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
       //incoming_message(const header_block& head, Socket&& sock);
-      incoming_message(header_block& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+      incoming_message(const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
       virtual ~incoming_message();
       //----------------------------------------------------------------//
 

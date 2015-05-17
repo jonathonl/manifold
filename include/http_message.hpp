@@ -21,14 +21,13 @@ namespace manifold
       //----------------------------------------------------------------//
     protected:
       //----------------------------------------------------------------//
-      header_block& head_;
       std::shared_ptr<http::connection> connection_;
       std::uint32_t stream_id_;
       bool ended_ = false;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      message(header_block& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
+      message(const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
       virtual ~message();
       //----------------------------------------------------------------//
 

@@ -407,10 +407,80 @@ namespace manifold
         {
           it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream), stream_id));
           this->run_send_loop();
+          ret = true;
         }
       }
 
       return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool connection::send_headers(std::uint32_t stream_id, const header_block& head, priority_options priority, bool end_headers, bool end_stream)
+    {
+      bool ret = false;
+
+      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
+
+      if (it == this->streams_.end())
+      {
+        // TODO: Handle error
+      }
+      else
+      {
+        std::string header_data;
+        http::header_block::serialize(this->hpack_encoder_, head, header_data);
+        const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
+        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->settings_[setting_code::max_frame_size])
+        {
+          // TODO: Handle error
+        }
+        else
+        {
+          it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream, priority), stream_id));
+          this->run_send_loop();
+          ret = true;
+        }
+      }
+
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool connection::send_priority(std::uint32_t stream_id, priority_options options)
+    {
+      bool ret = false;
+
+      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
+      if (it == this->streams_.end())
+      {
+        it->second.outgoing_non_data_frames.push(http::frame(http::priority_frame(options), stream_id));
+      }
+
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool connection::send_reset_stream(std::uint32_t stream_id, http::errc error_code)
+    {
+      bool ret = false;
+
+      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
+      if (it == this->streams_.end())
+      {
+        it->second.outgoing_non_data_frames.push(http::frame(http::rst_stream_frame(error_code), stream_id));
+      }
+
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::send_settings(const std::list<std::pair<std::uint16_t,std::uint32_t>>& settings)
+    {
+      this->root_stream_.outgoing_non_data_frames.push(http::frame(http::settings_frame(settings.begin(), settings.end()), 0x0));
     }
     //----------------------------------------------------------------//
 
@@ -437,6 +507,7 @@ namespace manifold
         {
           it->second.outgoing_non_data_frames.push(http::frame(http::continuation_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers), stream_id));
           this->run_send_loop();
+          ret = true;
         }
       }
 
@@ -455,9 +526,88 @@ namespace manifold
       {
         it->second.outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), stream_id));
         this->run_send_loop();
+        ret = true;
       }
 
       return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool connection::send_push_promise(std::uint32_t stream_id, const header_block&head, std::uint32_t promised_stream_id, bool end_headers)
+    {
+      bool ret = false;
+
+      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
+
+      if (it == this->streams_.end())
+      {
+        // TODO: Handle error
+      }
+      else
+      {
+        std::string header_data;
+        http::header_block::serialize(this->hpack_encoder_, head, header_data);
+        const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
+        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->settings_[setting_code::max_frame_size])
+        {
+          // TODO: Handle error
+        }
+        else
+        {
+          it->second.outgoing_non_data_frames.push(http::frame(http::push_promise_frame(header_data.data(), (std::uint32_t)header_data.size(), promised_stream_id, end_headers), stream_id));
+          this->run_send_loop();
+          ret = true;
+        }
+      }
+
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::send_ping(std::uint64_t opaque_data)
+    {
+      this->root_stream_.outgoing_non_data_frames.push(http::frame(http::ping_frame(opaque_data), 0x0));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::send_ping_acknowledgement(std::uint64_t opaque_data)
+    {
+      this->root_stream_.outgoing_non_data_frames.push(http::frame(http::ping_frame(opaque_data, true), 0x0));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::send_goaway(http::errc error_code, const char *const data, std::uint32_t data_sz)
+    {
+      this->root_stream_.outgoing_non_data_frames.push(http::frame(http::goaway_frame(this->streams_.size() ? this->streams_.rbegin()->first : 0, error_code, data, data_sz), 0x0));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool connection::send_window_update(std::uint32_t stream_id, std::uint32_t amount)
+    {
+      bool ret = false;
+
+      std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
+      if (it != this->streams_.end())
+      {
+        it->second.outgoing_data_frames.push(http::frame(http::window_update_frame(amount), stream_id));
+        this->run_send_loop();
+        ret = true;
+      }
+
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::send_connection_level_window_update(std::uint32_t amount)
+    {
+      this->root_stream_.outgoing_data_frames.push(http::frame(http::window_update_frame(amount), 0x0));
+      this->run_send_loop();
     }
     //----------------------------------------------------------------//
 

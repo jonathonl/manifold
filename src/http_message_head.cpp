@@ -203,7 +203,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool header_block::deserialize(hpack::decoder& dec, const std::string& source, header_block& destination)
     {
-      dec.decode(source.begin(), source.end(), destination.headers_);
+      return dec.decode(source.begin(), source.end(), destination.headers_);
     }
     //----------------------------------------------------------------//
   }

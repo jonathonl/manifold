@@ -15,6 +15,22 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    response_head::response_head(unsigned short status, std::list<hpack::header_field>&& headers)
+    {
+      this->headers_ = std::move(headers);
+      this->status_code(status);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    response_head::response_head(http::status_code status, std::list<hpack::header_field>&& headers)
+    {
+      this->headers_ = std::move(headers);
+      this->status_code(status);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     response_head::~response_head()
     {
     }

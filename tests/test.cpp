@@ -24,20 +24,20 @@ class client_stream_wrapper
 {
 private:
   http::client::request req_;
-  std::unique_ptr<http::client::response> resp_;
+  http::client::response resp_;
 
   std::function<void()> on_response_headers_fn_;
 
   void set_response(http::client::response&& r)
   {
-    this->resp_ = std::unique_ptr<http::client::response>(new http::client::response(std::move(r)));
+    this->resp_ = std::move(r);
   }
 public:
   client_stream_wrapper()
-    : req_(http::request_head(), nullptr, 0)
+    : req_(http::request_head(), nullptr, 0), resp_(http::response_head(), nullptr, 0)
   {}
   client_stream_wrapper(http::client::request&& req)
-    : req_(std::move(req))
+    : req_(std::move(req)), resp_(http::response_head(), nullptr, 0)
   {
     req_.on_response(std::bind(&client_stream_wrapper::set_response, this, std::placeholders::_1));
   }
@@ -59,10 +59,10 @@ class my_request_class
 {
 private:
   http::client& c_;
-  std::shared_ptr<http::client::request> request_;
-  std::shared_ptr<http::client::response> response_;
+  http::client::request request_;
+  http::client::response response_;
 public:
-  my_request_class(http::client& c) : c_(c)
+  my_request_class(http::client& c) : c_(c), request_(http::request_head(), nullptr, 0), response_(http::response_head(), nullptr, 0)
   {
     this->c_.on_connect(std::bind(&my_request_class::run, this));
   }
@@ -74,30 +74,30 @@ public:
 
   void handle_request(http::client::request&& req)
   {
-    this->request_ = std::make_shared<http::client::request>(std::move(req));
+    this->request_ = std::move(req);
 
-    this->request_->on_response(std::bind(&my_request_class::handle_response, this, std::placeholders::_1));
+    this->request_.on_response(std::bind(&my_request_class::handle_response, this, std::placeholders::_1));
 
 
-    this->request_->end(std::string("name=value&name2=value2"));
+    this->request_.end(std::string("name=value&name2=value2"));
   }
 
   void handle_response(http::client::response &&res)
   {
-    this->response_ = std::make_shared<http::client::response>(std::move(res));
+    this->response_ = std::move(res);
 
-    if (this->response_->head().status_code() < 200 || this->response_->head().status_code() >= 300)
+    if (this->response_.head().status_code() < 200 || this->response_.head().status_code() >= 300)
     {
-      this->request_->reset_stream();
+      this->request_.reset_stream();
     }
     else
     {
-      this->response_->on_data([](const char *const data, std::size_t datasz)
+      this->response_.on_data([](const char *const data, std::size_t datasz)
       {
 
       });
 
-      this->response_->on_end([]()
+      this->response_.on_end([]()
       {
 
       });
@@ -157,25 +157,35 @@ int main()
   // Server Test
   //
   http::router app;
+  app.register_handler(std::regex("^/redirect-url$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
+  {
+    res.head().status_code(http::status_code::found);
+    res.head().header("location","/new-url");
+    res.end();
+  });
   app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
   {
     auto req_ptr = std::make_shared<http::server::request>(std::move(req));
     auto res_ptr = std::make_shared<http::server::response>(std::move(res));
 
-    req_ptr->on_data([](const char*const data, std::size_t datasz)
+    auto req_entity = std::make_shared<std::string>();
+    req_ptr->on_data([req_entity](const char*const data, std::size_t datasz)
     {
-
+      req_entity->append(data, datasz);
     });
 
-    req_ptr->on_end([res_ptr]()
+    req_ptr->on_end([res_ptr, req_entity]()
     {
-      res_ptr->end(std::string("Hello World"));
+      res_ptr->end("Received: " + *req_entity);
     });
 
   });
 
   http::server srv(ioservice, 8080, "0.0.0.0");
   srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+
+  //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
+  //ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//

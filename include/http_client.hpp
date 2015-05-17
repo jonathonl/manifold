@@ -65,6 +65,10 @@ namespace manifold
       {
       private:
         response_head head_;
+      protected:
+        //----------------------------------------------------------------//
+        header_block& message_head() { return this->head_; }
+        //----------------------------------------------------------------//
       public:
         response(response_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
         ~response();
@@ -78,6 +82,10 @@ namespace manifold
       {
       private:
         request_head head_;
+      protected:
+        //----------------------------------------------------------------//
+        header_block& message_head() { return this->head_; }
+        //----------------------------------------------------------------//
       public:
         request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
         ~request();

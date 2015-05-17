@@ -111,14 +111,21 @@ namespace manifold
       stream* get_next_send_stream_ptr(const stream_dependency_tree& current_node);
       bool check_tree_for_outgoing_frame(const stream_dependency_tree& current_node);
       bool stream_has_sendable_frame(const stream& stream_to_check);
+      //----------------------------------------------------------------//
 
+      //----------------------------------------------------------------//
+      void send_connection_level_window_update(std::uint32_t amount);
+      void send_ping_acknowledgement(std::uint64_t opaque_data);
+      //----------------------------------------------------------------//
 
+      //----------------------------------------------------------------//
       void run_recv_loop();
       void run_send_loop();
       //----------------------------------------------------------------//
     protected:
       virtual void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb) = 0;
       virtual void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb) = 0;
+      virtual bool is_encrypted() const = 0;
     public:
       //----------------------------------------------------------------//
       connection();
@@ -141,14 +148,22 @@ namespace manifold
       void on_end_frame(std::uint32_t stream_id, const std::function<void()>& fn);
       void on_rst_stream_frame(std::uint32_t stream_id, const std::function<void(const std::error_code& ec)>& fn);
       void on_push_promise(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn);
-        //----------------------------------------------------------------//
+      void on_window_update(std::uint32_t stream_id, const std::function<void()>& fn);
+      //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void on_window_update(std::uint32_t stream_id, const std::function<void()>& fn);
       bool create_stream(std::uint32_t stream_id);
-      bool send_headers(std::uint32_t stream_id, const header_block&head, bool end_headers = false, bool end_stream = false);
-      bool send_countinuation(std::uint32_t stream_id, const header_block&head, bool end_headers = false);
-      bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream = false);
+      bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream);
+      bool send_headers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream);
+      bool send_headers(std::uint32_t stream_id, const header_block& head, priority_options priority, bool end_headers, bool end_stream);
+      bool send_priority(std::uint32_t stream_id, priority_options options);
+      bool send_reset_stream(std::uint32_t stream_id, http::errc error_code);
+      void send_settings(const std::list<std::pair<std::uint16_t,std::uint32_t>>& settings);
+      bool send_push_promise(std::uint32_t stream_id, const header_block&head, std::uint32_t promised_stream_id, bool end_headers);
+      void send_ping(std::uint64_t opaque_data);
+      void send_goaway(http::errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0);
+      bool send_window_update(std::uint32_t stream_id, std::uint32_t amount);
+      bool send_countinuation(std::uint32_t stream_id, const header_block& head, bool end_headers);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -183,7 +198,7 @@ namespace manifold
 
       asio::ip::tcp::socket::lowest_layer_type& socket() { return this->socket_stream_.lowest_layer(); }
       asio::ssl::stream<asio::ip::tcp::socket>& ssl_stream() { return this->socket_stream_; }
-
+      bool is_encrypted() const { return true; }
     };
     //================================================================//
 
@@ -208,6 +223,7 @@ namespace manifold
       ~non_tls_connection() {}
 
       asio::ip::tcp::socket::lowest_layer_type& socket() { return this->socket_; }
+      bool is_encrypted() const { return false; }
     };
     //================================================================//
   }

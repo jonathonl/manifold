@@ -242,12 +242,12 @@ namespace manifold
     //****************************************************************//
     // priority_frame
     //----------------------------------------------------------------//
-    priority_frame::priority_frame(std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive) : frame_payload_base(0x0)
+    priority_frame::priority_frame(priority_options options) : frame_payload_base(0x0)
     {
       this->buf_.resize(5);
-      std::uint32_t tmp = (exclusive ? (0x80000000 ^ stream_dependency_id) : (0x7FFFFFFF & stream_dependency_id));
+      std::uint32_t tmp = (options.exclusive ? (0x80000000 ^ options.stream_dependency_id) : (0x7FFFFFFF & options.stream_dependency_id));
       memcpy(this->buf_.data(), &tmp, 4);
-      memcpy(this->buf_.data() + 4, &weight, 1);
+      memcpy(this->buf_.data() + 4, &(options.weight), 1);
     }
     //----------------------------------------------------------------//
 
@@ -283,7 +283,7 @@ namespace manifold
     //****************************************************************//
     // rst_stream_frame
     //----------------------------------------------------------------//
-    rst_stream_frame::rst_stream_frame(http::errc error_code, std::uint8_t flags) : frame_payload_base(flags)
+    rst_stream_frame::rst_stream_frame(http::errc error_code) : frame_payload_base(0x0)
     {
       this->buf_.resize(4);
       memcpy(this->buf_.data(), &error_code, 4);
@@ -468,7 +468,7 @@ namespace manifold
     //****************************************************************//
     // goaway_frame
     //----------------------------------------------------------------//
-    goaway_frame::goaway_frame(std::uint32_t last_stream_id, std::uint32_t error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz) : frame_payload_base(0)
+    goaway_frame::goaway_frame(std::uint32_t last_stream_id, http::errc error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz) : frame_payload_base(0)
     {
       this->buf_.resize(8 + addl_error_data_sz);
       std::uint32_t tmp = 0x7FFFFFFF & last_stream_id;

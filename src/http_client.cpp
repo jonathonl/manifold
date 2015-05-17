@@ -8,7 +8,7 @@ namespace manifold
   {
     //----------------------------------------------------------------//
     client::request::request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
-      : outgoing_message(this->head_, conn, stream_id)
+      : outgoing_message(conn, stream_id)
     {
       this->head_ = std::move(head);
     }
@@ -46,7 +46,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     client::response::response(response_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
-      : incoming_message(this->head_, conn, stream_id)
+      : incoming_message(conn, stream_id)
     {
       this->head_ = std::move(head);
     }

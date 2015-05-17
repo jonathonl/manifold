@@ -22,9 +22,13 @@ namespace manifold
       //bool sendChunkedEntity(const char* data, std::size_t dataSize);
       //bool sendKnownLengthEntity(const char* data, std::size_t dataSize);
       //----------------------------------------------------------------//
+    protected:
+      //----------------------------------------------------------------//
+      virtual header_block& message_head() = 0;
+      //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      outgoing_message(header_block& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+      outgoing_message(const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
       virtual ~outgoing_message();
       //----------------------------------------------------------------//
 

@@ -9,8 +9,8 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    outgoing_message::outgoing_message(header_block& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
-      : message(head, conn, stream_id),
+    outgoing_message::outgoing_message(const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
+      : message(conn, stream_id),
         bytes_sent_(0),
         headers_sent_(false)
     {
@@ -30,7 +30,7 @@ namespace manifold
 
       if (!this->headers_sent_)
       {
-        ret = this->connection_->send_headers(this->stream_id_, this->head_, true, end_stream);
+        ret = this->connection_->send_headers(this->stream_id_, this->message_head(), true, end_stream);
         this->headers_sent_= true;
         this->ended_ = end_stream;
       }

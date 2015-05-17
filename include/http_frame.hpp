@@ -132,7 +132,7 @@ namespace manifold
     {
     public:
       priority_frame() : frame_payload_base(0) {}
-      priority_frame(std::uint8_t weight, std::uint32_t stream_dependency_id, bool exclusive);
+      priority_frame(priority_options options);
       ~priority_frame() {}
 
       std::uint8_t weight() const;
@@ -146,7 +146,7 @@ namespace manifold
     {
     public:
       rst_stream_frame() : frame_payload_base(0) {}
-      rst_stream_frame(http::errc error_code, std::uint8_t flags);
+      rst_stream_frame(http::errc error_code);
       ~rst_stream_frame() {}
 
       http::errc error_code() const;
@@ -210,7 +210,7 @@ namespace manifold
     {
     public:
       goaway_frame() : frame_payload_base(0) {}
-      goaway_frame(std::uint32_t last_stream_id, std::uint32_t error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz);
+      goaway_frame(std::uint32_t last_stream_id, http::errc error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz);
       ~goaway_frame() {}
 
       std::uint32_t last_stream_id() const;
