@@ -2,11 +2,13 @@
 #include <memory>
 #include <fstream>
 #include <cstdio>
+#include <iomanip>
 
 #include "asio.hpp"
 #include "http_server.hpp"
 #include "http_client.hpp"
 #include "http_router.hpp"
+#include "hpack.hpp"
 
 
 
@@ -110,6 +112,29 @@ public:
 int main()
 {
   asio::io_service ioservice;
+
+  //----------------------------------------------------------------//
+  std::uint32_t plus_sign_code = (0x7fb << (32 - 11));
+  auto res = hpack::huffman_code_tree.find(hpack::huffman_code(plus_sign_code, 32));
+  if (res != hpack::huffman_code_tree.end())
+    std::cout << res->second << std::endl;
+
+  std::string compressed_literal = {(char)0xf1,(char)0xe3,(char)0xc2,(char)0xe5,(char)0xf2,(char)0x3a,(char)0x6b,(char)0xa0,(char)0xab,(char)0x90,(char)0xf4,(char)0xff};
+  for (auto it = compressed_literal.begin(); it != compressed_literal.end(); ++it)
+    std::cout << std::hex << (unsigned int)(std::uint8_t)(*it) << std::dec << std::endl;
+  std::string uncompressed_literal;
+  hpack::decoder::huffman_decode(compressed_literal.begin(), compressed_literal.end(), uncompressed_literal);
+  std::cout << uncompressed_literal.size() << std::endl;
+  std::cout << uncompressed_literal << std::endl;
+
+//  for (auto it = hpack::huffman_code_tree.begin(); it != hpack::huffman_code_tree.end(); ++it)
+//    std::cout << "- " << std::hex << it->first.msb_code << std::dec << " | " << it->second << std::endl;
+
+
+  std::cout << uncompressed_literal << std::endl;
+  std::cout.flush();
+
+  //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
   // HPack Test

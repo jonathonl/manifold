@@ -46,7 +46,7 @@ namespace manifold
       bool end(const char*const data, std::size_t data_sz, const http::header_block& trailers = {});
       bool end(const char* cstr, const http::header_block& trailers = {})
       {
-        this->end(std::string(cstr), trailers);
+        return this->end(std::string(cstr), trailers);
       }
       template <typename BufferT>
       bool end(const BufferT& dataBuffer, const http::header_block& trailers = {})

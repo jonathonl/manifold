@@ -8,6 +8,7 @@
 #include <queue>
 #include <deque>
 #include <list>
+#include <map>
 #include <unordered_map>
 
 
@@ -33,8 +34,31 @@ namespace manifold
         : name(n), value(v), cache(cache_field) {}
     };
 
+    struct huffman_code
+    {
+      const std::int32_t msb_code;
+      const std::uint8_t bit_length;
+      huffman_code(std::int32_t msb_aligned_int, std::uint8_t bitlength)
+        : msb_code(msb_aligned_int), bit_length(bitlength) {}
+    };
+
+    class huffman_code_cmp
+    {
+    public:
+      bool operator() (const huffman_code& lhc, const huffman_code& rhc) const
+      {
+        std::uint8_t lowest_bit_length = lhc.bit_length < rhc.bit_length ? lhc.bit_length : rhc.bit_length;
+        std::uint32_t mask = 0xFFFFFFFF;
+        mask = mask << (32 - lowest_bit_length);
+
+        return ((mask & lhc.msb_code) >> (32 - lowest_bit_length)) < ((mask & rhc.msb_code) >> (32 - lowest_bit_length));
+      }
+    };
+
     extern const std::array<std::pair<std::string,std::string>, 61> static_table;
     extern const std::unordered_multimap<std::string, std::size_t> static_table_reverse_lookup_map;
+    extern const std::array<std::pair<std::uint32_t, std::uint8_t>,257> huffman_code_array;
+    extern const std::map<huffman_code,char,huffman_code_cmp> huffman_code_tree;
 
     enum class prefix_mask : std::uint8_t
     {
@@ -93,7 +117,7 @@ namespace manifold
     //================================================================//
     class encoder : public context
     {
-    private:
+    public:
       struct find_result { std::size_t name_index = 0; std::size_t name_and_value_index = 0; };
       std::queue<std::size_t> table_size_updates_;
       //std::multimap<std::pair<std::string,std::string>, std::size_t> dynamic_table_reverse_lookup_map_;
@@ -112,18 +136,18 @@ namespace manifold
     //================================================================//
     class decoder : public context
     {
-    private:
+    public:
       static std::uint64_t decode_integer(prefix_mask prfx_mask, std::string::const_iterator& itr);
       static bool decode_string_literal(std::string::const_iterator& itr, std::string& output);
       bool decode_nvp(std::size_t table_index, cacheability cache_header, std::string::const_iterator& itr, std::list<header_field>& headers);
-      static void huffman_decode(std::string::const_iterator begin, std::string::const_iterator end, std::string& output) {}
+      static void huffman_decode(std::string::const_iterator begin, std::string::const_iterator end, std::string& output);
     public:
       decoder(std::size_t max_table_size)
         : context(max_table_size) {}
       bool decode(std::string::const_iterator beg, std::string::const_iterator end, std::list<header_field>& headers);
     };
     //================================================================//
-  }
+  };
 }
 
 #endif // MANIFOLD_HPACK_HPP
