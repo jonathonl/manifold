@@ -16,6 +16,115 @@ namespace manifold
 {
   namespace hpack
   {
+    // TODO: Add huffman encoding and clean up this ugly huffman_tree code.
+    struct huffman_code2
+    {
+      const std::uint32_t msb_code;
+      const std::uint8_t bit_length;
+      huffman_code2(std::uint32_t msb_aligned_int, std::uint8_t bitlength)
+        : msb_code(msb_aligned_int), bit_length(bitlength) {}
+    };
+    class huffman_tree
+    {
+    private:
+      enum class child_direction
+      {
+        left = 0,
+        right
+      };
+    public:
+      huffman_tree(std::initializer_list<std::pair<huffman_code2, char>> il)
+      {
+        for (auto it = il.begin(); it != il.end(); ++it)
+          huffman_tree::insert(this->root_node_, it->first, 31, it->second);
+      }
+
+      bool lookup(std::string::const_iterator& input_it, const std::string::const_iterator& input_end, std::uint8_t& bit_position, char& output) const
+      {
+        bool ret = false;
+        auto* current_node = &this->root_node_;
+        //std::uint8_t bit_position = 7;
+        while (!ret && input_it != input_end)
+        {
+          child_direction child_to_use = (*input_it >> bit_position) & 0x1 ? child_direction::right : child_direction::left;
+
+          assert(current_node->child(child_to_use) != nullptr);
+          if (current_node->child(child_to_use)->is_leaf)
+          {
+            output = current_node->child(child_to_use)->value;
+            ret = true;
+          }
+          else
+          {
+            current_node = current_node->child(child_to_use);
+          }
+
+
+          if (bit_position == 0)
+          {
+            ++input_it;
+            bit_position = 7;
+          }
+          else
+          {
+            --bit_position;
+          }
+        }
+
+        return ret;
+      }
+    private:
+      struct node
+      {
+        bool is_leaf;
+        char value;
+        node* left_child;
+        node* right_child;
+        node()
+          : is_leaf(false), value('\0'), left_child(nullptr), right_child(nullptr) {}
+        node* child(child_direction dir) const { return (dir == child_direction::right ? this->right_child : this->left_child); }
+        void set_child(child_direction dir, node* v)
+        {
+          if (dir == child_direction::left)
+            this->left_child = v;
+          else
+            this->right_child = v;
+        }
+      };
+
+      node root_node_;
+
+
+
+
+      static bool insert(node& current_node, const huffman_code2& code, std::uint8_t bit_position, char value)
+      {
+        bool ret = false;
+        bool final_bit = (bit_position + code.bit_length) == 32;
+        child_direction child_node_to_use = (code.msb_code >> bit_position) & 0x1 ? child_direction::right : child_direction::left;
+
+        if (final_bit)
+        {
+          assert(current_node.child(child_node_to_use) == nullptr);
+          if (current_node.child(child_node_to_use) == nullptr)
+          {
+            current_node.set_child(child_node_to_use, new node());
+            current_node.child(child_node_to_use)->is_leaf = true;
+            current_node.child(child_node_to_use)->value = value;
+            ret = true;
+          }
+        }
+        else
+        {
+          if (!current_node.child(child_node_to_use))
+            current_node.set_child(child_node_to_use, new node());
+          ret = huffman_tree::insert(*current_node.child(child_node_to_use), code, --bit_position, value);
+        }
+
+        return ret;
+      }
+    };
+
     enum class cacheability
     {
       yes = 1,
@@ -59,6 +168,7 @@ namespace manifold
     extern const std::unordered_multimap<std::string, std::size_t> static_table_reverse_lookup_map;
     extern const std::array<std::pair<std::uint32_t, std::uint8_t>,257> huffman_code_array;
     extern const std::map<huffman_code,char,huffman_code_cmp> huffman_code_tree;
+    extern const huffman_tree huffman_code_tree2;
 
     enum class prefix_mask : std::uint8_t
     {

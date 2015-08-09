@@ -124,14 +124,12 @@ int main()
     std::cout << std::hex << (unsigned int)(std::uint8_t)(*it) << std::dec << std::endl;
   std::string uncompressed_literal;
   hpack::decoder::huffman_decode(compressed_literal.begin(), compressed_literal.end(), uncompressed_literal);
-  std::cout << uncompressed_literal.size() << std::endl;
-  std::cout << uncompressed_literal << std::endl;
+  std::cout << "uncompressed size: " << uncompressed_literal.size() << std::endl;
+  std::cout << "uncompressed value: " << uncompressed_literal << std::endl;
 
 //  for (auto it = hpack::huffman_code_tree.begin(); it != hpack::huffman_code_tree.end(); ++it)
 //    std::cout << "- " << std::hex << it->first.msb_code << std::dec << " | " << it->second << std::endl;
 
-
-  std::cout << uncompressed_literal << std::endl;
   std::cout.flush();
 
   //----------------------------------------------------------------//
