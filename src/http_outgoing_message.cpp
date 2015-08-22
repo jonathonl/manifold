@@ -58,7 +58,7 @@ namespace manifold
     //----------------------------------------------------------------//
     void outgoing_message::on_drain(const std::function<void()>& fn)
     {
-      this->connection_->on_window_update(this->stream_id_, fn);
+      this->connection_->on_drain(this->stream_id_, fn);
     }
     //----------------------------------------------------------------//
 

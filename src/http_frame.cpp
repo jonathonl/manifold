@@ -1,5 +1,6 @@
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #include <new>
+#include <iostream>
 
 #include "asio/ssl.hpp"
 #include "http_frame.hpp"
@@ -8,6 +9,31 @@ namespace manifold
 {
   namespace http
   {
+    enum class log_dir { outgoing = 1, incoming };
+    void log(const frame& f, log_dir direction)
+    {
+      std::cout << (direction == log_dir::outgoing ? "--- OUT ---" : "--- IN ---") << std::endl;
+      std::cout << "Stream ID: " << f.stream_id() << std::endl;
+      std::cout << "Payload Length: " << f.payload_length() << std::endl;
+
+      std::string str_type;
+      switch(f.type())
+      {
+        case frame_type::data           : str_type = "data" ; break;
+        case frame_type::headers        : str_type = "headers" ; break;
+        case frame_type::priority       : str_type = "priority" ; break;
+        case frame_type::rst_stream     : str_type = "rst_stream" ; break;
+        case frame_type::settings       : str_type = "settings" ; break;
+        case frame_type::push_promise   : str_type = "push_promise" ; break;
+        case frame_type::ping           : str_type = "ping" ; break;
+        case frame_type::goaway         : str_type = "goaway" ; break;
+        case frame_type::window_update  : str_type = "window_update" ; break;
+        case frame_type::continuation   : str_type = "continuation" ; break;
+        case frame_type::invalid_type   : str_type = "invalid" ; break;
+      }
+      std::cout << "Frame Type: " << str_type << std::endl;
+      std::cout << std::endl;
+    }
     //****************************************************************//
     // frame_payload_base
     //----------------------------------------------------------------//
@@ -30,7 +56,10 @@ namespace manifold
     {
       destination.flags_ = flags;
       destination.buf_.resize(payload_size);
-      asio::async_read(sock, asio::buffer(destination.buf_.data(), payload_size), [cb](const std::error_code& ec, std::size_t bytes_read) { (cb ? cb(ec) : void()); });
+      asio::async_read(sock, asio::buffer(destination.buf_.data(), payload_size), [cb](const std::error_code& ec, std::size_t bytes_read)
+      {
+        (cb ? cb(ec) : void());
+      });
     }
     template void frame_payload_base::recv_frame_payload<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
     template void frame_payload_base::recv_frame_payload<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
@@ -40,7 +69,10 @@ namespace manifold
     template <typename S>
     void frame_payload_base::send_frame_payload(S& sock, const frame_payload_base& source, const std::function<void(const std::error_code& ec)>& cb)
     {
-      asio::async_write(sock, asio::buffer(source.buf_.data(), source.buf_.size()), [cb](const std::error_code& ec, std::size_t bytes_transfered) { (cb ? cb(ec) : void()); });
+      asio::async_write(sock, asio::buffer(source.buf_.data(), source.buf_.size()), [cb](const std::error_code& ec, std::size_t bytes_transfered)
+      {
+        (cb ? cb(ec) : void());
+      });
     }
     template void frame_payload_base::send_frame_payload<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, const frame_payload_base& source, const std::function<void(const std::error_code& ec)>& cb);
     template void frame_payload_base::send_frame_payload<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, const frame_payload_base& source, const std::function<void(const std::error_code& ec)>& cb);
@@ -659,6 +691,36 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
+    frame::frame(frame&& source)
+    {
+      operator=(std::move(source));
+    }
+
+    frame& frame::operator=(frame&& source)
+    {
+      if (&source != this)
+      {
+        this->destroy_union();
+
+        frame_type t = source.type();
+        switch (t)
+        {
+          case frame_type::data           : this->payload_.data_frame_          = std::move(source.payload_.data_frame_)          ; break;
+          case frame_type::headers        : this->payload_.headers_frame_       = std::move(source.payload_.headers_frame_)       ; break;
+          case frame_type::priority       : this->payload_.priority_frame_      = std::move(source.payload_.priority_frame_)      ; break;
+          case frame_type::rst_stream     : this->payload_.rst_stream_frame_    = std::move(source.payload_.rst_stream_frame_)    ; break;
+          case frame_type::settings       : this->payload_.settings_frame_      = std::move(source.payload_.settings_frame_)      ; break;
+          case frame_type::push_promise   : this->payload_.push_promise_frame_  = std::move(source.payload_.push_promise_frame_)  ; break;
+          case frame_type::ping           : this->payload_.ping_frame_          = std::move(source.payload_.ping_frame_)          ; break;
+          case frame_type::goaway         : this->payload_.goaway_frame_        = std::move(source.payload_.goaway_frame_)        ; break;
+          case frame_type::window_update  : this->payload_.window_update_frame_ = std::move(source.payload_.window_update_frame_) ; break;
+          case frame_type::continuation   : this->payload_.continuation_frame_  = std::move(source.payload_.continuation_frame_)  ; break;
+          case frame_type::invalid_type   : break;
+        }
+        this->metadata_ = std::move(source.metadata_);
+      }
+      return (*this);
+    }
     //----------------------------------------------------------------//
     frame::~frame()
     {
@@ -669,7 +731,8 @@ namespace manifold
     //----------------------------------------------------------------//
     void frame::init_meta(frame_type t, std::uint32_t payload_length, std::uint32_t stream_id, std::uint8_t flags)
     {
-      memcpy(this->metadata_.data(), ((char*)&payload_length) + 1, 3);
+      std::uint32_t payload_length_24bit = (payload_length << 8);
+      memcpy(this->metadata_.data(), &payload_length_24bit, 3);
       memcpy(this->metadata_.data() + 3, &t, 1);
       memcpy(this->metadata_.data() + 4, &flags, 1);
       memcpy(this->metadata_.data() + 5, &stream_id, 4); // assuming first bit is zero.
@@ -813,6 +876,7 @@ namespace manifold
         }
         else
         {
+          log(destination, log_dir::incoming);
           if (destination.is<http::data_frame>())
           {
             new (&destination.payload_.data_frame_) http::data_frame();
@@ -881,6 +945,7 @@ namespace manifold
     template <typename S>
     void frame::send_frame(S& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb)
     {
+      log(source, log_dir::outgoing);
       asio::async_write(sock, asio::buffer(source.metadata_, source.metadata_.size()), [&sock, &source, cb](const std::error_code& ec, std::size_t bytes_transfered)
       {
         if (ec)

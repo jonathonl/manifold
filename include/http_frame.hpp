@@ -334,9 +334,9 @@ namespace manifold
       frame(http::goaway_frame&& payload, std::uint32_t stream_id);
       frame(http::window_update_frame&& payload, std::uint32_t stream_id);
       frame(http::continuation_frame&& payload, std::uint32_t stream_id);
-      frame(frame&& source) {} // TODO:
+      frame(frame&& source);
       ~frame();
-      frame& operator=(frame&& source) { return (*this); } // TODO:
+      frame& operator=(frame&& source);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//

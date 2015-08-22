@@ -80,20 +80,25 @@ namespace manifold
       //================================================================//
       class request : public outgoing_message
       {
-      private:
-        request_head head_;
-      protected:
-        //----------------------------------------------------------------//
-        header_block& message_head() { return this->head_; }
-        //----------------------------------------------------------------//
       public:
         request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
+        request(request&& source);
+        request& operator=(request&& source);
         ~request();
 
         const request_head& head() const;
 
         void on_push_promise(const std::function<void(http::client::request&& request)>& cb);
         void on_response(const std::function<void(http::client::response&& resp)>& cb);
+        void on_informational_headers(const std::function<void(http::response_head&& resp_head)>& cb);
+      private:
+        request_head head_;
+        request(const request&) = delete;
+        request& operator=(const request&) = delete;
+      protected:
+        //----------------------------------------------------------------//
+        header_block& message_head() { return this->head_; }
+        //----------------------------------------------------------------//
       };
       //================================================================//
 
@@ -123,13 +128,13 @@ namespace manifold
 
       std::uint32_t get_next_stream_id();
     public:
-      client(asio::io_service& ioservice, const std::string& host, short port = 80);
-      client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, short port = 443);
+      client(asio::io_service& ioservice, const std::string& host, unsigned short port = 80);
+      client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, unsigned short port = 443);
       ~client();
 
       void on_connect(const std::function<void()>& fn);
       void on_close(const std::function<void(const std::error_code ec)>& fn);
-      std::uint32_t make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& cb);
+      client::request make_request(http::request_head&& req_head);
     };
     //================================================================//
   }

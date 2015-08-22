@@ -15,6 +15,25 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    client::request::request(request&& source)
+     : outgoing_message(std::move(source)), head_(std::move(source.head_))
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    client::request& client::request::operator=(request&& source)
+    {
+      if (this != &source)
+      {
+        outgoing_message::operator=(std::move(source));
+        this->head_ = std::move(source.head_);
+      }
+      return *this;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     client::request::~request()
     {
     }
@@ -34,6 +53,13 @@ namespace manifold
       {
         http::client::request r(http::request_head(), this->connection_, this->stream_id_);
       });
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void client::request::on_informational_headers(const std::function<void(http::response_head&& resp_head)>& cb)
+    {
+
     }
     //----------------------------------------------------------------//
 
@@ -67,7 +93,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    client::client(asio::io_service& ioservice, const std::string& host, short port)
+    client::client(asio::io_service& ioservice, const std::string& host, unsigned short port)
       : io_service_(ioservice), tcp_resolver_(ioservice)
     {
       this->last_stream_id_ = (std::uint32_t)-1;
@@ -81,6 +107,9 @@ namespace manifold
         }
         else
         {
+          std::cout << it->host_name() << std::endl;
+          std::cout << it->endpoint().address().to_string() << std::endl;
+          std::cout << it->endpoint().port() << std::endl;
           c->socket().async_connect(*it, [this, c](const std::error_code& ec)
           {
             if (ec)
@@ -100,7 +129,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    client::client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, short port)
+    client::client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, unsigned short port)
         : io_service_(ioservice), tcp_resolver_(ioservice), ssl_context_(new asio::ssl::context(options.method))
     {
       this->last_stream_id_ = (std::uint32_t)-1;
@@ -114,6 +143,8 @@ namespace manifold
         }
         else
         {
+          std::cout << it->host_name() << std::endl;
+          std::cout << it->endpoint().port() << std::endl;
           c->socket().async_connect(*it, [this](const std::error_code& ec)
           {
             if (ec)
@@ -150,25 +181,21 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::uint32_t client::make_request(http::request_head&& req_head, const std::function<void(http::client::request&& req)>& fn)
+    http::client::request client::make_request(http::request_head&& req_head)
     {
-      std::uint32_t next_stream_id = 0;
-      //TODO: this method needs better error handling.
-      if (!fn)
-        throw std::invalid_argument("Callback cannot be null.");
 
-      if (this->connection_)
-      {
-        next_stream_id = this->get_next_stream_id();
-        if (next_stream_id)
-        {
-          this->connection_->create_stream(next_stream_id);
-          client::request r(std::move(req_head), this->connection_, next_stream_id);
-          r.send_headers(req_head.method() == "GET" || req_head.method() == "HEAD");
-          fn(std::move(r));
-        }
-      }
-      return next_stream_id;
+      //TODO: this method needs better error handling.
+
+      if (!this->connection_)
+        throw std::invalid_argument("No connection.");
+
+      std::uint32_t next_stream_id = this->get_next_stream_id(); // could be zero;
+
+      this->connection_->create_stream(next_stream_id);
+      std::string req_method = req_head.method();
+      client::request r(std::move(req_head), this->connection_, next_stream_id);
+      r.send_headers(req_method == "GET" || req_method == "HEAD");
+      return r;
     }
     //----------------------------------------------------------------//
 

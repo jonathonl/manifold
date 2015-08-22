@@ -28,6 +28,9 @@ namespace manifold
     public:
       //----------------------------------------------------------------//
       message(const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
+      //message(message&& source) {}
+      //message& operator=(message&& source) { return *this; }
+
       virtual ~message();
       //----------------------------------------------------------------//
 
@@ -35,6 +38,9 @@ namespace manifold
       std::uint32_t stream_id() const;
       void on_stream_reset(const std::function<void(const std::error_code& ec)>& cb);
       //----------------------------------------------------------------//
+    private:
+      //message(const message&) = delete;
+      //message& operator=(const message&) = delete;
     };
     //================================================================//
   }

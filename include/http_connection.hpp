@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <queue>
 
 #include "asio.hpp"
 #include "asio/ssl.hpp"
@@ -41,7 +42,8 @@ namespace manifold
       {
         std::function<void(const char* const buf, std::size_t buf_size)> on_data_frame;
         std::function<void()> on_end_frame;
-        std::function<void()> on_window_update;
+        std::function<void()> on_drain;
+        std::function<void(const std::error_code& ec)> on_close;
 
         std::queue<frame> incoming_header_and_continuation_frames;
         std::queue<header_block> incoming_message_heads;
@@ -98,6 +100,8 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
+      std::uint32_t last_newly_accepted_stream_id_;
+      std::uint32_t last_newly_created_stream_id_;
       std::map<std::uint32_t,stream> streams_;
       stream root_stream_; // used for connection level frames
       http::frame incoming_frame_;
@@ -148,7 +152,8 @@ namespace manifold
       void on_end_frame(std::uint32_t stream_id, const std::function<void()>& fn);
       void on_rst_stream_frame(std::uint32_t stream_id, const std::function<void(const std::error_code& ec)>& fn);
       void on_push_promise(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn);
-      void on_window_update(std::uint32_t stream_id, const std::function<void()>& fn);
+      //void on_window_update(std::uint32_t stream_id, const std::function<void()>& fn);
+      void on_drain(std::uint32_t stream_id, const std::function<void()>& fn);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
