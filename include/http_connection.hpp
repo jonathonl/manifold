@@ -38,14 +38,26 @@ namespace manifold
       //================================================================//
 
       //================================================================//
+      enum class stream_state
+      {
+        idle = 0,
+        reserved_local,
+        reserved_remote,
+        open,
+        half_close_local,
+        half_closed_remote,
+        closed
+      };
       struct stream
       {
-        std::function<void(const char* const buf, std::size_t buf_size)> on_data_frame;
-        std::function<void()> on_end_frame;
-        std::function<void()> on_drain;
+        stream_state state = stream_state::idle;
+        std::function<void(const char* const buf, std::size_t buf_size)> on_data;
+        std::function<void(http::header_block&& headers)> on_headers;
+        std::function<void(std::uint32_t error_code)> on_rst_stream;
+        std::function<void(http::header_block&& headers)> on_push_promise;
+
         std::function<void(const std::error_code& ec)> on_close;
 
-        std::queue<frame> incoming_header_and_continuation_frames;
         std::queue<header_block> incoming_message_heads;
         std::queue<frame> incoming_data_frames;
         std::queue<frame> outgoing_non_data_frames;
@@ -95,7 +107,7 @@ namespace manifold
 
       //----------------------------------------------------------------//
       // Connection level callbacks:
-      std::function<void(std::uint32_t stream_id, std::list<std::pair<std::string,std::string>>&& headers, std::uint32_t stream_dependency_id)> on_new_stream_;
+      std::function<void(std::uint32_t stream_id, header_block&& headers, std::uint32_t stream_dependency_id)> on_new_stream_;
       std::function<void()> on_close_;
       //----------------------------------------------------------------//
 
@@ -105,6 +117,7 @@ namespace manifold
       std::map<std::uint32_t,stream> streams_;
       stream root_stream_; // used for connection level frames
       http::frame incoming_frame_;
+      std::queue<http::frame> incoming_header_block_fragments_;
       http::frame outgoing_frame_;
       stream_dependency_tree stream_dependency_tree_;
       std::uint32_t connection_level_outgoing_window_size() const { return this->root_stream_.outgoing_window_size; }
@@ -125,6 +138,22 @@ namespace manifold
       //----------------------------------------------------------------//
       void run_recv_loop();
       void run_send_loop();
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      void handle_incoming_frame(stream& frame_stream, const data_frame&          incoming_data_frame);
+      void handle_incoming_frame(stream& frame_stream, const headers_frame&       incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames);
+      void handle_incoming_frame(stream& frame_stream, const priority_frame&      incoming_priority_frame);
+      void handle_incoming_frame(stream& frame_stream, const rst_stream_frame&    incoming_rst_stream_frame);
+      void handle_incoming_frame(stream& frame_stream, const settings_frame&      incoming_settings_frame);
+      void handle_incoming_frame(stream& frame_stream, const push_promise_frame&  incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames);
+      void handle_incoming_frame(stream& frame_stream, const ping_frame&          incoming_ping_frame);
+      void handle_incoming_frame(stream& frame_stream, const goaway_frame&        incoming_goaway_frame);
+      void handle_incoming_frame(stream& frame_stream, const window_update_frame& incoming_window_update_frame);
+      //void handle_incoming_frame(stream& frame_stream, const continuation_frame&  incoming_frame);
+
+      void handle_incoming_frame_on_idle_stream(stream& idle_stream);
+      void handle_incoming_frame_on_open_stream(stream& idle_stream);
       //----------------------------------------------------------------//
     protected:
       virtual void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb) = 0;
@@ -148,10 +177,15 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void on_data_frame(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
+      // connection-only frames: settings, ping, goaway
+      // window_update is for both.
+      void on_data(         std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
+      void on_headers(      std::uint32_t stream_id, const std::function<void(const std::function<void(http::header_block&& headers)>& fn)>& fn);
+      void on_rst_stream(   std::uint32_t stream_id, const std::function<void(std::uint32_t error_code)>& fn);
+      void on_push_promise( std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn);
+
+
       void on_end_frame(std::uint32_t stream_id, const std::function<void()>& fn);
-      void on_rst_stream_frame(std::uint32_t stream_id, const std::function<void(const std::error_code& ec)>& fn);
-      void on_push_promise(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn);
       //void on_window_update(std::uint32_t stream_id, const std::function<void()>& fn);
       void on_drain(std::uint32_t stream_id, const std::function<void()>& fn);
       //----------------------------------------------------------------//

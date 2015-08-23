@@ -177,7 +177,7 @@ namespace manifold
     //================================================================//
 
     //================================================================//
-    class push_promise_frame : public frame_payload_base // TODO: Impl optional padding
+    class push_promise_frame : public frame_payload_base // TODO: Impl optional padding. Also flags need to looked at!!
     {
     public:
       push_promise_frame() : frame_payload_base(0) {}
@@ -189,6 +189,7 @@ namespace manifold
       const char*const padding() const;
       std::uint8_t pad_length() const;
       std::uint32_t promised_stream_id() const;
+      bool has_end_headers_flag() const { return this->flags_ & frame_flag::end_headers; }
     };
     //================================================================//
 
