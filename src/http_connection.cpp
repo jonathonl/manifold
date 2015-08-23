@@ -250,30 +250,24 @@ namespace manifold
               }
               else
               {
-
-                if (current_stream.state == stream_state::idle)
+                switch (incoming_frame_type)
                 {
-                  this->handle_incoming_frame_on_idle_stream(current_stream);
-                }
-                else if (current_stream.state == stream_state::reserved_local)
-                {
-                }
-                else if (current_stream.state == stream_state::reserved_remote)
-                {
-                }
-                else if (current_stream.state == stream_state::open)
-                {
-                  this->handle_incoming_frame_on_open_stream(current_stream);
-                }
-                else if (current_stream.state == stream_state::half_close_local)
-                {
-                }
-                else if (current_stream.state == stream_state::half_closed_remote)
-                {
-                }
-                else // closed
-                {
-
+                  case frame_type::data:
+                    this->handle_incoming_frame(current_stream, self->incoming_frame_.data_frame());
+                    break;
+                  case frame_type::priority:
+                    this->handle_incoming_frame(current_stream, self->incoming_frame_.priority_frame());
+                    break;
+                  case frame_type::rst_stream:
+                    this->handle_incoming_frame(current_stream, self->incoming_frame_.rst_stream_frame());
+                    break;
+                  case frame_type::window_update:
+                    this->handle_incoming_frame(current_stream, self->incoming_frame_.window_update_frame());
+                    break;
+                  default:
+                  {
+                    // TODO: Handle error. connection-only frame type has stream id.
+                  }
                 }
 
 //            const frame_type incoming_frame_type = self->incoming_frame_.type();
