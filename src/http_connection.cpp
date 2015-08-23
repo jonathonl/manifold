@@ -44,7 +44,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     connection::connection()
-    : hpack_encoder_(4096), hpack_decoder_(4096), last_newly_created_stream_id_(0), last_newly_accepted_stream_id_(0), stream_dependency_tree_(&this->root_stream_)
+    : hpack_encoder_(4096), hpack_decoder_(4096), last_newly_accepted_stream_id_(0), last_newly_created_stream_id_(0), root_stream_(0), stream_dependency_tree_(&this->root_stream_)
     {
       std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
       this->rg_.seed(seed);
@@ -164,16 +164,16 @@ namespace manifold
           std::uint32_t incoming_stream_id = self->incoming_frame_.stream_id();
           if (incoming_stream_id)
           {
-            auto it = self->streams_.find(incoming_stream_id);
+            std::map<std::uint32_t,stream>::iterator current_stream_it = self->streams_.find(incoming_stream_id);
 
-            if (it == self->streams_.end())
+            if (current_stream_it == self->streams_.end())
             {
               if (incoming_stream_id > self->last_newly_accepted_stream_id_)
               {
                 self->last_newly_accepted_stream_id_ = incoming_stream_id;
                 if (self->create_stream(incoming_stream_id))
-                  it = self->streams_.find(incoming_stream_id);
-                assert(it != self->streams_.end());
+                  current_stream_it = self->streams_.find(incoming_stream_id);
+                assert(current_stream_it != self->streams_.end());
               }
               else
               {
@@ -181,21 +181,19 @@ namespace manifold
               }
             }
 
-            if (it == self->streams_.end())
+            if (current_stream_it == self->streams_.end())
             {
               // TODO: Handle Error.
             }
             else
             {
-              stream& current_stream = it->second;
-
               if (self->incoming_header_block_fragments_.size() && (incoming_frame_type != frame_type::continuation || self->incoming_frame_.stream_id() != self->incoming_header_block_fragments_.front().stream_id()))
               {
                 // TODO: connection error PROTOCOL_ERROR
               }
               else if (incoming_frame_type == frame_type::continuation)
               {
-                if (this->incoming_header_block_fragments_.empty())
+                if (self->incoming_header_block_fragments_.empty())
                 {
                   // TODO: connection error PROTOCOL_ERROR
                 }
@@ -218,7 +216,7 @@ namespace manifold
                       self->incoming_header_block_fragments_.pop();
                     }
 
-                    this->handle_incoming_frame(current_stream, h_frame, cont_frames);
+                    self->handle_incoming_frame(current_stream_it->second, h_frame, cont_frames);
                   }
                   else
                   {
@@ -233,7 +231,7 @@ namespace manifold
                       self->incoming_header_block_fragments_.pop();
                     }
 
-                    this->handle_incoming_frame(current_stream, pp_frame, cont_frames);
+                    self->handle_incoming_frame(current_stream_it->second, pp_frame, cont_frames);
                   }
                 }
               }
@@ -244,145 +242,55 @@ namespace manifold
                 if (!has_end_headers_flag)
                   self->incoming_header_block_fragments_.push(std::move(self->incoming_frame_));
                 else if (incoming_frame_type == frame_type::headers)
-                  self->handle_incoming_frame(current_stream, self->incoming_frame_.headers_frame(), {});
+                  self->handle_incoming_frame(current_stream_it->second, self->incoming_frame_.headers_frame(), {});
                 else
-                  self->handle_incoming_frame(current_stream, self->incoming_frame_.push_promise_frame(), {});
+                  self->handle_incoming_frame(current_stream_it->second, self->incoming_frame_.push_promise_frame(), {});
               }
               else
               {
                 switch (incoming_frame_type)
                 {
                   case frame_type::data:
-                    this->handle_incoming_frame(current_stream, self->incoming_frame_.data_frame());
+                    self->handle_incoming_frame(current_stream_it->second, self->incoming_frame_.data_frame());
                     break;
                   case frame_type::priority:
-                    this->handle_incoming_frame(current_stream, self->incoming_frame_.priority_frame());
+                    self->handle_incoming_frame(current_stream_it->second, self->incoming_frame_.priority_frame());
                     break;
                   case frame_type::rst_stream:
-                    this->handle_incoming_frame(current_stream, self->incoming_frame_.rst_stream_frame());
+                    self->handle_incoming_frame(current_stream_it->second, self->incoming_frame_.rst_stream_frame());
                     break;
                   case frame_type::window_update:
-                    this->handle_incoming_frame(current_stream, self->incoming_frame_.window_update_frame());
+                    self->handle_incoming_frame(current_stream_it->second, self->incoming_frame_.window_update_frame());
                     break;
                   default:
                   {
                     // TODO: Handle error. connection-only frame type has stream id.
                   }
                 }
-
-//            const frame_type incoming_frame_type = self->incoming_frame_.type();
-//            auto it = self->streams_.find(incoming_stream_id);
-//            bool stream_exists = (it == self->streams_.end());
-//            if (!stream_exists)
-//            {
-//              if (incoming_frame_type == frame_type::headers || incoming_frame_type == frame_type::push_promise)
-//              {
-//                if (incoming_stream_id > this->last_newly_accepted_stream_id_)
-//                {
-//                  this->last_newly_accepted_stream_id_ = incoming_stream_id;
-//                  stream_exists = this->create_stream(incoming_stream_id);
-//                  assert(stream_exists);
-//                }
-//                else
-//                {
-//                  // TODO: Connection error for reusing old stream id.
-//                }
-//              }
-//              else
-//              {
-//                // TODO: Some other frames may be allowed after a stream is removed (eg, window_update).
-//              }
-//            }
-//
-//            if (!stream_exists)
-//            {
-//              // TODO: Handle Error.
-//            }
-//            else
-//            {
-//              stream& current_stream = self->streams_[incoming_stream_id];
-//              if (incoming_frame_type == frame_type::window_update)
-//              {
-//                current_stream.outgoing_window_size += self->incoming_frame_.window_update_frame().window_size_increment();
-//              }
-//              else if (incoming_frame_type == frame_type::data)
-//              {
-//                self->streams_[self->incoming_frame_.stream_id()].incoming_data_frames.push(std::move(self->incoming_frame_));
-//                if (current_stream.on_data)
-//                {
-//                  while (current_stream.incoming_data_frames.size())
-//                  {
-//                    current_stream.on_data(current_stream.incoming_data_frames.front().data_frame().data(), current_stream.incoming_data_frames.front().data_frame().data_length());
-//
-//                    if (current_stream.incoming_data_frames.front().data_frame().flags() & frame_flag::end_stream)
-//                    {
-//                      current_stream.end_stream_frame_received= true;
-//                      if (current_stream.on_end_frame)
-//                        current_stream.on_end_frame();
-//                    }
-//
-//                    current_stream.incoming_data_frames.pop();
-//                  }
-//                }
-//              }
-//              else if (incoming_frame_type == frame_type::headers || incoming_frame_type == frame_type::continuation)
-//              {
-//                if (incoming_frame_type == frame_type::headers && current_stream.incoming_header_block_fragments.size())
-//                {
-//                  // TODO: connection error
-//                }
-//                else if (incoming_frame_type == frame_type::continuation && current_stream.incoming_header_block_fragments.empty())
-//                {
-//                  // TODO: connection error
-//                }
-//                else
-//                {
-//                  bool has_end_headers_flag = (incoming_frame_type == frame_type::headers ? self->incoming_frame_.headers_frame().has_end_headers_flag() : self->incoming_frame_.continuation_frame().has_end_headers_flag());
-//
-//                  if (incoming_frame_type == frame_type::headers && self->incoming_frame_.headers_frame().has_end_stream_flag())
-//                    current_stream.end_stream_frame_received = true;
-//
-//                  current_stream.incoming_header_block_fragments.push(std::move(self->incoming_frame_));
-//
-//                  if (has_end_headers_flag)
-//                  {
-//                    header_block headers;
-//                    for (int i = 0; current_stream.incoming_header_block_fragments.size(); ++i)
-//                    {
-//                      frame& front = current_stream.incoming_header_block_fragments.front();
-//                      std::string header_data;
-//                      if (front.is<headers_frame>())
-//                      {
-//                        assert(i == 0 && "header frame found in middle of fragment sequence");
-//                        header_data = std::string(front.headers_frame().header_block_fragment(), front.headers_frame().header_block_fragment_length());
-//                      }
-//                      else
-//                      {
-//                        assert(i > 0 && "continuation frame found at beginning of fragment sequence");
-//                        header_data = std::string(front.continuation_frame().header_block_fragment(), front.continuation_frame().header_block_fragment_length());
-//                      }
-//                      assert(header_block::deserialize(this->hpack_decoder_, header_data, headers)); // TODO: handle deserialize error.
-//                      current_stream.incoming_header_block_fragments.pop();
-//                    }
-//
-//                    current_stream.incoming_message_heads.push(std::move(headers));
-//                    // TODO: call on_headers function
-//
-//                    if (current_stream.end_stream_frame_received && current_stream.on_end_frame)
-//                      current_stream.on_end_frame();
-//                  }
-//                }
-//              }
-//
-//            }
-//
-//            //self->streams_[self->incoming_frame_.stream_id()].frames_.push_back(std::move(self->incoming_frame_));
               }
             }
           }
           else
           {
-            // TODO: Connection level frame.
+            switch (incoming_frame_type)
+            {
+              case frame_type::settings:
+                self->handle_incoming_frame(self->incoming_frame_.settings_frame());
+                break;
+              case frame_type::ping:
+                self->handle_incoming_frame(self->incoming_frame_.ping_frame());
+                break;
+              case frame_type::goaway:
+                self->handle_incoming_frame(self->incoming_frame_.goaway_frame());
+                break;
+              case frame_type::window_update:
+                self->handle_incoming_frame(self->incoming_frame_.window_update_frame());
+                break;
+              default:
+              {
+                // TODO: error stream-only frame missing stream id
+              }
+            }
           }
 
           self->run_recv_loop();
@@ -392,81 +300,206 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::handle_incoming_frame_on_idle_stream(stream& idle_stream)
+    void connection::handle_incoming_frame(stream& stream, const data_frame& incoming_data_frame)
     {
-      frame_type incoming_frame_type = this->incoming_frame_.type();
-      if (incoming_frame_type == frame_type::headers)
+      switch (stream.state)
       {
-        if (this->incoming_frame_.headers_frame().has_end_headers_flag())
+        case stream_state::open:
         {
-          header_block headers;
-          std::string header_data = std::string(this->incoming_frame_.headers_frame().header_block_fragment(), this->incoming_frame_.headers_frame().header_block_fragment_length());
-          assert(header_block::deserialize(this->hpack_decoder_, header_data, headers)); // TODO: handle deserialize error.
-
-          if (this->incoming_frame_.headers_frame().has_end_stream_flag())
-            idle_stream.state = stream_state::half_closed_remote;
-          else
-            idle_stream.state = stream_state::open;
-
-          this->on_new_stream_ ? this->on_new_stream_(std::move(headers)) : void();
-        }
-        else
-        {
-          this->incoming_header_block_fragments_.push(std::move(this->incoming_frame_));
-        }
-      }
-      else if (incoming_frame_type == frame_type::continuation)
-      {
-        bool is_last_continuation_frame = this->incoming_frame_.continuation_frame().has_end_headers_flag();
-        this->incoming_header_block_fragments_.push(std::move(this->incoming_frame_));
-        if (is_last_continuation_frame)
-        {
-          bool end_stream_flag_set = false;
-          header_block headers;
-          for (int i = 0; this->incoming_header_block_fragments_.size(); ++i)
+          stream.on_data ? stream.on_data(incoming_data_frame.data(), incoming_data_frame.data_length()) : void();
+          if (incoming_data_frame.has_end_stream_flag())
           {
-            frame& front = this->incoming_header_block_fragments_.front();
-            std::string header_data;
-
-            if (front.is<headers_frame>())
-            {
-              end_stream_flag_set = front.headers_frame().has_end_stream_flag();
-              assert(i == 0 && "header frame found in middle of fragment sequence");
-              header_data = std::string(front.headers_frame().header_block_fragment(), front.headers_frame().header_block_fragment_length());
-            }
-            else
-            {
-              assert(i > 0 && "continuation frame found at beginning of fragment sequence");
-              header_data = std::string(front.continuation_frame().header_block_fragment(), front.continuation_frame().header_block_fragment_length());
-            }
-
-            assert(header_block::deserialize(this->hpack_decoder_, header_data, headers)); // TODO: handle deserialize error.
-
-            this->incoming_header_block_fragments_.pop();
+            stream.state = stream_state::half_closed_remote;
+            stream.on_end ? stream.on_end() : void();
           }
-
-          if (end_stream_flag_set)
-            idle_stream.state = stream_state::open;
-          else
-            idle_stream.state = stream_state::half_closed_remote;
-
-          this->on_new_stream_ ? this->on_new_stream_(std::move(headers)) : void();
+          break;
         }
-      }
-      else if (incoming_frame_type == frame_type::priority)
-      {
-        // Receiving priority frames in the idle state is allowed according to spec, though I don't yet understand why.
-      }
-      else
-      {
-        // TODO: connection error PROTOCOL_ERROR
+        case stream_state::half_close_local:
+        {
+          stream.on_data ? stream.on_data(incoming_data_frame.data(), incoming_data_frame.data_length()) : void();
+          if (incoming_data_frame.has_end_stream_flag())
+          {
+            stream.state = stream_state::closed;
+            stream.on_end ? stream.on_end() : void();
+            stream.on_close ? stream.on_close(0) : void();
+          }
+          break;
+        }
+        default:
+        {
+          // TODO: deal with frame / state mismatch
+        }
       }
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::handle_incoming_frame_on_open_stream(stream& open_stream)
+    void connection::handle_incoming_frame(stream& stream, const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames)
     {
+      switch (stream.state)
+      {
+        case stream_state::idle:
+        case stream_state::open:
+        case stream_state::half_close_local:
+        {
+          header_block headers;
+
+          {
+            std::string header_data(incoming_headers_frame.header_block_fragment(), incoming_headers_frame.header_block_fragment_length());
+            header_block::deserialize(this->hpack_decoder_, header_data, headers);
+          }
+
+          for (auto it = continuation_frames.begin(); it != continuation_frames.end(); ++it)
+          {
+            std::string header_data(it->header_block_fragment(), it->header_block_fragment_length());
+            header_block::deserialize(this->hpack_decoder_, header_data, headers);
+          }
+
+
+          if (stream.state == stream_state::idle)
+          {
+            stream.state = (incoming_headers_frame.has_end_stream_flag() ? stream_state::half_closed_remote : stream_state::open );
+            if (this->on_new_stream_)
+              this->on_new_stream_(stream.id, std::move(headers));
+          }
+          else
+          {
+            if (incoming_headers_frame.has_end_stream_flag())
+              stream.state = (stream.state == stream_state::half_close_local ? stream_state::closed : stream_state::half_closed_remote);
+            stream.on_headers ? stream.on_headers(std::move(headers)) : void();
+          }
+
+          if (stream.state == stream_state::closed)
+          {
+            stream.on_end ? stream.on_end() : void();
+            stream.on_close ? stream.on_close(0) : void();
+          }
+          else if (stream.state == stream_state::half_closed_remote)
+          {
+            stream.on_end ? stream.on_end() : void();
+          }
+
+
+          break;
+        }
+        default:
+        {
+          // TODO: deal with frame / state mismatch
+        }
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::handle_incoming_frame(stream& stream, const priority_frame& incoming_priority_frame)
+    {
+      // TODO: implement.
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::handle_incoming_frame(stream& stream, const rst_stream_frame& incoming_rst_stream_frame)
+    {
+      if (stream.state != stream_state::closed)
+      {
+        stream.state = stream_state::closed;
+        stream.on_close ? stream.on_close(incoming_rst_stream_frame.error_code()) : void();
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::handle_incoming_frame(const settings_frame& incoming_settings_frame)
+    {
+      // TODO
+    }
+    //----------------------------------------------------------------//
+
+    void connection::handle_incoming_frame(stream& stream, const push_promise_frame& incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames)
+    {
+      switch (stream.state)
+      {
+        case stream_state::half_close_local:
+        case stream_state::open:
+        {
+          header_block headers;
+
+          {
+            std::string header_data(incoming_push_promise_frame.header_block_fragment(), incoming_push_promise_frame.header_block_fragment_length());
+            header_block::deserialize(this->hpack_decoder_, header_data, headers);
+          }
+
+          for (auto it = continuation_frames.begin(); it != continuation_frames.end(); ++it)
+          {
+            std::string header_data(it->header_block_fragment(), it->header_block_fragment_length());
+            header_block::deserialize(this->hpack_decoder_, header_data, headers);
+          }
+
+          if (incoming_push_promise_frame.promised_stream_id() <= this->last_newly_accepted_stream_id_)
+          {
+            this->last_newly_accepted_stream_id_ = incoming_push_promise_frame.promised_stream_id();
+            assert(this->create_stream(this->last_newly_accepted_stream_id_));
+            auto it = this->streams_.find(this->last_newly_accepted_stream_id_);
+            assert(it != this->streams_.end());
+            it->second.state = stream_state::reserved_remote;
+            stream.on_push_promise ? stream.on_push_promise(std::move(headers), this->last_newly_accepted_stream_id_) : void();
+          }
+          else
+          {
+            // TODO: error promised stream_id is too low
+          }
+        }
+        case stream_state::closed:
+        {
+          if (true) // if stream was reset by me
+          {
+            if (incoming_push_promise_frame.promised_stream_id() <= this->last_newly_accepted_stream_id_)
+            {
+              this->last_newly_accepted_stream_id_ = incoming_push_promise_frame.promised_stream_id();
+              assert(this->create_stream(this->last_newly_accepted_stream_id_));
+              auto it = this->streams_.find(this->last_newly_accepted_stream_id_);
+              assert(it != this->streams_.end());
+              it->second.state = stream_state::reserved_remote;
+              this->send_reset_stream(this->last_newly_accepted_stream_id_, errc::refused_stream);
+            }
+            else
+            {
+              // TODO: error promised stream_id is too low
+            }
+          }
+          else
+          {
+            // TODO: handle error.
+          }
+        }
+        default:
+        {
+          // TODO: deal with frame / state mismatch
+        }
+      }
+    }
+
+    void connection::handle_incoming_frame(const ping_frame& incoming_ping_frame)
+    {
+      this->send_ping_acknowledgement(incoming_ping_frame.data());
+    }
+
+    void connection::handle_incoming_frame(const goaway_frame& incoming_goaway_frame)
+    {
+      // TODO:
+    }
+
+    //----------------------------------------------------------------//
+    void connection::handle_incoming_frame(const window_update_frame& incoming_window_update_frame)
+    {
+      this->root_stream_.outgoing_window_size += incoming_window_update_frame.window_size_increment();
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void connection::handle_incoming_frame(stream& stream, const window_update_frame& incoming_window_update_frame)
+    {
+      stream.outgoing_window_size += incoming_window_update_frame.window_size_increment();
     }
     //----------------------------------------------------------------//
 
@@ -529,14 +562,16 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::on_new_stream(const std::function<void(std::int32_t stream_id, std::list<std::pair<std::string,std::string>>&& headers, std::int32_t stream_dependency_id)>& fn)
+    void connection::on_new_stream(const std::function<void(std::int32_t stream_id, header_block&& headers)>& fn)
     {
+      this->on_new_stream_ = fn;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::on_close(const std::function<void()>& fn)
+    void connection::on_close(const std::function<void(std::uint32_t ec)>& fn)
     {
+      this->on_close_ = fn;
     }
     //----------------------------------------------------------------//
 
@@ -556,7 +591,7 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
-    void connection::on_headers(std::uint32_t stream_id, const std::function<void(const std::function<void(http::header_block&& headers)>& fn)>& fn)
+    void connection::on_headers(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn)
     {
       std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -570,7 +605,7 @@ namespace manifold
       }
     }
 
-    void connection::on_rst_stream(std::uint32_t stream_id, const std::function<void(std::uint32_t error_code)>& fn)
+    void connection::on_close(std::uint32_t stream_id, const std::function<void(std::uint32_t error_code)>& fn)
     {
       std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -579,12 +614,12 @@ namespace manifold
       }
       else
       {
-        if (it->second.on_rst_steam == nullptr)
-          it->second.on_rst_steam = fn;
+        if (it->second.on_close == nullptr)
+          it->second.on_close = fn;
       }
     }
 
-    void connection::on_push_promise(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn)
+    void connection::on_push_promise(std::uint32_t stream_id, const std::function<void(http::header_block&& headers, std::uint32_t promised_stream_id)>& fn)
     {
       std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -599,7 +634,7 @@ namespace manifold
     }
 
     //----------------------------------------------------------------//
-    void connection::on_end_frame(std::uint32_t stream_id, const std::function<void()>& fn)
+    void connection::on_end(std::uint32_t stream_id, const std::function<void()>& fn)
     {
       std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -608,8 +643,8 @@ namespace manifold
       }
       else
       {
-        if (it->second.on_end_frame == nullptr)
-          it->second.on_end_frame = fn;
+        if (it->second.on_end == nullptr)
+          it->second.on_end = fn;
       }
     }
     //----------------------------------------------------------------//
@@ -635,7 +670,7 @@ namespace manifold
     {
       bool ret = false;
 
-      std::pair<std::map<std::uint32_t,stream>::iterator,bool> insert_res = this->streams_.emplace(stream_id, stream());
+      std::pair<std::map<std::uint32_t,stream>::iterator,bool> insert_res = this->streams_.emplace(stream_id, stream(stream_id));
       if (insert_res.second)
       {
         this->stream_dependency_tree_.insert_child(stream_dependency_tree((&insert_res.first->second)));
@@ -668,10 +703,7 @@ namespace manifold
         }
         else
         {
-          auto f = http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream), stream_id);
-          std::cout << "before: " << f.headers_frame().header_block_fragment_length() << std::endl;
-          it->second.outgoing_non_data_frames.push(std::move(f));
-          std::cout << "after: " << it->second.outgoing_non_data_frames.back().headers_frame().header_block_fragment_length() << std::endl;
+          it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream), stream_id));
           this->run_send_loop();
           ret = true;
         }

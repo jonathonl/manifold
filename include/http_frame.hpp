@@ -54,7 +54,7 @@ namespace manifold
       std::uint8_t flags_;
     public:
       frame_payload_base(std::uint8_t flags) : flags_(flags) {}
-      ~frame_payload_base() {}
+      virtual ~frame_payload_base() {}
 
       std::uint8_t flags() const;
       std::uint32_t serialized_length() const;
@@ -149,7 +149,7 @@ namespace manifold
       rst_stream_frame(http::errc error_code);
       ~rst_stream_frame() {}
 
-      http::errc error_code() const;
+      std::uint32_t error_code() const;
     };
     //================================================================//
 

@@ -323,11 +323,11 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    http::errc rst_stream_frame::error_code() const
+    std::uint32_t rst_stream_frame::error_code() const
     {
       std::uint32_t tmp;
       memcpy(&tmp, this->buf_.data(), 4);
-      return int_to_errc(tmp);
+      return tmp;
     }
     //----------------------------------------------------------------//
     //****************************************************************//
@@ -701,20 +701,21 @@ namespace manifold
       if (&source != this)
       {
         this->destroy_union();
-
         frame_type t = source.type();
+        this->init_meta(t, source.payload_length(), source.stream_id(), source.flags());
+
         switch (t)
         {
-          case frame_type::data           : this->payload_.data_frame_          = std::move(source.payload_.data_frame_)          ; break;
-          case frame_type::headers        : this->payload_.headers_frame_       = std::move(source.payload_.headers_frame_)       ; break;
-          case frame_type::priority       : this->payload_.priority_frame_      = std::move(source.payload_.priority_frame_)      ; break;
-          case frame_type::rst_stream     : this->payload_.rst_stream_frame_    = std::move(source.payload_.rst_stream_frame_)    ; break;
-          case frame_type::settings       : this->payload_.settings_frame_      = std::move(source.payload_.settings_frame_)      ; break;
-          case frame_type::push_promise   : this->payload_.push_promise_frame_  = std::move(source.payload_.push_promise_frame_)  ; break;
-          case frame_type::ping           : this->payload_.ping_frame_          = std::move(source.payload_.ping_frame_)          ; break;
-          case frame_type::goaway         : this->payload_.goaway_frame_        = std::move(source.payload_.goaway_frame_)        ; break;
-          case frame_type::window_update  : this->payload_.window_update_frame_ = std::move(source.payload_.window_update_frame_) ; break;
-          case frame_type::continuation   : this->payload_.continuation_frame_  = std::move(source.payload_.continuation_frame_)  ; break;
+          case frame_type::data           : new(&this->payload_.data_frame_         ) http::data_frame()          ; this->payload_.data_frame_          = std::move(source.payload_.data_frame_)          ; break;
+          case frame_type::headers        : new(&this->payload_.headers_frame_      ) http::headers_frame()       ; this->payload_.headers_frame_       = std::move(source.payload_.headers_frame_)       ; break;
+          case frame_type::priority       : new(&this->payload_.priority_frame_     ) http::priority_frame()      ; this->payload_.priority_frame_      = std::move(source.payload_.priority_frame_)      ; break;
+          case frame_type::rst_stream     : new(&this->payload_.rst_stream_frame_   ) http::rst_stream_frame()    ; this->payload_.rst_stream_frame_    = std::move(source.payload_.rst_stream_frame_)    ; break;
+          case frame_type::settings       : new(&this->payload_.settings_frame_     ) http::settings_frame()      ; this->payload_.settings_frame_      = std::move(source.payload_.settings_frame_)      ; break;
+          case frame_type::push_promise   : new(&this->payload_.push_promise_frame_ ) http::push_promise_frame()  ; this->payload_.push_promise_frame_  = std::move(source.payload_.push_promise_frame_)  ; break;
+          case frame_type::ping           : new(&this->payload_.ping_frame_         ) http::ping_frame()          ; this->payload_.ping_frame_          = std::move(source.payload_.ping_frame_)          ; break;
+          case frame_type::goaway         : new(&this->payload_.goaway_frame_       ) http::goaway_frame()        ; this->payload_.goaway_frame_        = std::move(source.payload_.goaway_frame_)        ; break;
+          case frame_type::window_update  : new(&this->payload_.window_update_frame_) http::window_update_frame() ; this->payload_.window_update_frame_ = std::move(source.payload_.window_update_frame_) ; break;
+          case frame_type::continuation   : new(&this->payload_.continuation_frame_ ) http::continuation_frame()  ; this->payload_.continuation_frame_  = std::move(source.payload_.continuation_frame_)  ; break;
           case frame_type::invalid_type   : break;
         }
         this->metadata_ = std::move(source.metadata_);

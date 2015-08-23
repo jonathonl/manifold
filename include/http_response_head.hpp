@@ -71,6 +71,7 @@ namespace manifold
     public:
       //----------------------------------------------------------------//
       response_head();
+      response_head(header_block&& hb);
       response_head(unsigned short status, std::list<hpack::header_field>&& headers = {});
       response_head(http::status_code status, std::list<hpack::header_field>&& headers = {});
       ~response_head();

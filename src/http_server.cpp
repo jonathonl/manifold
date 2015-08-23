@@ -120,7 +120,10 @@ namespace manifold
         {
           auto it = this->connections_.emplace(conn);
           if (it.second)
+          {
+            this->manage_connection(*it.first);
             (*it.first)->run();
+          }
         }
         else
         {
@@ -162,7 +165,10 @@ namespace manifold
             {
               auto it = this->connections_.emplace(conn);
               if (it.second)
+              {
+                this->manage_connection(*it.first);
                 (*it.first)->run();
+              }
             }
           });
         }
@@ -179,12 +185,12 @@ namespace manifold
     //----------------------------------------------------------------//
     void server::manage_connection(const std::shared_ptr<http::connection>& conn)
     {
-      conn->on_new_stream([this, conn](std::int32_t stream_id, std::list<std::pair<std::string,std::string>>&& headers, std::int32_t stream_dependency_id)
+      conn->on_new_stream([this, conn](std::int32_t stream_id, header_block&& headers)
       {
-        this->request_handler_ ? this->request_handler_(server::request(http::request_head(), conn, stream_id), server::response(http::response_head(), conn, stream_id)) : void();
+        this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(http::response_head(), conn, stream_id)) : void();
       });
 
-      conn->on_close([conn, this]()
+      conn->on_close([conn, this](std::uint32_t ec)
       {
         this->connections_.erase(conn);
       });

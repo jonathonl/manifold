@@ -25,14 +25,14 @@ namespace manifold
     //----------------------------------------------------------------//
     void incoming_message::on_data(const std::function<void(const char*const buff, std::size_t buff_size)>& fn)
     {
-      this->connection_->on_data_frame(this->stream_id_, fn);
+      this->connection_->on_data(this->stream_id_, fn);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void incoming_message::on_end(const std::function<void()>& fn)
     {
-      this->connection_->on_end_frame(this->stream_id_, fn);
+      this->connection_->on_end(this->stream_id_, fn);
     }
     //----------------------------------------------------------------//
 

@@ -93,6 +93,11 @@ namespace manifold
         void on_informational_headers(const std::function<void(http::response_head&& resp_head)>& cb);
       private:
         request_head head_;
+        std::function<void(http::client::response&& resp)> on_response_;
+        std::function<void(http::response_head&& resp_head)> on_informational_headers_;
+
+        void handle_on_headers(http::header_block&& headers);
+
         request(const request&) = delete;
         request& operator=(const request&) = delete;
       protected:

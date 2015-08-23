@@ -314,7 +314,7 @@ int main()
     });
 
     //
-    req_ptr->on_stream_reset([ofs](const std::error_code& ec)
+    req_ptr->on_close([ofs](std::uint32_t ec)
     {
       ofs->close();
       std::remove("./response_file.txt.tmp");

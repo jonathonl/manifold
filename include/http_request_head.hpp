@@ -21,6 +21,7 @@ namespace manifold
     private:
     public:
       //----------------------------------------------------------------//
+      request_head(header_block&& hb);
       request_head(const std::string& url = "/", const std::string& method = "get", std::list<hpack::header_field>&& headers = {});
       request_head(const std::string& url, http::method meth, std::list<hpack::header_field>&& headers = {});
       ~request_head();

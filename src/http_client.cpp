@@ -49,9 +49,9 @@ namespace manifold
     //----------------------------------------------------------------//
     void client::request::on_push_promise(const std::function<void(http::client::request&& request)>& cb)
     {
-      this->connection_->on_push_promise(this->stream_id_, [this, cb](http::header_block&& headers)
+      this->connection_->on_push_promise(this->stream_id_, [this, cb](http::header_block&& headers, std::uint32_t promised_stream_id)
       {
-        http::client::request r(http::request_head(), this->connection_, this->stream_id_);
+        cb(http::client::request(std::move(headers), this->connection_, promised_stream_id));
       });
     }
     //----------------------------------------------------------------//
@@ -59,16 +59,37 @@ namespace manifold
     //----------------------------------------------------------------//
     void client::request::on_informational_headers(const std::function<void(http::response_head&& resp_head)>& cb)
     {
-
+      this->on_informational_headers_ = cb;
+      this->connection_->on_headers(this->stream_id_, std::bind(&request::handle_on_headers, this, std::placeholders::_1));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void client::request::on_response(const std::function<void(http::client::response&& resp)>& cb)
     {
-
+      this->on_response_ = cb;
+      this->connection_->on_headers(this->stream_id_, std::bind(&request::handle_on_headers, this, std::placeholders::_1));
     }
     //----------------------------------------------------------------//
+
+    void client::request::handle_on_headers(http::header_block&& headers)
+    {
+      // TODO: need to make sure response is only received once and that all of thes happen in the correct order.
+      int status_code = atoi(headers.header(":status").c_str());
+      if (status_code == 0)
+      {
+        // assuming trailers
+
+      }
+      else if (status_code < 200)
+      {
+        this->on_informational_headers_ ? this->on_informational_headers_(std::move(headers)) : void();
+      }
+      else
+      {
+        this->on_response_ ? this->on_response_(client::response(std::move(headers), this->connection_, this->stream_id_)) : void();
+      }
+    }
 
     //----------------------------------------------------------------//
     client::response::response(response_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)

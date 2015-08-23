@@ -28,6 +28,13 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    request_head::request_head(header_block&& hb)
+      : header_block(std::move(hb))
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     request_head::request_head(const std::string& path, const std::string& method, std::list<hpack::header_field>&& headers)
     {
       this->headers_ = std::move(headers);

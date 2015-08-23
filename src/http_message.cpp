@@ -28,9 +28,9 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void message::on_stream_reset(const std::function<void(const std::error_code& ec)>& cb)
+    void message::on_close(const std::function<void(std::uint32_t ec)>& cb)
     {
-      this->connection_->on_rst_stream_frame(this->stream_id_, cb);
+      this->connection_->on_close(this->stream_id_, cb);
     }
     //----------------------------------------------------------------//
 
