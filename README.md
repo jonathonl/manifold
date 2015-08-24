@@ -43,7 +43,7 @@ asio::io_service ioservice;
 http::client conn(ioservice, "www.example.com", http::client::ssl_options());
 conn.on_connect([&conn]()
 {
-  auto request = std::make_shared<http::client::request>(conn.make_request(http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}}));
+  auto request = std::make_shared<http::client::request>(conn.make_request());
 
   request->on_response([request](http::client::response&& resp)
   {
@@ -65,6 +65,7 @@ conn.on_connect([&conn]()
     }
   });
 
+  request->head() = http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}});
   request->end("name=value&name2=value2");
 });
 
@@ -95,8 +96,13 @@ enc.add_table_size_update(4096);
 
 std::string serialized_headers;
 enc.encode(send_headers, serialized_headers);
+std::cout << serialized_headers.size() << std::endl;
 dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers);
 
 for (auto it : recv_headers)
     std::cout << it.name << ": " << it.value << std::endl;
 ```
+
+## Dependencies
+* Non-boost version of asio.
+* OpenSSL.
