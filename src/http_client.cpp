@@ -40,9 +40,18 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const request_head& client::request::head() const
+    request_head& client::request::head()
     {
       return this->head_;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool client::request::send_headers(bool end_stream)
+    {
+      if (this->head_.method() == "get" || this->head_.method() == "head")
+        end_stream = true;
+      return outgoing_message::send_headers(end_stream);
     }
     //----------------------------------------------------------------//
 
@@ -141,6 +150,7 @@ namespace manifold
             else
             {
               this->connection_ = c;
+              this->connection_->run();
               this->on_connect_ ? this->on_connect_() : void();
             }
           });
@@ -202,7 +212,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    http::client::request client::make_request(http::request_head&& req_head)
+    http::client::request client::make_request()
     {
 
       //TODO: this method needs better error handling.
@@ -211,12 +221,9 @@ namespace manifold
         throw std::invalid_argument("No connection.");
 
       std::uint32_t next_stream_id = this->get_next_stream_id(); // could be zero;
-
       this->connection_->create_stream(next_stream_id);
-      std::string req_method = req_head.method();
-      client::request r(std::move(req_head), this->connection_, next_stream_id);
-      r.send_headers(req_method == "GET" || req_method == "HEAD");
-      return r;
+
+      return client::request(http::request_head(), this->connection_, next_stream_id);;
     }
     //----------------------------------------------------------------//
 

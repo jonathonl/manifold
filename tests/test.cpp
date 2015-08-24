@@ -89,12 +89,13 @@ public:
 
   void run()
   {
-    this->handle_request(this->c_.make_request(http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}})));
+    this->handle_request(this->c_.make_request());
   }
 
   void handle_request(http::client::request&& req)
   {
     this->request_ = std::move(req);
+    this->request_.head() = http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}});
 
     this->request_.on_response(std::bind(&my_request_class::handle_response, this, std::placeholders::_1));
 
@@ -112,14 +113,15 @@ public:
     }
     else
     {
-      this->response_.on_data([](const char *const data, std::size_t datasz)
+      auto response_data = std::make_shared<std::string>();
+      this->response_.on_data([response_data](const char *const data, std::size_t datasz)
       {
-
+        response_data->append(data, datasz);
       });
 
-      this->response_.on_end([]()
+      this->response_.on_end([response_data]()
       {
-
+        std::cout << (*response_data) << std::endl;
       });
     }
   }
@@ -255,7 +257,7 @@ int main()
   http::client c2(ioservice, "www.google.com", http::client::ssl_options());
   c2.on_connect([&c2]()
   {
-    auto request = std::make_shared<http::client::request>(c2.make_request(http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}})));
+    auto request = std::make_shared<http::client::request>(c2.make_request());
 
     request->on_response([request](http::client::response&& resp)
     {
@@ -274,12 +276,13 @@ int main()
           // ...
         });
       }
-
-      request->end("name=value&name2=value2");
     });
 
+    request->head() = http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}});
+    request->end("name=value&name2=value2");
 
-    auto req2(c2.make_request(http::request_head()));
+
+    auto req2(c2.make_request());
 
 
     auto req_ptr = std::make_shared<http::client::request>(std::move(req2));

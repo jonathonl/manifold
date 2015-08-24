@@ -504,6 +504,80 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    http::errc connection::handle_outgoing_headers_state_change(stream& stream)
+    {
+      errc ret = errc::no_error;
+      switch (stream.state)
+      {
+        case stream_state::idle:
+          stream.state = stream_state::open;
+          break;
+        case stream_state::reserved_local:
+          stream.state = stream_state::half_closed_remote;
+          break;
+        case stream_state::reserved_remote:
+          // TODO: Error cant send headers or data in reserved_remote state.
+          break;
+        case stream_state::half_close_local:
+        case stream_state::closed:
+          // TODO: Error
+          break;
+        default:
+          break;
+      }
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    http::errc connection::handle_outgoing_end_stream_state_change(stream& stream)
+    {
+      errc ret = errc::no_error;
+
+      switch (stream.state)
+      {
+        case stream_state::open:
+          stream.state = stream_state::half_close_local;
+          break;
+        case stream_state::half_closed_remote:
+          stream.state = stream_state::closed;
+          break;
+        case stream_state::reserved_remote:
+          // TODO: Error cant send headers or data in reserved_remote state.
+          break;
+        case stream_state::idle:
+        case stream_state::reserved_local:
+        case stream_state::half_close_local:
+        case stream_state::closed:
+          // TODO: Error
+          break;
+      }
+
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    http::errc connection::handle_outgoing_rst_stream_state_change(stream& stream)
+    {
+      errc ret = errc::no_error;
+
+      switch (stream.state)
+      {
+        case stream_state::idle:
+        case stream_state::closed:
+          // TODO: Error
+          break;
+        default:
+          stream.state = stream_state::closed;
+          break;
+      }
+
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     void connection::run_send_loop()
     {
       if (!this->send_loop_running_)
@@ -703,9 +777,21 @@ namespace manifold
         }
         else
         {
-          it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream), stream_id));
-          this->run_send_loop();
-          ret = true;
+          // TODO: check for errors below
+          auto state_change_error = this->handle_outgoing_headers_state_change(it->second);
+          if (end_stream && state_change_error == errc::no_error)
+            state_change_error = this->handle_outgoing_end_stream_state_change(it->second);
+
+          if (state_change_error == errc::no_error)
+          {
+            it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream), stream_id));
+            this->run_send_loop();
+            ret = true;
+          }
+          else
+          {
+            assert(!"Stream state change not allowed.");
+          }
         }
       }
 
@@ -735,9 +821,21 @@ namespace manifold
         }
         else
         {
-          it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream, priority), stream_id));
-          this->run_send_loop();
-          ret = true;
+          // TODO: check for errors below
+          auto state_change_error = this->handle_outgoing_headers_state_change(it->second);
+          if (end_stream && state_change_error == errc::no_error)
+            state_change_error = this->handle_outgoing_end_stream_state_change(it->second);
+
+          if (state_change_error == errc::no_error)
+          {
+            it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream, priority), stream_id));
+            this->run_send_loop();
+            ret = true;
+          }
+          else
+          {
+            assert(!"Stream state change not allowed.");
+          }
         }
       }
 
@@ -768,7 +866,16 @@ namespace manifold
       std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
       {
-        it->second.outgoing_non_data_frames.push(http::frame(http::rst_stream_frame(error_code), stream_id));
+        if (this->handle_outgoing_rst_stream_state_change(it->second) == errc::no_error)
+        {
+          it->second.outgoing_non_data_frames.push(http::frame(http::rst_stream_frame(error_code), stream_id));
+          this->run_send_loop();
+          ret = true;
+        }
+        else
+        {
+          assert(!"Stream state change not allowed.");
+        }
       }
 
       return ret;
@@ -822,9 +929,20 @@ namespace manifold
 
       if (it != this->streams_.end())
       {
-        it->second.outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), stream_id));
-        this->run_send_loop();
-        ret = true;
+        errc state_change_error = errc::no_error;
+        if (end_stream)
+          state_change_error = this->handle_outgoing_end_stream_state_change(it->second);
+
+        if (state_change_error == errc::no_error)
+        {
+          it->second.outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), stream_id));
+          this->run_send_loop();
+          ret = true;
+        }
+        else
+        {
+          assert(!"Stream state change not allowed.");
+        }
       }
 
       return ret;

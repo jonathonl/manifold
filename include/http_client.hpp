@@ -86,7 +86,9 @@ namespace manifold
         request& operator=(request&& source);
         ~request();
 
-        const request_head& head() const;
+        request_head& head();
+
+        bool send_headers(bool end_stream = false);
 
         void on_push_promise(const std::function<void(http::client::request&& request)>& cb);
         void on_response(const std::function<void(http::client::response&& resp)>& cb);
@@ -139,7 +141,7 @@ namespace manifold
 
       void on_connect(const std::function<void()>& fn);
       void on_close(const std::function<void(const std::error_code ec)>& fn);
-      client::request make_request(http::request_head&& req_head);
+      client::request make_request();
     };
     //================================================================//
   }

@@ -157,6 +157,12 @@ namespace manifold
       void handle_incoming_frame(stream& stream, const window_update_frame& incoming_window_update_frame);
       //void handle_incoming_frame(stream& frame_stream, const continuation_frame&  incoming_frame);
       //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      http::errc handle_outgoing_headers_state_change(stream& stream);
+      http::errc handle_outgoing_end_stream_state_change(stream& stream);
+      http::errc handle_outgoing_rst_stream_state_change(stream& stream);
+      //----------------------------------------------------------------//
     protected:
       virtual void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb) = 0;
       virtual void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb) = 0;
@@ -200,7 +206,7 @@ namespace manifold
       bool send_priority(std::uint32_t stream_id, priority_options options);
       bool send_reset_stream(std::uint32_t stream_id, http::errc error_code);
       void send_settings(const std::list<std::pair<std::uint16_t,std::uint32_t>>& settings);
-      bool send_push_promise(std::uint32_t stream_id, const header_block&head, std::uint32_t promised_stream_id, bool end_headers);
+      bool send_push_promise(std::uint32_t stream_id, const header_block& head, std::uint32_t promised_stream_id, bool end_headers);
       void send_ping(std::uint64_t opaque_data);
       void send_goaway(http::errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0);
       bool send_window_update(std::uint32_t stream_id, std::uint32_t amount);
