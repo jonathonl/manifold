@@ -223,7 +223,7 @@ namespace manifold
       std::uint32_t next_stream_id = this->get_next_stream_id(); // could be zero;
       this->connection_->create_stream(next_stream_id);
 
-      return client::request(http::request_head(), this->connection_, next_stream_id);;
+      return client::request(http::request_head("/", "GET", {{"user-agent", "Manifold"}}), this->connection_, next_stream_id);;
     }
     //----------------------------------------------------------------//
 

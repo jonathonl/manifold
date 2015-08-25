@@ -56,6 +56,15 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    bool server::response::send_headers(bool end_stream)
+    {
+      if (this->head().header("date").empty())
+        this->head().header("date", server::date_string());
+      return outgoing_message::send_headers(end_stream);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     server::server(asio::io_service& ioService, unsigned short port, const std::string& host)
       : io_service_(ioService),
         acceptor_(io_service_)

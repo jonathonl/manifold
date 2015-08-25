@@ -7,6 +7,7 @@
 #include <functional>
 #include <set>
 #include <memory>
+#include <ctime>
 
 #include "asio.hpp"
 #include "http_request_head.hpp"
@@ -65,7 +66,7 @@ namespace manifold
 
         //----------------------------------------------------------------//
         response_head& head();
-        //bool end() { return false; }
+        bool send_headers(bool end_stream = false);
         //----------------------------------------------------------------//
       };
       //================================================================//
@@ -112,6 +113,22 @@ namespace manifold
       //----------------------------------------------------------------//
       void listen(const std::function<void(server::request&& req, server::response&& res)>& handler);
       //void register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler);
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      static std::string date_string()
+      {
+        const int RFC1123_TIME_LEN = 29;
+        time_t t;
+        struct tm* tm;
+        char buf[RFC1123_TIME_LEN+1] = {'\0'};
+
+        time(&t);
+        tm = std::gmtime(&t);
+
+        strftime(buf, RFC1123_TIME_LEN+1, "%a, %d %b %Y %H:%M:%S GMT", tm);
+        return std::string(&buf[0]);
+      }
       //----------------------------------------------------------------//
     };
     //================================================================//

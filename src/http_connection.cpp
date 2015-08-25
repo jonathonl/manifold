@@ -504,76 +504,60 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    http::errc connection::handle_outgoing_headers_state_change(stream& stream)
+    bool connection::handle_outgoing_headers_state_change(stream& stream)
     {
-      errc ret = errc::no_error;
       switch (stream.state)
       {
         case stream_state::idle:
           stream.state = stream_state::open;
-          break;
+          return true;
         case stream_state::reserved_local:
           stream.state = stream_state::half_closed_remote;
-          break;
+          return true;
         case stream_state::reserved_remote:
-          // TODO: Error cant send headers or data in reserved_remote state.
-          break;
         case stream_state::half_close_local:
         case stream_state::closed:
-          // TODO: Error
-          break;
-        default:
-          break;
+          return false;
+        case stream_state::open:
+        case stream_state::half_closed_remote:
+          return true;
       }
-      return ret;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    http::errc connection::handle_outgoing_end_stream_state_change(stream& stream)
+    bool connection::handle_outgoing_end_stream_state_change(stream& stream)
     {
-      errc ret = errc::no_error;
-
       switch (stream.state)
       {
         case stream_state::open:
           stream.state = stream_state::half_close_local;
-          break;
+          return true;
         case stream_state::half_closed_remote:
           stream.state = stream_state::closed;
-          break;
+          return true;
         case stream_state::reserved_remote:
-          // TODO: Error cant send headers or data in reserved_remote state.
-          break;
         case stream_state::idle:
         case stream_state::reserved_local:
         case stream_state::half_close_local:
         case stream_state::closed:
-          // TODO: Error
-          break;
+          return false;
       }
-
-      return ret;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    http::errc connection::handle_outgoing_rst_stream_state_change(stream& stream)
+    bool connection::handle_outgoing_rst_stream_state_change(stream& stream)
     {
-      errc ret = errc::no_error;
-
       switch (stream.state)
       {
         case stream_state::idle:
         case stream_state::closed:
-          // TODO: Error
-          break;
+          return false;
         default:
           stream.state = stream_state::closed;
-          break;
+          return true;
       }
-
-      return ret;
     }
     //----------------------------------------------------------------//
 
@@ -778,11 +762,11 @@ namespace manifold
         else
         {
           // TODO: check for errors below
-          auto state_change_error = this->handle_outgoing_headers_state_change(it->second);
-          if (end_stream && state_change_error == errc::no_error)
-            state_change_error = this->handle_outgoing_end_stream_state_change(it->second);
+          bool state_change_result = this->handle_outgoing_headers_state_change(it->second);
+          if (end_stream && state_change_result)
+            state_change_result = this->handle_outgoing_end_stream_state_change(it->second);
 
-          if (state_change_error == errc::no_error)
+          if (state_change_result)
           {
             it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream), stream_id));
             this->run_send_loop();
@@ -822,11 +806,11 @@ namespace manifold
         else
         {
           // TODO: check for errors below
-          auto state_change_error = this->handle_outgoing_headers_state_change(it->second);
-          if (end_stream && state_change_error == errc::no_error)
-            state_change_error = this->handle_outgoing_end_stream_state_change(it->second);
+          auto state_change_result = this->handle_outgoing_headers_state_change(it->second);
+          if (end_stream && state_change_result)
+            state_change_result = this->handle_outgoing_end_stream_state_change(it->second);
 
-          if (state_change_error == errc::no_error)
+          if (state_change_result)
           {
             it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream, priority), stream_id));
             this->run_send_loop();
@@ -866,7 +850,7 @@ namespace manifold
       std::map<std::uint32_t,stream>::iterator it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
       {
-        if (this->handle_outgoing_rst_stream_state_change(it->second) == errc::no_error)
+        if (this->handle_outgoing_rst_stream_state_change(it->second))
         {
           it->second.outgoing_non_data_frames.push(http::frame(http::rst_stream_frame(error_code), stream_id));
           this->run_send_loop();
@@ -929,11 +913,11 @@ namespace manifold
 
       if (it != this->streams_.end())
       {
-        errc state_change_error = errc::no_error;
+        bool state_change_result = true;
         if (end_stream)
-          state_change_error = this->handle_outgoing_end_stream_state_change(it->second);
+          state_change_result = this->handle_outgoing_end_stream_state_change(it->second);
 
-        if (state_change_error == errc::no_error)
+        if (state_change_result)
         {
           it->second.outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), stream_id));
           this->run_send_loop();

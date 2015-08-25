@@ -107,6 +107,9 @@ public:
   {
     this->response_ = std::move(res);
 
+    for (auto it : this->response_.head().raw_headers())
+      std::cout << it.name << ": " << it.value << std::endl;
+
     if (!this->response_.head().is_successful_status())
     {
       this->request_.reset_stream();
@@ -216,6 +219,9 @@ int main()
     auto req_ptr = std::make_shared<http::server::request>(std::move(req));
     auto res_ptr = std::make_shared<http::server::response>(std::move(res));
 
+    for (auto it : req_ptr->head().raw_headers())
+      std::cout << it.name << ": " << it.value << std::endl;
+
     auto req_entity = std::make_shared<std::string>();
     req_ptr->on_data([req_entity](const char*const data, std::size_t datasz)
     {
@@ -262,6 +268,7 @@ int main()
     request->on_response([request](http::client::response&& resp)
     {
       auto response = std::make_shared<http::client::response>(std::move(resp));
+
       if (!response->head().is_successful_status())
         request->reset_stream();
       else

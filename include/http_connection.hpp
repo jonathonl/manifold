@@ -159,9 +159,9 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      http::errc handle_outgoing_headers_state_change(stream& stream);
-      http::errc handle_outgoing_end_stream_state_change(stream& stream);
-      http::errc handle_outgoing_rst_stream_state_change(stream& stream);
+      bool handle_outgoing_headers_state_change(stream& stream);
+      bool handle_outgoing_end_stream_state_change(stream& stream);
+      bool handle_outgoing_rst_stream_state_change(stream& stream);
       //----------------------------------------------------------------//
     protected:
       virtual void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb) = 0;
