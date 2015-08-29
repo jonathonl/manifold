@@ -95,6 +95,7 @@ namespace manifold
       std::string host_;
       std::set<std::shared_ptr<http::connection>> connections_;
       std::function<void(server::request&& req, server::response&& res)> request_handler_;
+      std::string default_server_header_ = "Manifold";
       //std::list<std::pair<std::regex,std::function<void(server::request&& req, server::response&& res)>>> stream_handlers_;
       //----------------------------------------------------------------//
 
@@ -113,6 +114,7 @@ namespace manifold
       //----------------------------------------------------------------//
       void listen(const std::function<void(server::request&& req, server::response&& res)>& handler);
       //void register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler);
+      void set_default_server_header(const std::string& value);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//

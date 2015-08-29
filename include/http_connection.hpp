@@ -174,6 +174,10 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
+      static const std::array<char,24> preface;
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
       void run();
       void close();
       void cancelAllStreams();
@@ -270,6 +274,7 @@ namespace manifold
       ~non_tls_connection() {}
 
       asio::ip::tcp::socket::lowest_layer_type& socket() { return this->socket_; }
+      asio::ip::tcp::socket& raw_socket() { return this->socket_; }
       bool is_encrypted() const { return false; }
     };
     //================================================================//

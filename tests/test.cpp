@@ -95,7 +95,10 @@ public:
   void handle_request(http::client::request&& req)
   {
     this->request_ = std::move(req);
-    this->request_.head() = http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}});
+    this->request_.head() = http::request_head("/foobar", http::method::post,
+      {
+        {"content-type","application/x-www-form-urlencoded"}
+      });
 
     this->request_.on_response(std::bind(&my_request_class::handle_response, this, std::placeholders::_1));
 
@@ -285,7 +288,9 @@ int main()
       }
     });
 
-    request->head() = http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}});
+    request->head().path("/foobar");
+    request->head().method(http::method::post);
+    request->head().header("content-type","application/x-www-form-urlencoded");
     request->end("name=value&name2=value2");
 
 

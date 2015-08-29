@@ -149,9 +149,21 @@ namespace manifold
             }
             else
             {
-              this->connection_ = c;
-              this->connection_->run();
-              this->on_connect_ ? this->on_connect_() : void();
+              asio::async_write(c->raw_socket(), asio::buffer(connection::preface.data(), connection::preface.size()), [this, c](const std::error_code& ec, std::size_t bytes_transfered)
+              {
+                if (ec)
+                {
+                  this->ec_ = ec;
+                  this->on_close_ ? this->on_close_(this->ec_) : void();
+                }
+                else
+                {
+                  this->connection_ = c;
+                  this->connection_->run();
+                  this->connection_->send_settings({});
+                  this->on_connect_ ? this->on_connect_() : void();
+                }
+              });
             }
           });
         }
@@ -176,7 +188,7 @@ namespace manifold
         {
           std::cout << it->host_name() << std::endl;
           std::cout << it->endpoint().port() << std::endl;
-          c->socket().async_connect(*it, [this](const std::error_code& ec)
+          c->socket().async_connect(*it, [this, c](const std::error_code& ec)
           {
             if (ec)
             {
@@ -185,7 +197,24 @@ namespace manifold
             }
             else
             {
-              // ... TODO: SSL Handshake.
+              c->ssl_stream().async_handshake(asio::ssl::stream_base::client, [this, c](const std::error_code& ec)
+              {
+                asio::async_write(c->ssl_stream(), asio::buffer(connection::preface.data(), connection::preface.size()), [this, c](const std::error_code& ec, std::size_t bytes_transfered)
+                {
+                  if (ec)
+                  {
+                    this->ec_ = ec;
+                    this->on_close_ ? this->on_close_(this->ec_) : void();
+                  }
+                  else
+                  {
+                    this->connection_ = c;
+                    this->connection_->run();
+                    this->connection_->send_settings({});
+                    this->on_connect_ ? this->on_connect_() : void();
+                  }
+                });
+              });
             }
           });
         }
@@ -223,7 +252,7 @@ namespace manifold
       std::uint32_t next_stream_id = this->get_next_stream_id(); // could be zero;
       this->connection_->create_stream(next_stream_id);
 
-      return client::request(http::request_head("/", "GET", {{"user-agent", "Manifold"}}), this->connection_, next_stream_id);;
+      return client::request(http::request_head("/", "GET", {{"user-agent", this->default_user_agent_}}), this->connection_, next_stream_id);;
     }
     //----------------------------------------------------------------//
 
@@ -245,6 +274,13 @@ namespace manifold
       // TODO: Add is_closed() to connection class.
       /*if (!had_previous_handler && this->connection_ && this->connection_.is_closed() && this->on_close_)
         this->on_close_(this->ec_);*/
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void client::set_default_user_agent(const std::string user_agent)
+    {
+      this->default_user_agent_ = user_agent;
     }
     //----------------------------------------------------------------//
   }

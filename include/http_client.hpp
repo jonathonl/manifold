@@ -123,6 +123,7 @@ namespace manifold
       asio::io_service& io_service_;
       asio::ip::tcp::resolver tcp_resolver_;
       std::uint32_t last_stream_id_;
+      std::string default_user_agent_ = "Manifold";
 
       std::unique_ptr<asio::ssl::context> ssl_context_;
       std::shared_ptr<http::connection> connection_;
@@ -134,6 +135,7 @@ namespace manifold
       std::error_code ec_;
 
       std::uint32_t get_next_stream_id();
+      void send_connection_preface(std::function<void(const std::error_code& ec)>& fn);
     public:
       client(asio::io_service& ioservice, const std::string& host, unsigned short port = 80);
       client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, unsigned short port = 443);
@@ -142,6 +144,7 @@ namespace manifold
       void on_connect(const std::function<void()>& fn);
       void on_close(const std::function<void(const std::error_code ec)>& fn);
       client::request make_request();
+      void set_default_user_agent(const std::string user_agent);
     };
     //================================================================//
   }

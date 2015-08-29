@@ -114,7 +114,7 @@ namespace manifold
     //----------------------------------------------------------------//
     void server::accept()
     {
-      std::shared_ptr<connection> conn;
+      std::shared_ptr<non_tls_connection> conn;
       conn = std::make_shared<non_tls_connection>(this->io_service_);
       acceptor_.async_accept(conn->socket(), [this, conn](std::error_code ec)
       {
@@ -127,12 +127,31 @@ namespace manifold
 
         if (!ec)
         {
-          auto it = this->connections_.emplace(conn);
-          if (it.second)
+          auto* preface_buf = new std::array<char,connection::preface.size()>();
+          asio::async_read(conn->raw_socket(), asio::buffer(preface_buf, connection::preface.size()), [this, conn, preface_buf](const std::error_code& ec, std::size_t bytes_read)
           {
-            this->manage_connection(*it.first);
-            (*it.first)->run();
-          }
+            if (ec)
+            {
+              std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
+            }
+            else
+            {
+              if (*preface_buf != connection::preface)
+              {
+                std::cout << "Invalid Connection Preface" << ":" __FILE__ << "/" << __LINE__ << std::endl;
+              }
+              else
+              {
+                auto it = this->connections_.emplace(conn);
+                if (it.second)
+                {
+                  this->manage_connection(*it.first);
+                  (*it.first)->run();
+                }
+              }
+            }
+            delete preface_buf;
+          });
         }
         else
         {
@@ -172,18 +191,34 @@ namespace manifold
             }
             else
             {
-              auto it = this->connections_.emplace(conn);
-              if (it.second)
+              auto* preface_buf = new std::array<char,connection::preface.size()>();
+              asio::async_read(conn->ssl_stream(), asio::buffer(preface_buf, connection::preface.size()), [this, conn, preface_buf](const std::error_code& ec, std::size_t bytes_read)
               {
-                this->manage_connection(*it.first);
-                (*it.first)->run();
-              }
+                if (ec)
+                {
+                  std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
+                }
+                else
+                {
+                  if (*preface_buf != connection::preface)
+                  {
+                    std::cout << "Invalid Connection Preface" << ":" __FILE__ << "/" << __LINE__ << std::endl;
+                  }
+                  else
+                  {
+                    auto it = this->connections_.emplace(conn);
+                    if (it.second)
+                    {
+                      this->manage_connection(*it.first);
+                      (*it.first)->run();
+                    }
+                  }
+                }
+                delete preface_buf;
+              });
             }
           });
         }
-
-
-
 
         if (!this->io_service_.stopped())
           this->accept(ctx);
@@ -196,13 +231,20 @@ namespace manifold
     {
       conn->on_new_stream([this, conn](std::int32_t stream_id, header_block&& headers)
       {
-        this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(http::response_head(), conn, stream_id)) : void();
+        this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(http::response_head(200, {{"server", this->default_server_header_}}), conn, stream_id)) : void();
       });
 
       conn->on_close([conn, this](std::uint32_t ec)
       {
         this->connections_.erase(conn);
       });
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void server::set_default_server_header(const std::string& value)
+    {
+      this->default_server_header_ = value;
     }
     //----------------------------------------------------------------//
   }
