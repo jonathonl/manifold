@@ -58,7 +58,6 @@ namespace manifold
         std::function<void(http::header_block&& headers, std::uint32_t promised_stream_id)> on_push_promise;
         std::function<void()> on_end;
         std::function<void()> on_drain;
-
         std::function<void(std::uint32_t error_code)> on_close;
 
         std::queue<header_block> incoming_message_heads;
@@ -96,6 +95,8 @@ namespace manifold
         stream* stream_ptr() const;
         const std::vector<stream_dependency_tree>& children() const;
         void insert_child(stream_dependency_tree&& child);
+        void remove(stream& stream_to_remove);
+        void clear_children();
         //----------------------------------------------------------------//
       };
       //================================================================//
@@ -105,6 +106,7 @@ namespace manifold
       hpack::encoder hpack_encoder_;
       hpack::decoder hpack_decoder_;
       bool started_;
+      bool closed_;
       bool send_loop_running_;
       std::minstd_rand rg_;
       //----------------------------------------------------------------//
@@ -126,6 +128,7 @@ namespace manifold
       stream_dependency_tree stream_dependency_tree_;
       std::uint32_t connection_level_outgoing_window_size() const { return this->root_stream_.outgoing_window_size; }
       std::uint32_t connection_level_incoming_window_size() const { return this->root_stream_.incoming_window_size; }
+      void garbage_collect_streams();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
