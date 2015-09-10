@@ -45,8 +45,8 @@ namespace manifold
     const std::array<char,24> connection::preface = {0x50,0x52,0x49,0x20,0x2a,0x20,0x48,0x54,0x54,0x50,0x2f,0x32,0x2e,0x30,0x0d,0x0a,0x0d,0x0a,0x53,0x4d,0x0d,0x0a,0x0d,0x0a};
 
     //----------------------------------------------------------------//
-    connection::connection()
-    : hpack_encoder_(4096), hpack_decoder_(4096), last_newly_accepted_stream_id_(0), last_newly_created_stream_id_(0), root_stream_(0), stream_dependency_tree_(&this->root_stream_)
+    connection::connection(connection_io_impl* io_impl)
+      : io_impl_(io_impl), hpack_encoder_(4096), hpack_decoder_(4096), last_newly_accepted_stream_id_(0), last_newly_created_stream_id_(0), root_stream_(0), stream_dependency_tree_(&this->root_stream_)
     {
       std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
       this->rg_.seed(seed);
@@ -75,7 +75,7 @@ namespace manifold
     //----------------------------------------------------------------//
     connection::~connection()
     {
-      this->socket().close();
+      this->io_impl_->socket().close();
     }
     //----------------------------------------------------------------//
 
@@ -154,7 +154,7 @@ namespace manifold
     {
       std::shared_ptr<connection> self = this->shared_from_this();
       this->incoming_frame_ = frame(); // reset incoming frame
-      this->recv_frame(this->incoming_frame_, [self](const std::error_code& ec)
+      this->io_impl_->recv_frame(this->incoming_frame_, [self](const std::error_code& ec)
       {
         if (ec)
         {
