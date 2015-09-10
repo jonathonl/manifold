@@ -229,14 +229,21 @@ namespace manifold
     //----------------------------------------------------------------//
     void server::manage_connection(const std::shared_ptr<http::connection>& conn)
     {
-      conn->on_new_stream([this, conn](std::int32_t stream_id, header_block&& headers)
+      conn->on_new_stream([this, conn](std::int32_t stream_id)
       {
-        this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(http::response_head(200, {{"server", this->default_server_header_}}), conn, stream_id)) : void();
+        conn->on_headers(stream_id, [conn, stream_id, this](http::header_block&& headers)
+        {
+          this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(http::response_head(200, {{"server", this->default_server_header_}}), conn, stream_id)) : void();
+        });
       });
 
       conn->on_close([conn, this](std::uint32_t ec)
       {
         this->connections_.erase(conn);
+        this->io_service_.post([conn]()
+        {
+          conn->close();
+        });
       });
     }
     //----------------------------------------------------------------//

@@ -16,7 +16,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     response_head::response_head(header_block&& hb)
-      : header_block(hb)
+      : header_block(std::move(hb))
     {
     }
     //----------------------------------------------------------------//

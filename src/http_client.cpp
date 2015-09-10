@@ -36,6 +36,7 @@ namespace manifold
     //----------------------------------------------------------------//
     client::request::~request()
     {
+      std::cout << "client::request::~request()" << std::endl;
     }
     //----------------------------------------------------------------//
 
@@ -111,7 +112,7 @@ namespace manifold
     //----------------------------------------------------------------//
     client::response::~response()
     {
-
+      std::cout << "client::response::~response()" << std::endl;
     }
     //----------------------------------------------------------------//
 
@@ -126,13 +127,14 @@ namespace manifold
     client::client(asio::io_service& ioservice, const std::string& host, unsigned short port)
       : io_service_(ioservice), tcp_resolver_(ioservice)
     {
-      this->last_stream_id_ = (std::uint32_t)-1;
+      this->closed_ = false;
+      this->next_stream_id_= 1;
       std::shared_ptr<non_tls_connection> c = std::make_shared<non_tls_connection>(ioservice);
       this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [this, c](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
       {
         if (ec)
         {
-          this->ec_ = ec;
+          this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
           this->on_close_ ? this->on_close_(this->ec_) : void();
         }
         else
@@ -144,7 +146,7 @@ namespace manifold
           {
             if (ec)
             {
-              this->ec_ = ec;
+              this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
               this->on_close_ ? this->on_close_(this->ec_) : void();
             }
             else
@@ -153,7 +155,7 @@ namespace manifold
               {
                 if (ec)
                 {
-                  this->ec_ = ec;
+                  this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
                   this->on_close_ ? this->on_close_(this->ec_) : void();
                 }
                 else
@@ -175,13 +177,14 @@ namespace manifold
     client::client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, unsigned short port)
         : io_service_(ioservice), tcp_resolver_(ioservice), ssl_context_(new asio::ssl::context(options.method))
     {
-      this->last_stream_id_ = (std::uint32_t)-1;
+      this->closed_ = false;
+      this->next_stream_id_= 1;
       std::shared_ptr<tls_connection> c = std::make_shared<tls_connection>(ioservice, *this->ssl_context_);
       this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [this, c](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
       {
         if (ec)
         {
-          this->ec_ = ec;
+          this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
           this->on_close_ ? this->on_close_(this->ec_) : void();
         }
         else
@@ -192,7 +195,7 @@ namespace manifold
           {
             if (ec)
             {
-              this->ec_ = ec;
+              this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
               this->on_close_ ? this->on_close_(this->ec_) : void();
             }
             else
@@ -203,7 +206,7 @@ namespace manifold
                 {
                   if (ec)
                   {
-                    this->ec_ = ec;
+                    this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
                     this->on_close_ ? this->on_close_(this->ec_) : void();
                   }
                   else
@@ -225,18 +228,41 @@ namespace manifold
     //----------------------------------------------------------------//
     client::~client()
     {
+
     }
     //----------------------------------------------------------------//
+
+    void client::close()
+    {
+      if (!this->closed_)
+      {
+        this->closed_ = true;
+        this->io_service_.post([this]()
+        {
+          if (this->on_close_)
+            this->on_close_(this->ec_); // TODO: set with appropriate error;
+          this->on_close_ = nullptr;
+          this->on_connect_ = nullptr;
+          this->on_push_promise_ = nullptr;
+          if (this->connection_)
+          {
+            this->connection_->close();
+            this->connection_ = nullptr;
+          }
+        });
+      }
+    }
 
     //----------------------------------------------------------------//
     std::uint32_t client::get_next_stream_id()
     {
-      if (this->last_stream_id_ != client::max_stream_id)
+      std::uint32_t ret = 0;
+      if (this->next_stream_id_ <= client::max_stream_id)
       {
-        this->last_stream_id_ += 2;
-        return this->last_stream_id_;
+        ret = this->next_stream_id_;
+        this->next_stream_id_ += 2;
       }
-      return 0;
+      return ret;
     }
     //----------------------------------------------------------------//
 
@@ -267,7 +293,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void client::on_close(const std::function<void(const std::error_code ec)>& fn)
+    void client::on_close(const std::function<void(std::uint32_t ec)>& fn)
     {
       bool had_previous_handler = (bool)this->on_close_;
       this->on_close_ = fn;

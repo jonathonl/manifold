@@ -122,8 +122,9 @@ namespace manifold
     private:
       asio::io_service& io_service_;
       asio::ip::tcp::resolver tcp_resolver_;
-      std::uint32_t last_stream_id_;
+      std::uint32_t next_stream_id_;
       std::string default_user_agent_ = "Manifold";
+      bool closed_;
 
       std::unique_ptr<asio::ssl::context> ssl_context_;
       std::shared_ptr<http::connection> connection_;
@@ -131,8 +132,8 @@ namespace manifold
 
       std::function<void(http::client::request&& req)> on_push_promise_;
       std::function<void()> on_connect_;
-      std::function<void(const std::error_code& ec)> on_close_;
-      std::error_code ec_;
+      std::function<void(std::uint32_t ec)> on_close_;
+      std::uint32_t ec_;
 
       std::uint32_t get_next_stream_id();
       void send_connection_preface(std::function<void(const std::error_code& ec)>& fn);
@@ -142,8 +143,9 @@ namespace manifold
       ~client();
 
       void on_connect(const std::function<void()>& fn);
-      void on_close(const std::function<void(const std::error_code ec)>& fn);
+      void on_close(const std::function<void(std::uint32_t ec)>& fn);
       client::request make_request();
+      void close();
       void set_default_user_agent(const std::string user_agent);
     };
     //================================================================//

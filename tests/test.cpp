@@ -125,9 +125,10 @@ public:
         response_data->append(data, datasz);
       });
 
-      this->response_.on_end([response_data]()
+      this->response_.on_end([this, response_data]()
       {
         std::cout << (*response_data) << std::endl;
+        this->c_.close();
       });
     }
   }
@@ -249,11 +250,51 @@ int main()
   // Client to Local Server Test
   //
   http::client c1(ioservice, "127.0.0.1", 8080);
-  c1.on_close([](const std::error_code& ec)
+  c1.on_connect([&c1]()
   {
-    std::cout << ec.message() << std::endl;
+    auto req_ptr = std::make_shared<http::client::request>(c1.make_request());
+    req_ptr->head() = http::request_head("/foobar", http::method::post,
+      {
+        {"content-type","application/x-www-form-urlencoded"}
+      });
+
+    req_ptr->on_response([&c1](http::client::response &&res)
+    {
+      auto res_ptr = std::make_shared<http::client::response>(std::move(res));
+
+      for (auto it : res_ptr->head().raw_headers())
+        std::cout << it.name << ": " << it.value << std::endl;
+
+      if (!res_ptr->head().is_successful_status())
+      {
+        //req_ptr->reset_stream();
+      }
+      else
+      {
+        auto response_data = std::make_shared<std::string>();
+        res_ptr->on_data([response_data](const char *const data, std::size_t datasz)
+        {
+          response_data->append(data, datasz);
+        });
+
+        res_ptr->on_end([&c1, response_data]()
+        {
+          std::cout << (*response_data) << std::endl;
+          c1.close();
+        });
+      }
+    });
+
+
+    req_ptr->end(std::string("name=value&name2=value2"));
   });
-  my_request_class r(c1);
+
+  c1.on_close([&ioservice](std::uint32_t ec)
+  {
+    std::cout << ec << std::endl;
+    //ioservice.stop();
+  });
+  //my_request_class r(c1);
   //----------------------------------------------------------------//
 
   ioservice.run();
@@ -340,7 +381,7 @@ int main()
     req_ptr->end();
   });
 
-  c2.on_close([](const std::error_code& ec) { std::cerr << ec.message() << std::endl; });
+  c2.on_close([](std::uint32_t ec) { std::cerr << ec << std::endl; });
   //----------------------------------------------------------------//
 
 

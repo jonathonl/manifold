@@ -48,17 +48,37 @@ namespace manifold
         half_closed_remote,
         closed
       };
-      struct stream
+      class stream
       {
-        const std::uint32_t id;
-        stream_state state = stream_state::idle;
-        std::function<void(const char* const buf, std::size_t buf_size)> on_data;
-        std::function<void(http::header_block&& headers)> on_headers;
-        std::function<void(std::uint32_t error_code)> on_rst_stream;
-        std::function<void(http::header_block&& headers, std::uint32_t promised_stream_id)> on_push_promise;
-        std::function<void()> on_end;
-        std::function<void()> on_drain;
-        std::function<void(std::uint32_t error_code)> on_close;
+      protected:
+        const std::uint32_t id_;
+        connection& parent_connection_;
+        stream_state state_ = stream_state::idle;
+        std::function<void(const char* const buf, std::size_t buf_size)> on_data_;
+        std::function<void(http::header_block&& headers)> on_headers_;
+        std::function<void(std::uint32_t error_code)> on_rst_stream_;
+        std::function<void(http::header_block&& headers, std::uint32_t promised_stream_id)> on_push_promise_;
+        std::function<void()> on_end_;
+        std::function<void()> on_drain_;
+        std::function<void(std::uint32_t error_code)> on_close_;
+      public:
+        //const std::function<void(const char* const buf, std::size_t buf_size)>& on_data() const { return this->on_data_; }
+        //const std::function<void(http::header_block&& headers)>& on_headers() const { return this->on_headers_; }
+        //const std::function<void(std::uint32_t error_code)>& on_rst_stream() const { return this->on_rst_stream_; }
+        //const std::function<void(http::header_block&& headers, std::uint32_t promised_stream_id)>& on_push_promise() const { return this->on_push_promise_; }
+        //const std::function<void()>& on_end() const { return this->on_end_; }
+        //const std::function<void()>& on_drain() const { return this->on_drain_; }
+        //const std::function<void(std::uint32_t error_code)>& on_close() const { return this->on_close_; }
+
+        void on_data(const std::function<void(const char* const buf, std::size_t buf_size)>& fn) { this->on_data_ = fn; }
+        void on_headers(const std::function<void(http::header_block&& headers)>& fn) { this->on_headers_ = fn; }
+        void on_rst_stream(const std::function<void(std::uint32_t error_code)>& fn) { this->on_rst_stream_ = fn; }
+        void on_push_promise(const std::function<void(http::header_block&& headers, std::uint32_t promised_stream_id)>& fn)  { this->on_push_promise_ = fn; }
+        void on_end(const std::function<void()>& fn) { this->on_end_ = fn; }
+        void on_drain(const std::function<void()>& fn)  { this->on_drain_ = fn; }
+        void on_close(const std::function<void(std::uint32_t error_code)>& fn) { this->on_close_ = fn; }
+
+        stream_state state() const { return this->state_; }
 
         std::queue<header_block> incoming_message_heads;
         std::queue<frame> incoming_data_frames;
@@ -71,7 +91,22 @@ namespace manifold
         std::uint8_t weight = 16;
 
         bool end_stream_frame_received = false;
-        stream(std::uint32_t stream_id) : id(stream_id) {}
+        stream(connection& parent, std::uint32_t stream_id) : parent_connection_(parent), id_(stream_id) {}
+
+        //----------------------------------------------------------------//
+        void handle_incoming_frame(const data_frame& incoming_data_frame);
+        void handle_incoming_frame(const const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames);
+        void handle_incoming_frame(const priority_frame& incoming_priority_frame);
+        void handle_incoming_frame(const rst_stream_frame& incoming_rst_stream_frame);
+        void handle_incoming_frame(const push_promise_frame& incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames);
+        void handle_incoming_frame(const window_update_frame& incoming_window_update_frame);
+        //----------------------------------------------------------------//
+
+        //----------------------------------------------------------------//
+        bool handle_outgoing_headers_state_change();
+        bool handle_outgoing_end_stream_state_change();
+        bool handle_outgoing_rst_stream_state_change();
+        //----------------------------------------------------------------//
       };
       //================================================================//
 
@@ -113,7 +148,7 @@ namespace manifold
 
       //----------------------------------------------------------------//
       // Connection level callbacks:
-      std::function<void(std::uint32_t stream_id, header_block&& headers)> on_new_stream_;
+      std::function<void(std::uint32_t stream_id)> on_new_stream_;
       std::function<void(std::uint32_t error_code)> on_close_;
       //----------------------------------------------------------------//
 
@@ -148,23 +183,10 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void handle_incoming_frame(stream& stream, const data_frame& incoming_data_frame);
-      void handle_incoming_frame(stream& stream, const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames);
-      void handle_incoming_frame(stream& stream, const priority_frame& incoming_priority_frame);
-      void handle_incoming_frame(stream& stream, const rst_stream_frame& incoming_rst_stream_frame);
       void handle_incoming_frame(const settings_frame& incoming_settings_frame);
-      void handle_incoming_frame(stream& stream, const push_promise_frame& incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames);
       void handle_incoming_frame(const ping_frame& incoming_ping_frame);
       void handle_incoming_frame(const goaway_frame& incoming_goaway_frame);
       void handle_incoming_frame(const window_update_frame& incoming_window_update_frame);
-      void handle_incoming_frame(stream& stream, const window_update_frame& incoming_window_update_frame);
-      //void handle_incoming_frame(stream& frame_stream, const continuation_frame&  incoming_frame);
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-      bool handle_outgoing_headers_state_change(stream& stream);
-      bool handle_outgoing_end_stream_state_change(stream& stream);
-      bool handle_outgoing_rst_stream_state_change(stream& stream);
       //----------------------------------------------------------------//
     protected:
       virtual void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb) = 0;
@@ -187,7 +209,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void on_new_stream(const std::function<void(std::int32_t stream_id, header_block&& headers)>& fn);
+      void on_new_stream(const std::function<void(std::int32_t stream_id)>& fn);
       void on_close(const std::function<void(std::uint32_t error_code)>& fn);
       //----------------------------------------------------------------//
 

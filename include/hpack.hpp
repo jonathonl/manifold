@@ -254,7 +254,7 @@ namespace manifold
     public:
       decoder(std::size_t max_table_size)
         : context(max_table_size) {}
-      bool decode(std::string::const_iterator beg, std::string::const_iterator end, std::list<header_field>& headers);
+      bool decode(std::string::const_iterator beg, std::string::const_iterator end, std::list<header_field>& headers); // TODO: Allow for any type of char iterator.
     };
     //================================================================//
   };
