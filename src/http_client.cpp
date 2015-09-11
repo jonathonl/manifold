@@ -129,8 +129,8 @@ namespace manifold
     {
       this->closed_ = false;
       this->next_stream_id_= 1;
-      std::shared_ptr<non_tls_connection> c = std::make_shared<non_tls_connection>(ioservice);
-      this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [this, c](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
+      auto sock = std::make_shared<manifold::socket>(ioservice);
+      this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [this, sock](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
       {
         if (ec)
         {
@@ -142,7 +142,7 @@ namespace manifold
           std::cout << it->host_name() << std::endl;
           std::cout << it->endpoint().address().to_string() << std::endl;
           std::cout << it->endpoint().port() << std::endl;
-          c->socket().async_connect(*it, [this, c](const std::error_code& ec)
+          asio::async_connect(*sock, *it, [this, sock](const std::error_code& ec)
           {
             if (ec)
             {
@@ -151,7 +151,7 @@ namespace manifold
             }
             else
             {
-              asio::async_write(c->raw_socket(), asio::buffer(connection::preface.data(), connection::preface.size()), [this, c](const std::error_code& ec, std::size_t bytes_transfered)
+              asio::async_write(*sock, asio::buffer(connection::preface.data(), connection::preface.size()), [this, sock](const std::error_code& ec, std::size_t bytes_transfered)
               {
                 if (ec)
                 {
@@ -160,7 +160,7 @@ namespace manifold
                 }
                 else
                 {
-                  this->connection_ = c;
+                  this->connection_ = std::make_shared<http::connection>(std::move(*sock));
                   this->connection_->run();
                   this->connection_->send_settings({});
                   this->on_connect_ ? this->on_connect_() : void();
@@ -179,8 +179,9 @@ namespace manifold
     {
       this->closed_ = false;
       this->next_stream_id_= 1;
-      std::shared_ptr<tls_connection> c = std::make_shared<tls_connection>(ioservice, *this->ssl_context_);
-      this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [this, c](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
+      
+      auto sock = std::make_shared<manifold::tls_socket>(ioservice);
+      this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [this, sock](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
       {
         if (ec)
         {
@@ -191,7 +192,7 @@ namespace manifold
         {
           std::cout << it->host_name() << std::endl;
           std::cout << it->endpoint().port() << std::endl;
-          c->socket().async_connect(*it, [this, c](const std::error_code& ec)
+          asio::async_connect(sock, *it, [this, sock](const std::error_code& ec)
           {
             if (ec)
             {
@@ -200,9 +201,9 @@ namespace manifold
             }
             else
             {
-              c->ssl_stream().async_handshake(asio::ssl::stream_base::client, [this, c](const std::error_code& ec)
+              ((asio::ssl::stream<asio::ip::tcp::socket>*)sock)->async_handshake(asio::ssl::stream_base::client, [this, sock](const std::error_code& ec)
               {
-                asio::async_write(c->ssl_stream(), asio::buffer(connection::preface.data(), connection::preface.size()), [this, c](const std::error_code& ec, std::size_t bytes_transfered)
+                asio::async_write(sock, asio::buffer(connection::preface.data(), connection::preface.size()), [this, sock](const std::error_code& ec, std::size_t bytes_transfered)
                 {
                   if (ec)
                   {
@@ -211,7 +212,7 @@ namespace manifold
                   }
                   else
                   {
-                    this->connection_ = c;
+                    this->connection_ = std::make_shared<http::connection>(std::move(*sock));
                     this->connection_->run();
                     this->connection_->send_settings({});
                     this->on_connect_ ? this->on_connect_() : void();

@@ -67,6 +67,8 @@ namespace manifold
     }
 
     //----------------------------------------------------------------//
+    connection::connection(connection_io_impl* io_impl)
+      : io_impl_(io_impl), hpack_encoder_(4096), hpack_decoder_(4096), last_newly_accepted_stream_id_(0), last_newly_created_stream_id_(0), root_stream_(0), stream_dependency_tree_(&this->root_stream_)
     void connection::stream_dependency_tree::clear_children()
     {
       for (auto it = this->children_.begin(); it != this->children_.end(); ++it)
@@ -223,9 +225,8 @@ namespace manifold
     void connection::run_recv_loop()
     {
       std::shared_ptr<connection> self = this->shared_from_this();
-
       this->incoming_frame_ = frame(); // reset incoming frame
-      this->recv_frame(this->incoming_frame_, [self](const std::error_code& ec)
+      this->io_impl_->recv_frame(this->incoming_frame_, [self](const std::error_code& ec)
       {
         if (ec)
         {
@@ -985,7 +986,7 @@ namespace manifold
       {
         bool state_change_result = true;
         if (end_stream)
-          state_change_result = it->second.handle_outgoing_end_stream_state_change();
+          state_change_result = this->handle_outgoing_end_stream_state_change(it->second);
 
         if (state_change_result)
         {
@@ -995,7 +996,7 @@ namespace manifold
         }
         else
         {
-          assert(!"Stream state_ change not allowed.");
+          assert(!"Stream state change not allowed.");
         }
       }
 
