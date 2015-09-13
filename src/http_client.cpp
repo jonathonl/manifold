@@ -7,10 +7,87 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    client::request::request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
-      : outgoing_message(conn, stream_id)
+    void client::connection::on_informational_headers(std::uint32_t stream_id, const std::function<void(http::response_head&& headers)>& fn)
     {
-      this->head_ = std::move(head);
+      auto it = this->streams_.find(stream_id);
+      if (it == this->streams_.end())
+      {
+        // TODO: Handle error
+      }
+      else
+      {
+        ((stream*)it->second.get())->on_informational_headers(fn);
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void client::connection::on_response(std::uint32_t stream_id, const std::function<void(http::client::response&& resp)>& fn)
+    {
+      auto self = shared_from_this();
+      auto it = this->streams_.find(stream_id);
+      if (it == this->streams_.end())
+      {
+        // TODO: Handle error
+      }
+      else
+      {
+        ((stream*)it->second.get())->on_response_headers([self, fn, stream_id](http::response_head&& headers)
+        {
+          fn(http::client::response(std::move(headers), self, stream_id));
+        });
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void client::connection::on_trailers(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn)
+    {
+      auto it = this->streams_.find(stream_id);
+      if (it == this->streams_.end())
+      {
+        // TODO: Handle error
+      }
+      else
+      {
+        ((stream*)it->second.get())->on_trailers(fn);
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void client::connection::on_push_promise(std::uint32_t stream_id, const std::function<void(http::client::request&& req)>& fn)
+    {
+      auto self = this->shared_from_this();
+      auto it = this->streams_.find(stream_id);
+      if (it == this->streams_.end())
+      {
+      // TODO: Handle error
+      }
+      else
+      {
+        it->second->on_push_promise([self, fn](http::request_head&& headers, std::uint32_t promised_stream_id)
+        {
+          if (!self->create_stream(promised_stream_id))
+          {
+            // TODO: Handle error
+          }
+          else
+          {
+            fn(http::client::request(std::move(headers), self, promised_stream_id));
+          }
+        });
+      }
+    }
+
+    //----------------------------------------------------------------//
+    client::request::request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
+      : outgoing_message(conn, stream_id), head_(std::move(head))
+    {
+      ((connection*)conn.get())->on_push_promise(stream_id, [stream_id, conn](http::client::request&& req)
+      {
+        conn->send_reset_stream(stream_id, errc::refused_stream);
+      });
     }
     //----------------------------------------------------------------//
 
@@ -59,47 +136,26 @@ namespace manifold
     //----------------------------------------------------------------//
     void client::request::on_push_promise(const std::function<void(http::client::request&& request)>& cb)
     {
-      this->connection_->on_push_promise(this->stream_id_, [this, cb](http::header_block&& headers, std::uint32_t promised_stream_id)
-      {
-        cb(http::client::request(std::move(headers), this->connection_, promised_stream_id));
-      });
+      auto c = this->connection_;
+      ((client::connection*)this->connection_.get())->on_push_promise(this->stream_id_, cb);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void client::request::on_informational_headers(const std::function<void(http::response_head&& resp_head)>& cb)
     {
-      this->on_informational_headers_ = cb;
-      this->connection_->on_headers(this->stream_id_, std::bind(&request::handle_on_headers, this, std::placeholders::_1));
+      ((client::connection*)this->connection_.get())->on_informational_headers(this->stream_id_, cb) ;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void client::request::on_response(const std::function<void(http::client::response&& resp)>& cb)
     {
-      this->on_response_ = cb;
-      this->connection_->on_headers(this->stream_id_, std::bind(&request::handle_on_headers, this, std::placeholders::_1));
+      auto c = this->connection_;
+      std::uint32_t stream_id = this->stream_id_;
+      ((client::connection*)this->connection_.get())->on_response(this->stream_id_, cb);
     }
     //----------------------------------------------------------------//
-
-    void client::request::handle_on_headers(http::header_block&& headers)
-    {
-      // TODO: need to make sure response is only received once and that all of thes happen in the correct order.
-      int status_code = atoi(headers.header(":status").c_str());
-      if (status_code == 0)
-      {
-        // assuming trailers
-
-      }
-      else if (status_code < 200)
-      {
-        this->on_informational_headers_ ? this->on_informational_headers_(std::move(headers)) : void();
-      }
-      else
-      {
-        this->on_response_ ? this->on_response_(client::response(std::move(headers), this->connection_, this->stream_id_)) : void();
-      }
-    }
 
     //----------------------------------------------------------------//
     client::response::response(response_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
@@ -129,7 +185,7 @@ namespace manifold
     {
       this->closed_ = false;
       this->next_stream_id_= 1;
-      auto sock = std::make_shared<manifold::socket>(ioservice);
+      auto sock = std::make_shared<manifold::non_tls_socket>(ioservice);
       this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [this, sock](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
       {
         if (ec)
@@ -142,7 +198,7 @@ namespace manifold
           std::cout << it->host_name() << std::endl;
           std::cout << it->endpoint().address().to_string() << std::endl;
           std::cout << it->endpoint().port() << std::endl;
-          asio::async_connect(*sock, *it, [this, sock](const std::error_code& ec)
+          ((asio::ip::tcp::socket&)*sock).async_connect(*it, [this, sock](const std::error_code& ec)
           {
             if (ec)
             {
@@ -151,7 +207,7 @@ namespace manifold
             }
             else
             {
-              asio::async_write(*sock, asio::buffer(connection::preface.data(), connection::preface.size()), [this, sock](const std::error_code& ec, std::size_t bytes_transfered)
+              sock->send(connection::preface.data(), connection::preface.size(), [this, sock](const std::error_code& ec, std::size_t bytes_transfered)
               {
                 if (ec)
                 {
@@ -160,7 +216,7 @@ namespace manifold
                 }
                 else
                 {
-                  this->connection_ = std::make_shared<http::connection>(std::move(*sock));
+                  this->connection_ = std::make_shared<connection>(std::move(*sock));
                   this->connection_->run();
                   this->connection_->send_settings({});
                   this->on_connect_ ? this->on_connect_() : void();
@@ -180,7 +236,7 @@ namespace manifold
       this->closed_ = false;
       this->next_stream_id_= 1;
       
-      auto sock = std::make_shared<manifold::tls_socket>(ioservice);
+      auto sock = std::make_shared<manifold::tls_socket>(ioservice, *this->ssl_context_);
       this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [this, sock](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
       {
         if (ec)
@@ -192,7 +248,7 @@ namespace manifold
         {
           std::cout << it->host_name() << std::endl;
           std::cout << it->endpoint().port() << std::endl;
-          asio::async_connect(sock, *it, [this, sock](const std::error_code& ec)
+          ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).next_layer().async_connect(*it, [this, sock](const std::error_code& ec)
           {
             if (ec)
             {
@@ -201,9 +257,9 @@ namespace manifold
             }
             else
             {
-              ((asio::ssl::stream<asio::ip::tcp::socket>*)sock)->async_handshake(asio::ssl::stream_base::client, [this, sock](const std::error_code& ec)
+              ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).async_handshake(asio::ssl::stream_base::client, [this, sock](const std::error_code& ec)
               {
-                asio::async_write(sock, asio::buffer(connection::preface.data(), connection::preface.size()), [this, sock](const std::error_code& ec, std::size_t bytes_transfered)
+                sock->send(connection::preface.data(), connection::preface.size(), [this, sock](const std::error_code& ec, std::size_t bytes_transfered)
                 {
                   if (ec)
                   {
@@ -212,7 +268,7 @@ namespace manifold
                   }
                   else
                   {
-                    this->connection_ = std::make_shared<http::connection>(std::move(*sock));
+                    this->connection_ = std::make_shared<connection>(std::move(*sock));
                     this->connection_->run();
                     this->connection_->send_settings({});
                     this->on_connect_ ? this->on_connect_() : void();

@@ -3,12 +3,82 @@
 //#include <errno.h>
 //#include <fcntl.h>
 //#include <cstring>
-//
-//#include "socket.hpp"
-//
-////################################################################//
-//namespace manifold
-//{
+
+#include "socket.hpp"
+
+//################################################################//
+namespace manifold
+{
+  //----------------------------------------------------------------//
+  void non_tls_socket::recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+  {
+    asio::async_read(*this->s_, asio::buffer(data, data_sz), cb);
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void non_tls_socket::recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+  {
+    this->recv(data, data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb));
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void non_tls_socket::send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+  {
+    asio::async_write(*this->s_, asio::buffer(data, data_sz), cb);
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void non_tls_socket::send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+  {
+    this->send(data, data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb));
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void non_tls_socket::close()
+  {
+    this->s_->close();
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void tls_socket::recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+  {
+    asio::async_read(*this->s_, asio::buffer(data, data_sz), cb);
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void tls_socket::recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+  {
+    this->recv(data, data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb));
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void tls_socket::send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+  {
+    asio::async_write(*this->s_, asio::buffer(data, data_sz), cb);
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void tls_socket::send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+  {
+    this->send(data, data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb));
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void tls_socket::close()
+  {
+    this->s_->next_layer().close();
+  }
+  //----------------------------------------------------------------//
+
 //  //----------------------------------------------------------------//
 //  Socket::Socket()
 //    : fd_(-1), family_(Family::Unspecified), type_(Type::Unknown)
@@ -237,5 +307,5 @@
 //    }
 //  }
 //  //----------------------------------------------------------------//
-//}
-////################################################################//
+}
+//################################################################//

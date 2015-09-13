@@ -114,9 +114,8 @@ namespace manifold
     //----------------------------------------------------------------//
     void server::accept()
     {
-      std::shared_ptr<non_tls_connection> conn;
-      conn = std::make_shared<non_tls_connection>(this->io_service_);
-      acceptor_.async_accept(conn->socket(), [this, conn](std::error_code ec)
+      auto sock = std::make_shared<non_tls_socket>(this->io_service_);
+      acceptor_.async_accept((asio::ip::tcp::socket&)*sock, [this, sock](std::error_code ec)
       {
 
         if (!acceptor_.is_open())
@@ -128,7 +127,7 @@ namespace manifold
         if (!ec)
         {
           auto* preface_buf = new std::array<char,connection::preface.size()>();
-          asio::async_read(conn->raw_socket(), asio::buffer(preface_buf, connection::preface.size()), [this, conn, preface_buf](const std::error_code& ec, std::size_t bytes_read)
+          sock->recv(preface_buf->data(), connection::preface.size(), [this, sock, preface_buf](const std::error_code& ec, std::size_t bytes_read)
           {
             if (ec)
             {
@@ -142,7 +141,7 @@ namespace manifold
               }
               else
               {
-                auto it = this->connections_.emplace(conn);
+                auto it = this->connections_.emplace(std::make_shared<connection>(std::move(*sock)));
                 if (it.second)
                 {
                   this->manage_connection(*it.first);
@@ -167,9 +166,8 @@ namespace manifold
     //----------------------------------------------------------------//
     void server::accept(asio::ssl::context& ctx)
     {
-      std::shared_ptr<tls_connection> conn;
-      conn = std::make_shared<tls_connection>(this->io_service_, ctx);
-      acceptor_.async_accept(conn->socket(), [this, conn, &ctx](std::error_code ec)
+      auto sock = std::make_shared<tls_socket>(this->io_service_, ctx);
+      acceptor_.async_accept(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).next_layer(), [this, sock, &ctx](std::error_code ec)
       {
 
         if (!acceptor_.is_open())
@@ -183,7 +181,7 @@ namespace manifold
         }
         else
         {
-          conn->ssl_stream().async_handshake(asio::ssl::stream_base::server, [this, conn] (const std::error_code& ec)
+          ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).async_handshake(asio::ssl::stream_base::server, [this, sock] (const std::error_code& ec)
           {
             if (ec)
             {
@@ -192,7 +190,7 @@ namespace manifold
             else
             {
               auto* preface_buf = new std::array<char,connection::preface.size()>();
-              asio::async_read(conn->ssl_stream(), asio::buffer(preface_buf, connection::preface.size()), [this, conn, preface_buf](const std::error_code& ec, std::size_t bytes_read)
+              sock->recv(preface_buf->data(), connection::preface.size(), [this, sock, preface_buf](const std::error_code& ec, std::size_t bytes_read)
               {
                 if (ec)
                 {
@@ -206,7 +204,7 @@ namespace manifold
                   }
                   else
                   {
-                    auto it = this->connections_.emplace(conn);
+                    auto it = this->connections_.emplace(std::make_shared<connection>(std::move(*sock)));
                     if (it.second)
                     {
                       this->manage_connection(*it.first);

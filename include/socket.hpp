@@ -1,9 +1,11 @@
 #pragma once
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 #ifndef MANIFOLD_SOCKET_HPP
 #define MANIFOLD_SOCKET_HPP
 
 #include "asio.hpp"
+#include "asio/ssl.hpp"
 
 //#include <sys/types.h>
 //#include <sys/socket.h>
@@ -11,12 +13,92 @@
 //#include <cstdint>
 //#include <string>
 //#include <chrono>
-#include <sys/socket.h>
+//#include <sys/socket.h>
 
 //################################################################//
 namespace manifold
 {
-  typedef asio::ip::tcp::socket Socket;
+  //================================================================//
+  class socket
+  {
+  public:
+    socket() {}
+    virtual ~socket() {}
+    virtual void recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
+    virtual void recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
+    virtual void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
+    virtual void send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
+    virtual void close() = 0;
+    virtual bool is_encrypted() const = 0;
+  };
+  //================================================================//
+
+  //================================================================//
+  class non_tls_socket : public socket
+  {
+  public:
+    non_tls_socket(asio::io_service &ioservice)
+      : s_(new asio::ip::tcp::socket(ioservice)) { }
+
+    non_tls_socket(non_tls_socket&& source)
+      : s_(source.s_)
+    {
+      source.s_ = nullptr;
+    }
+
+    ~non_tls_socket()
+    {
+      if (this->s_)
+        delete this->s_;
+    }
+
+    void recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
+    void recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+    void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
+    void send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+    void close();
+    bool is_encrypted() const { return false; }
+
+    operator const asio::ip::tcp::socket& () const { return *this->s_; }
+    operator asio::ip::tcp::socket& () { return *this->s_; }
+  private:
+    asio::ip::tcp::socket* s_;
+  };
+  //================================================================//
+
+  //================================================================//
+  class tls_socket : public socket
+  {
+  public:
+    tls_socket(asio::io_service &ioservice, asio::ssl::context& ctx)
+      : s_(new asio::ssl::stream<asio::ip::tcp::socket>(ioservice, ctx)) { }
+
+    tls_socket(tls_socket&& source)
+      : s_(source.s_)
+    {
+      source.s_ = nullptr;
+    }
+
+    ~tls_socket()
+    {
+      if (this->s_)
+        delete this->s_;
+    }
+
+    void recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
+    void recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+    void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
+    void send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+    void close();
+    bool is_encrypted() const { return true; }
+
+    operator const asio::ssl::stream<asio::ip::tcp::socket>& () const { return *this->s_; }
+    operator asio::ssl::stream<asio::ip::tcp::socket>& () { return *this->s_; }
+  private:
+    asio::ssl::stream<asio::ip::tcp::socket>* s_;
+  };
+  //================================================================//
+
 //  //================================================================//
 //  class Socket
 //  {

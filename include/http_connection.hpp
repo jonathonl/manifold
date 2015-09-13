@@ -1,5 +1,4 @@
 #pragma once
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 #ifndef MANIFOLD_HTTP_CONNECTION_HPP
 #define MANIFOLD_HTTP_CONNECTION_HPP
@@ -12,135 +11,83 @@
 #include <vector>
 #include <queue>
 
-#include "asio.hpp"
-#include "asio/ssl.hpp"
+#include "socket.hpp"
 #include "http_frame.hpp"
 #include "http_message_head.hpp"
 
 namespace manifold
 {
-  //================================================================//
-  // These wrappers are to add move semantics.
-  class socket
-  {
-  public:
-    socket(asio::io_service &ioservice)
-      : s_(new asio::ip::tcp::socket(ioservice)) { }
-
-    socket(socket&& source)
-      : s_(source.s_)
-    {
-      source.s_ = nullptr;
-    }
-
-    ~socket()
-    {
-      if (this->s_)
-        delete this->s_;
-    }
-    operator asio::ip::tcp::socket() const { return *this->s_; }
-    operator asio::ip::tcp::socket() { return *this->s_; }
-  private:
-    asio::ip::tcp::socket* s_;
-  };
-  //================================================================//
-
-  //================================================================//
-  class tls_socket
-  {
-  public:
-    tls_socket(asio::io_service &ioservice, asio::ssl::context& ctx)
-      : s_(new asio::ssl::stream<asio::ip::tcp::socket>(ioservice, ctx)) { }
-
-    tls_socket(tls_socket&& source)
-      : s_(source.s_)
-    {
-      source.s_ = nullptr;
-    }
-
-    ~socket()
-    {
-      if (this->s_)
-        delete this->s_;
-    }
-    operator asio::ssl::stream<asio::ip::tcp::socket>() const { return *this->s_; }
-    operator asio::ssl::stream<asio::ip::tcp::socket>() { return *this->s_; }
-  private:
-    asio::ssl::stream<asio::ip::tcp::socket>* s_;
-  };
-  //================================================================//
-
   namespace http
   {
-    //================================================================//
-    class connection_io_impl
-    {
-    public:
-      connection_io_impl() {}
-      virtual ~connection_io_impl() {}
-      virtual void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb) = 0;
-      virtual void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb) = 0;
-      virtual bool is_encrypted() const = 0;
-      virtual asio::ip::tcp::socket::lowest_layer_type& socket() = 0;
-    };
-    //================================================================//
+//    //================================================================//
+//    class connection_io_impl
+//    {
+//    public:
+//      connection_io_impl() {}
+//      virtual ~connection_io_impl() {}
+//      virtual void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb) = 0;
+//      virtual void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb) = 0;
+//      virtual bool is_encrypted() const = 0;
+//      virtual asio::ip::tcp::socket::lowest_layer_type& socket() = 0;
+//    };
+//    //================================================================//
 
-    //================================================================//
-    class tls_connection_io_impl : public connection_io_impl
-    {
-    private:
-      manifold::tls_socket socket_stream_;
-    protected:
-      void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb)
-      {
-        frame::recv_frame(this->socket_stream_, destination, cb);
-      }
-      void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb)
-      {
-        frame::send_frame(this->socket_stream_, source, cb);
-      }
-    public:
-      tls_connection_io_impl(manifold::tls_socket&& sock)
-          : socket_stream_(std::move(sock))
-      {}
-      ~tls_connection_io_impl() {}
-
-      asio::ip::tcp::socket::lowest_layer_type& socket() { return this->ssl_stream().lowest_layer(); }
-      asio::ssl::stream<asio::ip::tcp::socket>& ssl_stream() { return this->socket_stream_; }
-      bool is_encrypted() const { return true; }
-    };
-    //================================================================//
-
-    //================================================================//
-    class non_tls_connection_io_impl : public connection_io_impl
-    {
-    private:
-      manifold::socket socket_;
-    protected:
-      void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb)
-      {
-        frame::recv_frame(this->socket_, destination, cb);
-      }
-      void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb)
-      {
-        frame::send_frame(this->socket_, source, cb);
-      }
-    public:
-      non_tls_connection_io_impl(asio::io_service& ioservice)
-        : socket_(ioservice)
-      {}
-      ~non_tls_connection_io_impl() {}
-
-      asio::ip::tcp::socket::lowest_layer_type& socket() { return this->socket_; }
-      asio::ip::tcp::socket& raw_socket() { return this->socket_; }
-      bool is_encrypted() const { return false; }
-    };
-    //================================================================//
+//    //================================================================//
+//    class tls_connection_io_impl : public connection_io_impl
+//    {
+//    private:
+//      manifold::tls_socket socket_stream_;
+//    protected:
+//      void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb)
+//      {
+//        frame::recv_frame(this->socket_stream_, destination, cb);
+//      }
+//      void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb)
+//      {
+//        frame::send_frame(this->socket_stream_, source, cb);
+//      }
+//    public:
+//      tls_connection_io_impl(manifold::tls_socket&& sock)
+//          : socket_stream_(std::move(sock))
+//      {}
+//      ~tls_connection_io_impl() {}
+//
+//      asio::ip::tcp::socket::lowest_layer_type& socket() { return this->ssl_stream().lowest_layer(); }
+//      asio::ssl::stream<asio::ip::tcp::socket>& ssl_stream() { return this->socket_stream_; }
+//      bool is_encrypted() const { return true; }
+//    };
+//    //================================================================//
+//
+//    //================================================================//
+//    class non_tls_connection_io_impl : public connection_io_impl
+//    {
+//    private:
+//      manifold::socket socket_;
+//    protected:
+//      void recv_frame(frame& destination, const std::function<void(const std::error_code& ec)>& cb)
+//      {
+//        frame::recv_frame(this->socket_, destination, cb);
+//      }
+//      void send_frame(const frame& source, const std::function<void(const std::error_code& ec)>& cb)
+//      {
+//        frame::send_frame(this->socket_, source, cb);
+//      }
+//    public:
+//      non_tls_connection_io_impl(asio::io_service& ioservice)
+//        : socket_(ioservice)
+//      {}
+//      ~non_tls_connection_io_impl() {}
+//
+//      asio::ip::tcp::socket::lowest_layer_type& socket() { return this->socket_; }
+//      asio::ip::tcp::socket& raw_socket() { return this->socket_; }
+//      bool is_encrypted() const { return false; }
+//    };
+//    //================================================================//
 
     //================================================================//
     class connection : public std::enable_shared_from_this<connection>
     {
-    private:
+    protected:
       //================================================================//
       enum class setting_code
       {
@@ -164,11 +111,11 @@ namespace manifold
         half_closed_remote,
         closed
       };
+
       class stream
       {
       protected:
         const std::uint32_t id_;
-        connection& parent_connection_;
         stream_state state_ = stream_state::idle;
         std::function<void(const char* const buf, std::size_t buf_size)> on_data_;
         std::function<void(http::header_block&& headers)> on_headers_;
@@ -207,14 +154,15 @@ namespace manifold
         std::uint8_t weight = 16;
 
         bool end_stream_frame_received = false;
-        stream(connection& parent, std::uint32_t stream_id) : parent_connection_(parent), id_(stream_id) {}
+        stream(std::uint32_t stream_id) : id_(stream_id) {}
+        virtual ~stream() {}
 
         //----------------------------------------------------------------//
         void handle_incoming_frame(const data_frame& incoming_data_frame);
-        void handle_incoming_frame(const const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames);
+        void handle_incoming_frame(const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec);
         void handle_incoming_frame(const priority_frame& incoming_priority_frame);
         void handle_incoming_frame(const rst_stream_frame& incoming_rst_stream_frame);
-        void handle_incoming_frame(const push_promise_frame& incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames);
+        void handle_incoming_frame(const push_promise_frame& incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, stream& idle_promised_stream);
         void handle_incoming_frame(const window_update_frame& incoming_window_update_frame);
         //----------------------------------------------------------------//
 
@@ -251,9 +199,15 @@ namespace manifold
         //----------------------------------------------------------------//
       };
       //================================================================//
+
+
+      //----------------------------------------------------------------//
+      std::map<std::uint32_t,std::unique_ptr<stream>> streams_;
+      virtual stream* create_stream_object(std::uint32_t stream_id) = 0;
+      //----------------------------------------------------------------//
     private:
       //----------------------------------------------------------------//
-      connection_io_impl* io_impl_;
+      socket* socket_;
       std::map<setting_code,std::uint32_t> settings_;
       hpack::encoder hpack_encoder_;
       hpack::decoder hpack_decoder_;
@@ -272,7 +226,6 @@ namespace manifold
       //----------------------------------------------------------------//
       std::uint32_t last_newly_accepted_stream_id_;
       std::uint32_t last_newly_created_stream_id_;
-      std::map<std::uint32_t,stream> streams_;
       stream root_stream_; // used for connection level frames
       http::frame incoming_frame_;
       std::queue<http::frame> incoming_header_block_fragments_;
@@ -307,7 +260,8 @@ namespace manifold
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      connection(connection_io_impl* io_impl);
+      connection(non_tls_socket&& sock);
+      connection(tls_socket&& sock);
       virtual ~connection();
       //----------------------------------------------------------------//
 

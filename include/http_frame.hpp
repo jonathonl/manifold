@@ -7,7 +7,7 @@
 #include <list>
 #include <cstdint>
 
-#include "asio.hpp"
+#include "socket.hpp"
 #include "http_error_category.hpp"
 
 namespace manifold
@@ -59,10 +59,9 @@ namespace manifold
       std::uint8_t flags() const;
       std::uint32_t serialized_length() const;
 
-      template <typename S>
-      static void recv_frame_payload(S& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
-      template <typename S>
-      static void send_frame_payload(S& sock, const frame_payload_base& source, const std::function<void(const std::error_code& ec)>& cb);
+
+      static void recv_frame_payload(socket& sock, frame_payload_base& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
+      static void send_frame_payload(socket& sock, const frame_payload_base& source, const std::function<void(const std::error_code& ec)>& cb);
     };
     //================================================================//
 
@@ -283,10 +282,8 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      template <typename S>
-      static void recv_frame(S& sock, frame& destination, const std::function<void(const std::error_code& ec)>& cb);
-      template <typename S>
-      static void send_frame(S& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb);
+      static void recv_frame(manifold::socket& sock, frame& destination, const std::function<void(const std::error_code& ec)>& cb);
+      static void send_frame(manifold::socket& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb);
       //----------------------------------------------------------------//
     private:
       //----------------------------------------------------------------//

@@ -60,6 +60,71 @@ namespace manifold
     {
     public:
       static const std::uint32_t max_stream_id = 0x7FFFFFFF;
+      class response;
+      class request;
+      //================================================================//
+      class connection : public http::connection
+      {
+      public:
+        connection(non_tls_socket&& sock)
+          : http::connection(std::move(sock)) {}
+        connection(tls_socket&& sock)
+          : http::connection(std::move(sock)) {}
+        ~connection() {}
+
+        void on_informational_headers(std::uint32_t stream_id, const std::function<void(http::response_head&& headers)>& fn);
+        void on_response(std::uint32_t stream_id, const std::function<void(http::client::response&& resp)>& fn);
+        void on_trailers(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn);
+        void on_push_promise(std::uint32_t stream_id, const std::function<void(http::client::request&& resp)>& fn);
+      private:
+        class stream : public http::connection::stream
+        {
+        public:
+          stream(std::uint32_t stream_id) : http::connection::stream(stream_id)
+          {
+            http::connection::stream::on_headers(std::bind(&stream::on_headers_handler, this, std::placeholders::_1));
+            http::connection::stream::on_push_promise(std::bind(&stream::on_push_promise_handler, this, std::placeholders::_1, std::placeholders::_2));
+          }
+          ~stream() {}
+
+          void on_informational_headers(const std::function<void(http::response_head&& headers)>& fn) { this->on_informational_headers_ = fn; }
+          void on_response_headers(const std::function<void(http::response_head&& headers)>& fn) { this->on_response_headers_ = fn; }
+          void on_trailers(const std::function<void(http::header_block&& headers)>& fn) { this->on_trailers_ = fn; }
+          void on_push_promise_headers(const std::function<void(http::request_head&& headers, std::uint32_t)>& fn) { this->on_push_promise_repsonse_head_ = fn; }
+        private:
+          std::function<void(http::response_head&& headers)> on_informational_headers_;
+          std::function<void(http::response_head&& headers)> on_response_headers_;
+          std::function<void(http::header_block&& headers)> on_trailers_;
+          std::function<void(http::request_head&& req_head, std::uint32_t)> on_push_promise_repsonse_head_;
+
+          void on_headers_handler(http::header_block&& headers)
+          {
+            // TODO: need to make sure response is only received once and that all of thes happen in the correct order.
+            int status_code = atoi(headers.header(":status").c_str());
+            if (status_code == 0)
+            {
+              this->on_trailers_ ? this->on_trailers_(std::move(headers)) : void();
+            }
+            else if (status_code < 200)
+            {
+              this->on_informational_headers_ ? this->on_informational_headers_(std::move(headers)) : void();
+            }
+            else
+            {
+              this->on_response_headers_ ? this->on_response_headers_(std::move(headers)) : void();
+            }
+          }
+
+          void on_push_promise_handler(http::header_block&& headers, std::uint32_t promised_stream_id)
+          {
+            this->on_push_promise_ ? this->on_push_promise_(request_head(std::move(headers)), promised_stream_id) : void();
+          }
+        };
+        stream* create_stream_object(std::uint32_t stream_id) { return new stream(stream_id); }
+
+      };
+      //================================================================//
+
       //================================================================//
       class response : public incoming_message
       {
@@ -95,10 +160,6 @@ namespace manifold
         void on_informational_headers(const std::function<void(http::response_head&& resp_head)>& cb);
       private:
         request_head head_;
-        std::function<void(http::client::response&& resp)> on_response_;
-        std::function<void(http::response_head&& resp_head)> on_informational_headers_;
-
-        void handle_on_headers(http::header_block&& headers);
 
         request(const request&) = delete;
         request& operator=(const request&) = delete;

@@ -23,6 +23,33 @@ namespace manifold
     //================================================================//
     class server
     {
+    private:
+      //================================================================//
+      class connection : public http::connection
+      {
+      public:
+        connection(non_tls_socket&& sock)
+          : http::connection(std::move(sock)) {}
+        connection(tls_socket&& sock)
+          : http::connection(std::move(sock)) {}
+        ~connection() {}
+      private:
+        class stream : public http::connection::stream
+        {
+        public:
+          stream(std::uint32_t stream_id) : http::connection::stream(stream_id)
+          {
+
+          }
+          ~stream() {}
+
+        private:
+
+        };
+        stream* create_stream_object(std::uint32_t stream_id) { return new stream(stream_id); }
+
+      };
+      //================================================================//
     public:
       //================================================================//
       class request : public incoming_message
