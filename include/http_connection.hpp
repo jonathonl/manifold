@@ -15,10 +15,13 @@
 #include "http_frame.hpp"
 #include "http_message_head.hpp"
 
+#define MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL "\x2h2"
+
 namespace manifold
 {
   namespace http
   {
+
 //    //================================================================//
 //    class connection_io_impl
 //    {

@@ -12,6 +12,31 @@ namespace manifold
 {
   namespace http
   {
+    int alpn_select_proto_cb(SSL *ssl, const unsigned char **out,
+      unsigned char *out_len, const unsigned char *in,
+      unsigned int in_len, void *arg)
+    {
+      static const char*const h2_proto_string = "\x02h2";
+      std::size_t h2_proto_string_len = ::strlen(h2_proto_string);
+
+      int ret = SSL_select_next_proto((unsigned char **)out, out_len, (unsigned char*)h2_proto_string, h2_proto_string_len, in, in_len);
+      int e = SSL_get_error(ssl, ret);
+      return ret;
+//      const unsigned char* client_proto = in;
+//      const unsigned char* client_proto_end = in + in_len;
+//      for ( ; client_proto + h2_proto_string_len <= client_proto_end; client_proto += *client_proto + 1)
+//      {
+//        std::size_t client_proto_len = (*client_proto + 1);
+//        if (::memcmp(h2_proto_string, client_proto, h2_proto_string_len <  client_proto_len ? h2_proto_string_len : client_proto_len) == 0)
+//        {
+//          *out = client_proto + 1;
+//          *out_len = (unsigned char)(client_proto_len - 1);
+//          return SSL_TLSEXT_ERR_OK;
+//        }
+//      }
+      return SSL_TLSEXT_ERR_NOACK;
+    }
+
     //----------------------------------------------------------------//
     server::request::request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
       : incoming_message(conn, stream_id)
@@ -80,6 +105,30 @@ namespace manifold
       acceptor_(io_service_),
       ssl_context_(new asio::ssl::context(options.method))
     {
+//      this->ssl_context_->set_options(
+//        asio::ssl::context::default_workarounds
+//          | asio::ssl::context::no_sslv2
+//          | asio::ssl::context::single_dh_use);
+      if (true) //options.pfx.size())
+      {
+        this->ssl_context_->use_certificate_chain_file("/Users/jonathonl/Developer/certs/server.crt");
+        this->ssl_context_->use_private_key_file("/Users/jonathonl/Developer/certs/server.key", asio::ssl::context::pem);
+        //this->ssl_context_->use_tmp_dh_file("/Users/jonathonl/Developer/certs/dh512.pem");
+      }
+      else
+      {
+        std::error_code ec;
+        if (options.cert.size())
+          this->ssl_context_->use_certificate_chain(asio::const_buffer(options.cert.data(), options.cert.size()));
+        if (options.key.size())
+          this->ssl_context_->use_private_key(asio::const_buffer(options.key.data(), options.key.size()), asio::ssl::context::file_format::pem);
+        if (options.ca.size())
+          this->ssl_context_->use_tmp_dh_file("/Users/jonathonl/Developer/certs/dh512.pem");
+      }
+
+
+
+      //SSL_CTX_set_alpn_select_cb(this->ssl_context_->impl(), alpn_select_proto_cb, nullptr);
       this->port_ = port;
       this->host_ = host;
     }
@@ -178,6 +227,7 @@ namespace manifold
 
         if (ec)
         {
+
         }
         else
         {
@@ -196,8 +246,16 @@ namespace manifold
                 {
                   std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
                 }
+                else if(!bytes_read)
+                {
+                  sock->recv(preface_buf->data(), preface_buf->size(), [](const std::error_code& ec, std::size_t bytes_read)
+                  {
+                    std::cout << ec.message() << std::endl;
+                  });
+                }
                 else
                 {
+                  const char* t = preface_buf->data();
                   if (*preface_buf != connection::preface)
                   {
                     std::cout << "Invalid Connection Preface" << ":" __FILE__ << "/" << __LINE__ << std::endl;

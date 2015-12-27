@@ -175,7 +175,7 @@ namespace manifold
       {
       public:
         asio::ssl::context::method method;
-        ssl_options(asio::ssl::context::method meth = asio::ssl::context::method::sslv2) : method(meth)
+        ssl_options(asio::ssl::context::method meth = asio::ssl::context::method::tlsv12) : method(meth)
         {
         }
       };

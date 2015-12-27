@@ -239,8 +239,27 @@ int main()
 
   });
 
-  http::server srv(ioservice, 8080, "0.0.0.0");
+
+  auto ops = http::server::ssl_options(asio::ssl::context::method::tlsv12);
+  {
+    std::ifstream ifs("/Users/jonathonl/Developer/certs/server.key");
+    if (ifs.good())
+      ops.key.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+  }
+  {
+    std::ifstream ifs("/Users/jonathonl/Developer/certs/server.crt");
+    if (ifs.good())
+      ops.cert.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+  }
+  {
+    std::ifstream ifs("/Users/jonathonl/Developer/certs/ca.crt");
+    if (ifs.good())
+      ops.ca.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+  }
+
+  http::server srv(ioservice, ops, 8080, "0.0.0.0");
   srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+  ioservice.run();
 
   //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
   //ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
@@ -249,7 +268,7 @@ int main()
   //----------------------------------------------------------------//
   // Client to Local Server Test
   //
-  http::client c1(ioservice, "127.0.0.1", 8080);
+  http::client c1(ioservice, "127.0.0.1", http::client::ssl_options(), 8080);
   c1.on_connect([&c1]()
   {
     auto req_ptr = std::make_shared<http::client::request>(c1.make_request());

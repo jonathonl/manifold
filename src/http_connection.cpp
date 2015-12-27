@@ -710,6 +710,7 @@ namespace manifold
             if (ec)
             {
               // TODO: Handle error.
+              std::cout << "ERROR " << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
             }
             else
             {
