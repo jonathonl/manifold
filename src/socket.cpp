@@ -4,6 +4,7 @@
 //#include <fcntl.h>
 //#include <cstring>
 
+
 #include "socket.hpp"
 
 //################################################################//
@@ -12,7 +13,7 @@ namespace manifold
   //----------------------------------------------------------------//
   void non_tls_socket::recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
   {
-    asio::async_read(*this->s_, asio::buffer(data, data_sz), cb);
+    asio::async_read(*this->s_, asio::buffer(data, data_sz), std::move(cb));
   }
   //----------------------------------------------------------------//
 
@@ -26,7 +27,7 @@ namespace manifold
   //----------------------------------------------------------------//
   void non_tls_socket::send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
   {
-    asio::async_write(*this->s_, asio::buffer(data, data_sz), cb);
+    asio::async_write(*this->s_, asio::buffer(data, data_sz), std::move(cb));
   }
   //----------------------------------------------------------------//
 
@@ -47,7 +48,7 @@ namespace manifold
   //----------------------------------------------------------------//
   void tls_socket::recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
   {
-    asio::async_read(*this->s_, asio::buffer(data, data_sz), cb);
+    asio::async_read(*this->s_, asio::buffer(data, data_sz), std::move(cb));
   }
   //----------------------------------------------------------------//
 
@@ -61,7 +62,7 @@ namespace manifold
   //----------------------------------------------------------------//
   void tls_socket::send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
   {
-    asio::async_write(*this->s_, asio::buffer(data, data_sz), cb);
+    asio::async_write(*this->s_, asio::buffer(data, data_sz), std::move(cb));
   }
   //----------------------------------------------------------------//
 

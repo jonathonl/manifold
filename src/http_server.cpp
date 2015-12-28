@@ -19,9 +19,10 @@ namespace manifold
       static const char*const h2_proto_string = "\x02h2";
       std::size_t h2_proto_string_len = ::strlen(h2_proto_string);
 
-      int ret = SSL_select_next_proto((unsigned char **)out, out_len, (unsigned char*)h2_proto_string, h2_proto_string_len, in, in_len);
+      int ret = SSL_select_next_proto((unsigned char **)out, out_len, (unsigned char*)h2_proto_string, h2_proto_string_len, in, in_len) == OPENSSL_NPN_NEGOTIATED ? SSL_TLSEXT_ERR_OK : SSL_TLSEXT_ERR_ALERT_FATAL;
+      auto select_proto = *out;
       int e = SSL_get_error(ssl, ret);
-      return ret;
+      return  ret;
 //      const unsigned char* client_proto = in;
 //      const unsigned char* client_proto_end = in + in_len;
 //      for ( ; client_proto + h2_proto_string_len <= client_proto_end; client_proto += *client_proto + 1)
@@ -111,9 +112,20 @@ namespace manifold
 //          | asio::ssl::context::single_dh_use);
       if (true) //options.pfx.size())
       {
-        this->ssl_context_->use_certificate_chain_file("/Users/jonathonl/Developer/certs/server.crt");
-        this->ssl_context_->use_private_key_file("/Users/jonathonl/Developer/certs/server.key", asio::ssl::context::pem);
+        //this->ssl_context_->use_certificate_chain_file("/Users/jonathonl/Developer/certs2/server-cert.pem");
+        //this->ssl_context_->use_private_key_file("/Users/jonathonl/Developer/certs2/server-key.pem", asio::ssl::context::pem);
         //this->ssl_context_->use_tmp_dh_file("/Users/jonathonl/Developer/certs/dh512.pem");
+
+        char cwd[FILENAME_MAX];
+        getcwd(cwd, FILENAME_MAX);
+
+        //this->ssl_context_->use_certificate_chain_file("tests/certs/server.crt");
+        //this->ssl_context_->use_private_key_file("tests/certs/server.key", asio::ssl::context::pem);
+        //this->ssl_context_->use_tmp_dh_file("tests/certs/dh2048.pem");
+
+        this->ssl_context_->use_certificate_chain(asio::buffer(options.chain.data(), options.chain.size()));
+        this->ssl_context_->use_private_key(asio::buffer(options.key.data(), options.key.size()), asio::ssl::context::pem);
+        this->ssl_context_->use_tmp_dh(asio::buffer(options.dhparam.data(), options.dhparam.size()));
       }
       else
       {
@@ -127,8 +139,34 @@ namespace manifold
       }
 
 
+      auto ssl_opts = (SSL_OP_ALL & ~SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS) |
+        SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION |
+        SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION |
+        SSL_OP_SINGLE_ECDH_USE | SSL_OP_NO_TICKET |
+        SSL_OP_CIPHER_SERVER_PREFERENCE;
 
-      //SSL_CTX_set_alpn_select_cb(this->ssl_context_->impl(), alpn_select_proto_cb, nullptr);
+      SSL_CTX_set_options(ssl_context_->impl(), ssl_opts);
+      SSL_CTX_set_mode(ssl_context_->impl(), SSL_MODE_AUTO_RETRY);
+      SSL_CTX_set_mode(ssl_context_->impl(), SSL_MODE_RELEASE_BUFFERS);
+
+      static const char *const DEFAULT_CIPHER_LIST =
+        //"HIGH:!AES256-SHA:!AES128-GCM-SHA256:!AES128-SHA:!DES-CBC3-SHA";
+        //"DHE:EDH:kDHE:kEDH:DH:kEECDH:kECDHE:ECDHE:EECDH:ECDH";
+        "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-"
+        "AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:"
+        "DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-"
+        "AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-"
+        "AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-"
+        "AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:"
+        "DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:!aNULL:!eNULL:"
+        "!EXPORT:!DES:!RC4:!3DES:!MD5:!PSK";
+
+
+
+      SSL_CTX_set_cipher_list(ssl_context_->impl(), DEFAULT_CIPHER_LIST);
+
+
+      SSL_CTX_set_alpn_select_cb(this->ssl_context_->impl(), alpn_select_proto_cb, nullptr);
       this->port_ = port;
       this->host_ = host;
     }
@@ -216,7 +254,7 @@ namespace manifold
     void server::accept(asio::ssl::context& ctx)
     {
       auto sock = std::make_shared<tls_socket>(this->io_service_, ctx);
-      acceptor_.async_accept(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).next_layer(), [this, sock, &ctx](std::error_code ec)
+      acceptor_.async_accept(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).lowest_layer(), [this, sock, &ctx](std::error_code ec)
       {
 
         if (!acceptor_.is_open())
@@ -233,6 +271,7 @@ namespace manifold
         {
           ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).async_handshake(asio::ssl::stream_base::server, [this, sock] (const std::error_code& ec)
           {
+            std::cout << "cipher: " << SSL_CIPHER_get_name(SSL_get_current_cipher(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle())) << std::endl;
             if (ec)
             {
               std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
@@ -245,13 +284,15 @@ namespace manifold
                 if (ec)
                 {
                   std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
-                }
-                else if(!bytes_read)
-                {
-                  sock->recv(preface_buf->data(), preface_buf->size(), [](const std::error_code& ec, std::size_t bytes_read)
+                  std::string err = ec.message();
+                  if (ec.category() == asio::error::get_ssl_category())
                   {
-                    std::cout << ec.message() << std::endl;
-                  });
+                    err = std::string(" (");
+                    //ERR_PACK /* crypto/err/err.h */
+                    char buf[128];
+                    ::ERR_error_string_n(ec.value(), buf, sizeof(buf));
+                    err += buf;
+                  }
                 }
                 else
                 {

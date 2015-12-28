@@ -175,8 +175,8 @@ namespace manifold
         this->buf_[0] = paddingsz;
         memcpy(this->buf_.data() + this->bytes_needed_for_pad_length() + 5 + header_block_sz, padding, paddingsz);
       }
-      std::uint32_t tmp = (priority_ops.exclusive ? (0x80000000 ^ priority_ops.stream_dependency_id) : (0x7FFFFFFF & priority_ops.stream_dependency_id));
-      memcpy(this->buf_.data() + this->bytes_needed_for_pad_length(), &tmp, 4);
+      std::uint32_t tmp_nbo = htonl(priority_ops.exclusive ? (0x80000000 ^ priority_ops.stream_dependency_id) : (0x7FFFFFFF & priority_ops.stream_dependency_id));
+      memcpy(this->buf_.data() + this->bytes_needed_for_pad_length(), &tmp_nbo, 4);
       memcpy(this->buf_.data() + this->bytes_needed_for_pad_length() + 4, &priority_ops.weight, 1);
       memcpy(this->buf_.data() + this->bytes_needed_for_pad_length() + 5, header_block, header_block_sz);
     }
@@ -253,7 +253,7 @@ namespace manifold
       std::uint32_t ret = 0;
       if (this->flags_ & frame_flag::priority)
         memcpy(&ret, this->buf_.data() + this->bytes_needed_for_pad_length(), 4);
-      return (0x7FFFFFFF & ret);
+      return (0x7FFFFFFF & ntohl(ret));
     }
     //----------------------------------------------------------------//
 
@@ -276,7 +276,8 @@ namespace manifold
     {
       this->buf_.resize(5);
       std::uint32_t tmp = (options.exclusive ? (0x80000000 ^ options.stream_dependency_id) : (0x7FFFFFFF & options.stream_dependency_id));
-      memcpy(this->buf_.data(), &tmp, 4);
+      std::uint32_t tmp_nbo = htonl(tmp);
+      memcpy(this->buf_.data(), &tmp_nbo, 4);
       memcpy(this->buf_.data() + 4, &(options.weight), 1);
     }
     //----------------------------------------------------------------//
@@ -295,7 +296,7 @@ namespace manifold
     {
       std::uint32_t ret;
       memcpy(&ret, this->buf_.data(), 4);
-      return (0x7FFFFFFF & ret);
+      return (0x7FFFFFFF & ntohl(ret));
     }
     //----------------------------------------------------------------//
 
@@ -316,7 +317,8 @@ namespace manifold
     rst_stream_frame::rst_stream_frame(http::errc error_code) : frame_payload_base(0x0)
     {
       this->buf_.resize(4);
-      memcpy(this->buf_.data(), &error_code, 4);
+      std::uint32_t error_code_nbo = htonl((std::uint32_t)error_code);
+      memcpy(this->buf_.data(), &error_code_nbo, 4);
     }
     //----------------------------------------------------------------//
 
@@ -325,7 +327,7 @@ namespace manifold
     {
       std::uint32_t tmp;
       memcpy(&tmp, this->buf_.data(), 4);
-      return tmp;
+      return ntohl(tmp);
     }
     //----------------------------------------------------------------//
     //****************************************************************//
@@ -347,8 +349,10 @@ namespace manifold
       std::size_t pos = 0;
       for (auto it = this->settings_.begin(); it != this->settings_.end(); ++it)
       {
-        memcpy(&this->buf_[pos], &(it->first),  2);
-        memcpy(&this->buf_[pos + 2], &(it->second),  4);
+        std::uint16_t key_nbo(htons(it->first));
+        std::uint32_t value_nbo(htonl(it->second));
+        memcpy(&this->buf_[pos], &key_nbo,  2);
+        memcpy(&this->buf_[pos + 2], &value_nbo,  4);
         pos = pos + 6;
       }
     }
@@ -365,7 +369,7 @@ namespace manifold
         std::uint32_t value;
         memcpy(&key, &this->buf_[pos], 2);
         memcpy(&value, &this->buf_[pos + 2], 4);
-        this->settings_.push_back(std::pair<std::uint16_t,std::uint32_t>(key, value));
+        this->settings_.push_back(std::pair<std::uint16_t,std::uint32_t>(ntohs(key), ntohl(value)));
         pos = pos + 6;
         bytesToParse = bytesToParse - 6;
       }
@@ -410,16 +414,16 @@ namespace manifold
       {
         this->buf_.resize(5 + header_block_sz + paddingsz);
         this->buf_[0] = paddingsz;
-        std::uint32_t tmp = (0x7FFFFFFF & promise_stream_id);
-        memcpy(this->buf_.data() + 1, &tmp, 4);
+        std::uint32_t promise_stream_id_nbo = htonl(0x7FFFFFFF & promise_stream_id);
+        memcpy(this->buf_.data() + 1, &promise_stream_id_nbo, 4);
         memcpy(this->buf_.data() + 5, header_block, header_block_sz);
         memcpy(this->buf_.data() + 5 + header_block_sz, padding, paddingsz);
       }
       else
       {
         this->buf_.resize(4 + header_block_sz);
-        std::uint32_t tmp = (0x7FFFFFFF & promise_stream_id);
-        memcpy(this->buf_.data(), &tmp, 4);
+        std::uint32_t promise_stream_id_nbo = htonl(0x7FFFFFFF & promise_stream_id);
+        memcpy(this->buf_.data(), &promise_stream_id_nbo, 4);
         memcpy(this->buf_.data() + 4, header_block, header_block_sz);
       }
     }
@@ -470,7 +474,7 @@ namespace manifold
     {
       std::uint32_t ret;
       memcpy(&ret, this->buf_.data() + (this->flags_ & frame_flag::padded ? 1 : 0), 4);
-      return (0x7FFFFFFF & ret);
+      return (0x7FFFFFFF & ntohl(ret));
     }
     //----------------------------------------------------------------//
     //****************************************************************//
@@ -481,7 +485,8 @@ namespace manifold
     ping_frame::ping_frame(std::uint64_t ping_data, bool ack) : frame_payload_base((std::uint8_t)(ack ? 0x1 : 0))
     {
       this->buf_.resize(8);
-      memcpy(this->buf_.data(), &ping_data, 8);
+      std::uint64_t ping_data_nbo = htonll(ping_data);
+      memcpy(this->buf_.data(), &ping_data_nbo, 8);
     }
     //----------------------------------------------------------------//
 
@@ -490,7 +495,7 @@ namespace manifold
     {
       std::uint64_t ret;
       memcpy(&ret, this->buf_.data(), 8);
-      return ret;
+      return ntohll(ret);
     }
     //----------------------------------------------------------------//
     //****************************************************************//
@@ -501,9 +506,10 @@ namespace manifold
     goaway_frame::goaway_frame(std::uint32_t last_stream_id, http::errc error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz) : frame_payload_base(0)
     {
       this->buf_.resize(8 + addl_error_data_sz);
-      std::uint32_t tmp = 0x7FFFFFFF & last_stream_id;
-      memcpy(this->buf_.data(), &tmp, 4);
-      memcpy(this->buf_.data() + 4, &error_code, 4);
+      std::uint32_t tmp_nbo = htonl(0x7FFFFFFF & last_stream_id);
+      std::uint32_t error_code_nbo = htonl((std::uint32_t)error_code);
+      memcpy(this->buf_.data(), &tmp_nbo, 4);
+      memcpy(this->buf_.data() + 4, &error_code_nbo, 4);
       memcpy(this->buf_.data() + 8, addl_error_data, addl_error_data_sz);
     }
     //----------------------------------------------------------------//
@@ -513,7 +519,7 @@ namespace manifold
     {
       std::uint32_t ret;
       memcpy(&ret, this->buf_.data(), 4);
-      return (0x7FFFFFFF & ret);
+      return (0x7FFFFFFF & ntohl(ret));
     }
     //----------------------------------------------------------------//
 
@@ -522,7 +528,7 @@ namespace manifold
     {
       std::uint32_t tmp;
       memcpy(&tmp, this->buf_.data() + 4, 4);
-      return int_to_errc(tmp);
+      return int_to_errc(ntohl(tmp));
     }
     //----------------------------------------------------------------//
 
@@ -547,8 +553,8 @@ namespace manifold
     window_update_frame::window_update_frame(std::uint32_t window_size_increment) : frame_payload_base(0)
     {
       this->buf_.resize(4);
-      std::uint32_t tmp = 0x7FFFFFFF & window_size_increment;
-      memcpy(this->buf_.data(), &tmp, 4);
+      std::uint32_t tmp_nbo = htonl(0x7FFFFFFF & window_size_increment);
+      memcpy(this->buf_.data(), &tmp_nbo, 4);
     }
     //----------------------------------------------------------------//
 
@@ -557,7 +563,7 @@ namespace manifold
     {
       std::uint32_t ret;
       memcpy(&ret, this->buf_.data(), 4);
-      return (0x7FFFFFFF & ret);
+      return (0x7FFFFFFF & ntohl(ret));
     }
     //----------------------------------------------------------------//
     //****************************************************************//
@@ -730,11 +736,12 @@ namespace manifold
     //----------------------------------------------------------------//
     void frame::init_meta(frame_type t, std::uint32_t payload_length, std::uint32_t stream_id, std::uint8_t flags)
     {
-      std::uint32_t payload_length_24bit = (payload_length << 8);
-      memcpy(this->metadata_.data(), &payload_length_24bit, 3);
+      std::uint32_t payload_length_24bit_nbo = htonl(payload_length << 8);
+      std::uint32_t stream_id_nbo = htonl(stream_id);
+      memcpy(this->metadata_.data(), &payload_length_24bit_nbo, 3);
       memcpy(this->metadata_.data() + 3, &t, 1);
       memcpy(this->metadata_.data() + 4, &flags, 1);
-      memcpy(this->metadata_.data() + 5, &stream_id, 4); // assuming first bit is zero.
+      memcpy(this->metadata_.data() + 5, &stream_id_nbo, 4); // assuming first bit is zero.
     };
     //----------------------------------------------------------------//
 
@@ -743,7 +750,7 @@ namespace manifold
     {
       std::uint32_t ret = 0;
       memcpy(&ret, this->metadata_.data(), 3);
-      return ((ret >> 8) & 0x00FFFFFF);
+      return ((ntohl(ret) >> 8) & 0x00FFFFFF);
     }
     //----------------------------------------------------------------//
 
@@ -784,7 +791,7 @@ namespace manifold
     {
       std::uint32_t ret;
       memcpy(&ret, this->metadata_.data() + 5, 4);
-      return (0x7FFFFFFF & ret);
+      return (0x7FFFFFFF & ntohl(ret));
     }
     //----------------------------------------------------------------//
 

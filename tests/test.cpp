@@ -145,67 +145,67 @@ int main()
 
   asio::io_service ioservice;
 
-  //----------------------------------------------------------------//
-  std::uint32_t plus_sign_code = (0x7fb << (32 - 11));
-  auto res = hpack::huffman_code_tree.find(hpack::huffman_code(plus_sign_code, 32));
-  if (res != hpack::huffman_code_tree.end())
-    std::cout << res->second << std::endl;
-
-  std::string compressed_literal = {(char)0xf1,(char)0xe3,(char)0xc2,(char)0xe5,(char)0xf2,(char)0x3a,(char)0x6b,(char)0xa0,(char)0xab,(char)0x90,(char)0xf4,(char)0xff};
-  for (auto it = compressed_literal.begin(); it != compressed_literal.end(); ++it)
-    std::cout << std::hex << (unsigned int)(std::uint8_t)(*it) << std::dec << std::endl;
-  std::string uncompressed_literal;
-  hpack::decoder::huffman_decode(compressed_literal.begin(), compressed_literal.end(), uncompressed_literal);
-  std::cout << "uncompressed size: " << uncompressed_literal.size() << std::endl;
-  std::cout << "uncompressed value: " << uncompressed_literal << std::endl;
-
-//  for (auto it = hpack::huffman_code_tree.begin(); it != hpack::huffman_code_tree.end(); ++it)
-//    std::cout << "- " << std::hex << it->first.msb_code << std::dec << " | " << it->second << std::endl;
-
-  std::cout.flush();
-
-  //----------------------------------------------------------------//
-
-  //----------------------------------------------------------------//
-  // HPack Test
-  //
-  std::size_t http2_default_table_size = 4096;
-  hpack::encoder enc(http2_default_table_size);
-  hpack::decoder dec(http2_default_table_size);
-
-  std::list<hpack::header_field> send_headers{
-    {":path","/"},
-    {":method","GET"},
-    {"content-type","application/json; charset=utf8"},
-    {"content-length","30"},
-    {"custom-header","foobar; baz"},
-    {"custom-header2","NOT INDEXED", hpack::cacheability::no}};
-  std::list<hpack::header_field> send_headers2{
-    {":path","/"},
-    {":method","GET"},
-    {"custom-header","foobar; baz3"},
-    {"custom-header2","NOT INDEXED", hpack::cacheability::never}};
-
-  std::list<hpack::header_field> recv_headers;
-  std::list<hpack::header_field> recv_headers2;
-
-  std::string serialized_headers;
-  enc.encode(send_headers, serialized_headers);
-  dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers);
-
-  for (auto it : recv_headers)
-    std::cout << it.name << ": " << it.value << std::endl;
-  std::cout << std::endl;
-
-  // Encoders can use table size updates to clear dynamic table.
-  enc.add_table_size_update(0);
-  enc.add_table_size_update(4096);
-
-  serialized_headers = "";
-  enc.encode(send_headers2, serialized_headers);
-  dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers2);
-  for (auto it : recv_headers2)
-    std::cout << it.name << ": " << it.value << std::endl;
+//  //----------------------------------------------------------------//
+//  std::uint32_t plus_sign_code = (0x7fb << (32 - 11));
+//  auto res = hpack::huffman_code_tree.find(hpack::huffman_code(plus_sign_code, 32));
+//  if (res != hpack::huffman_code_tree.end())
+//    std::cout << res->second << std::endl;
+//
+//  std::string compressed_literal = {(char)0xf1,(char)0xe3,(char)0xc2,(char)0xe5,(char)0xf2,(char)0x3a,(char)0x6b,(char)0xa0,(char)0xab,(char)0x90,(char)0xf4,(char)0xff};
+//  for (auto it = compressed_literal.begin(); it != compressed_literal.end(); ++it)
+//    std::cout << std::hex << (unsigned int)(std::uint8_t)(*it) << std::dec << std::endl;
+//  std::string uncompressed_literal;
+//  hpack::decoder::huffman_decode(compressed_literal.begin(), compressed_literal.end(), uncompressed_literal);
+//  std::cout << "uncompressed size: " << uncompressed_literal.size() << std::endl;
+//  std::cout << "uncompressed value: " << uncompressed_literal << std::endl;
+//
+////  for (auto it = hpack::huffman_code_tree.begin(); it != hpack::huffman_code_tree.end(); ++it)
+////    std::cout << "- " << std::hex << it->first.msb_code << std::dec << " | " << it->second << std::endl;
+//
+//  std::cout.flush();
+//
+//  //----------------------------------------------------------------//
+//
+//  //----------------------------------------------------------------//
+//  // HPack Test
+//  //
+//  std::size_t http2_default_table_size = 4096;
+//  hpack::encoder enc(http2_default_table_size);
+//  hpack::decoder dec(http2_default_table_size);
+//
+//  std::list<hpack::header_field> send_headers{
+//    {":path","/"},
+//    {":method","GET"},
+//    {"content-type","application/json; charset=utf8"},
+//    {"content-length","30"},
+//    {"custom-header","foobar; baz"},
+//    {"custom-header2","NOT INDEXED", hpack::cacheability::no}};
+//  std::list<hpack::header_field> send_headers2{
+//    {":path","/"},
+//    {":method","GET"},
+//    {"custom-header","foobar; baz3"},
+//    {"custom-header2","NOT INDEXED", hpack::cacheability::never}};
+//
+//  std::list<hpack::header_field> recv_headers;
+//  std::list<hpack::header_field> recv_headers2;
+//
+//  std::string serialized_headers;
+//  enc.encode(send_headers, serialized_headers);
+//  dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers);
+//
+//  for (auto it : recv_headers)
+//    std::cout << it.name << ": " << it.value << std::endl;
+//  std::cout << std::endl;
+//
+//  // Encoders can use table size updates to clear dynamic table.
+//  enc.add_table_size_update(0);
+//  enc.add_table_size_update(4096);
+//
+//  serialized_headers = "";
+//  enc.encode(send_headers2, serialized_headers);
+//  dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers2);
+//  for (auto it : recv_headers2)
+//    std::cout << it.name << ": " << it.value << std::endl;
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
@@ -240,21 +240,37 @@ int main()
   });
 
 
-  auto ops = http::server::ssl_options(asio::ssl::context::method::tlsv12);
+  auto ops = http::server::ssl_options(asio::ssl::context::method::sslv23);
+//  {
+//    std::ifstream ifs("/Users/jonathonl/Developer/certs/server.key");
+//    if (ifs.good())
+//      ops.key.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+//  }
+//  {
+//    std::ifstream ifs("/Users/jonathonl/Developer/certs/server.crt");
+//    if (ifs.good())
+//      ops.cert.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+//  }
+//  {
+//    std::ifstream ifs("/Users/jonathonl/Developer/certs/ca.crt");
+//    if (ifs.good())
+//      ops.ca.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+//  }
+
   {
-    std::ifstream ifs("/Users/jonathonl/Developer/certs/server.key");
+    std::ifstream ifs("tests/certs/server.crt");
+    if (ifs.good())
+      ops.chain.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+  }
+  {
+    std::ifstream ifs("tests/certs/server.key");
     if (ifs.good())
       ops.key.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
   }
   {
-    std::ifstream ifs("/Users/jonathonl/Developer/certs/server.crt");
+    std::ifstream ifs("tests/certs/dh2048.pem");
     if (ifs.good())
-      ops.cert.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-  }
-  {
-    std::ifstream ifs("/Users/jonathonl/Developer/certs/ca.crt");
-    if (ifs.good())
-      ops.ca.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+      ops.dhparam.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
   }
 
   http::server srv(ioservice, ops, 8080, "0.0.0.0");

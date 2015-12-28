@@ -105,9 +105,11 @@ namespace manifold
         asio::ssl::context::method method;
         std::vector<char> pfx;
         std::vector<char> key;
+        std::vector<char> chain;
         std::vector<char> passphrase;
         std::vector<char> cert;
         std::vector<char> ca;
+        std::vector<char> dhparam;
         ssl_options(asio::ssl::context::method meth) : method(meth)
         {
         }

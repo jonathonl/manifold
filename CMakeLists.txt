@@ -3,7 +3,7 @@ project(manifold)
 
 include_directories("include" "/opt/local/include")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -DASIO_STANDALONE -std=c++11 -stdlib=libc++")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -stdlib=libc++")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -DASIO_STANDALONE -std=c++11 -fno-weak")
 
 #set(CMAKE_CXX_COMPILER "/opt/local/bin/g++-mp-4.9")
@@ -53,5 +53,5 @@ add_library(manifold-static STATIC ${SOURCE_FILES} ${HEADER_FILES})
 
 add_executable(manifold-test tests/test.cpp ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(manifold-test /opt/local/lib/libssl.dylib)
-target_link_libraries(manifold-test libcrypto.dylib)
+target_link_libraries(manifold-test /opt/local/lib/libcrypto.dylib)
 #target_link_libraries(manifold /opt/local/lib/libboost_system-mt.a)
