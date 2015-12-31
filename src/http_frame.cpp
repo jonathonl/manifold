@@ -684,6 +684,10 @@ namespace manifold
 
     frame::frame(frame&& source)
     {
+      this->metadata_.fill('\0');
+      frame_type t = frame_type::invalid_type;
+      memcpy(this->metadata_.data() + 3, &t, 1);
+
       operator=(std::move(source));
     }
 

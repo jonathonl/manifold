@@ -13,35 +13,34 @@ namespace manifold
     const std::uint32_t connection::default_max_frame_size         = 16384;
 
     //----------------------------------------------------------------//
-    connection::stream_dependency_tree::stream_dependency_tree(stream* stream_ptr)
-      : stream_ptr_(stream_ptr)
+    connection::stream_dependency_tree::stream_dependency_tree()
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    connection::stream_dependency_tree::stream_dependency_tree(stream* stream_ptr, const std::vector<stream_dependency_tree>& children)
-      : children_(children), stream_ptr_(stream_ptr)
+    connection::stream_dependency_tree::stream_dependency_tree(const std::vector<stream_dependency_tree_child_node>& children)
+      : children_(children)
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    connection::stream* connection::stream_dependency_tree::stream_ptr() const
+    connection::stream* connection::stream_dependency_tree_child_node::stream_ptr() const
     {
       return this->stream_ptr_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::vector<connection::stream_dependency_tree>& connection::stream_dependency_tree::children() const
+    const std::vector<connection::stream_dependency_tree_child_node>& connection::stream_dependency_tree::children() const
     {
       return this->children_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void connection::stream_dependency_tree::insert_child(connection::stream_dependency_tree&& child)
+    void connection::stream_dependency_tree::insert_child(connection::stream_dependency_tree_child_node&& child)
     {
       this->children_.push_back(std::move(child));
     }
@@ -86,11 +85,17 @@ namespace manifold
 
     //----------------------------------------------------------------//
     connection::connection(non_tls_socket&& sock)
-    : socket_(new non_tls_socket(std::move(sock))), hpack_encoder_(4096), hpack_decoder_(4096), last_newly_accepted_stream_id_(0), last_newly_created_stream_id_(0), root_stream_(0, 65535, 65535), stream_dependency_tree_(&this->root_stream_)
+      : socket_(new non_tls_socket(std::move(sock))),
+      hpack_encoder_(4096),
+      hpack_decoder_(4096),
+      last_newly_accepted_stream_id_(0),
+      last_newly_created_stream_id_(0),
+      outgoing_window_size_(default_initial_window_size),
+      incoming_window_size_(default_initial_window_size),
+      stream_dependency_tree_()
     {
       std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
       this->rg_.seed(seed);
-
 
       // header_table_size      = 0x1, // 4096
       // enable_push            = 0x2, // 1
@@ -122,12 +127,12 @@ namespace manifold
       hpack_decoder_(4096),
       last_newly_accepted_stream_id_(0),
       last_newly_created_stream_id_(0),
-      root_stream_(0, default_initial_window_size, default_initial_window_size),
-      stream_dependency_tree_(&this->root_stream_)
+      outgoing_window_size_(default_initial_window_size),
+      incoming_window_size_(default_initial_window_size),
+      stream_dependency_tree_()
     {
       std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
       this->rg_.seed(seed);
-
 
       // header_table_size      = 0x1, // 4096
       // enable_push            = 0x2, // 1
@@ -185,16 +190,34 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::check_tree_for_outgoing_frame(const stream_dependency_tree& current_node)
+    connection::stream* connection::stream_dependency_tree::get_next_send_stream_ptr(std::uint32_t connection_window_size, std::minstd_rand& rng)
     {
-      bool ret = false;
+      stream* ret = nullptr;
+      std::uint64_t weight_sum = 0;
+      std::vector<stream_dependency_tree_child_node*> pool;
 
-      if (current_node.stream_ptr()->has_sendable_frame(this->connection_level_outgoing_window_size() > 0))
-        ret = true;
-
-      for (auto it = current_node.children().begin(); !ret && it != current_node.children().end(); ++it)
+      for (auto it = this->children_.begin(); it != this->children_.end(); ++it)
       {
-        ret = check_tree_for_outgoing_frame(*it);
+        if (it->check_for_outgoing_frame(connection_window_size > 0))
+        {
+          pool.push_back(&(*it));
+          weight_sum += (it->stream_ptr()->weight + 1);
+        }
+      }
+
+      if (pool.size())
+      {
+        std::uint64_t sum_index = (rng() % weight_sum) + 1;
+        std::uint64_t current_sum = 0;
+        for (auto it = pool.begin(); ret == nullptr && it != pool.end(); ++it)
+        {
+          stream_dependency_tree_child_node* current_pool_node = (*it);
+          current_sum += (current_pool_node->stream_ptr()->weight + 1);
+          if (sum_index <= current_sum)
+          {
+            ret = current_pool_node->get_next_send_stream_ptr(connection_window_size, rng);
+          }
+        }
       }
 
       return ret;
@@ -202,43 +225,35 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    connection::stream* connection::get_next_send_stream_ptr(const stream_dependency_tree& current_node)
+    connection::stream* connection::stream_dependency_tree_child_node::get_next_send_stream_ptr(std::uint32_t connection_window_size, std::minstd_rand& rng)
     {
       // TODO: enforce a max tree depth of 10 to avoid stack overflow from recursion.
       stream* ret = nullptr;
 
-      if (current_node.stream_ptr()->has_sendable_frame(this->connection_level_outgoing_window_size() > 0))
+      if (this->stream_ptr()->has_sendable_frame(connection_window_size > 0))
       {
-        ret = current_node.stream_ptr();
+        ret = this->stream_ptr();
       }
       else
       {
-        std::uint64_t weight_sum = 0;
-        std::vector<const stream_dependency_tree*> pool;
+        ret = stream_dependency_tree::get_next_send_stream_ptr(connection_window_size, rng);
+      }
 
-        for (auto it = current_node.children().begin(); it != current_node.children().end(); ++it)
-        {
-          if (this->check_tree_for_outgoing_frame(*it))
-          {
-            pool.push_back(&(*it));
-            weight_sum += (it->stream_ptr()->weight + 1);
-          }
-        }
+      return ret;
+    }
+    //----------------------------------------------------------------//
 
-        if (pool.size())
-        {
-          std::uint64_t sum_index = (this->rg_() % weight_sum) + 1;
-          std::uint64_t current_sum = 0;
-          for (auto it = pool.begin(); it != pool.end(); ++it)
-          {
-            const stream_dependency_tree* current_pool_node = (*it);
-            current_sum += (current_pool_node->stream_ptr()->weight + 1);
-            if (sum_index <= current_sum)
-            {
-              ret = this->get_next_send_stream_ptr(*current_pool_node);
-            }
-          }
-        }
+    //----------------------------------------------------------------//
+    bool connection::stream_dependency_tree_child_node::check_for_outgoing_frame(bool can_send_data)
+    {
+      bool ret = false;
+
+      if (this->stream_ptr_->has_sendable_frame(can_send_data))
+        ret = true;
+
+      for (auto it = this->children_.begin(); !ret && it != this->children_.end(); ++it)
+      {
+        ret = it->check_for_outgoing_frame(can_send_data);
       }
 
       return ret;
@@ -626,7 +641,7 @@ namespace manifold
 
           }
         }
-        this->root_stream_.outgoing_non_data_frames.push(http::frame(http::settings_frame(ack_flag()), 0x0));
+        this->outgoing_frames_.push(http::frame(http::settings_frame(ack_flag()), 0x0));
       }
     }
     //----------------------------------------------------------------//
@@ -698,7 +713,7 @@ namespace manifold
     //----------------------------------------------------------------//
     void connection::handle_incoming_frame(const window_update_frame& incoming_window_update_frame)
     {
-      this->root_stream_.outgoing_window_size += incoming_window_update_frame.window_size_increment();
+      this->outgoing_window_size_ += incoming_window_update_frame.window_size_increment();
     }
     //----------------------------------------------------------------//
 
@@ -776,16 +791,30 @@ namespace manifold
 
         auto self = shared_from_this();
 
-        stream* prioritized_stream_ptr = this->get_next_send_stream_ptr(this->stream_dependency_tree_);
+        bool outgoing_frame_set = false;
 
-        if (prioritized_stream_ptr)
+        if (this->outgoing_frames_.size())
         {
+          this->outgoing_frame_ = std::move(this->outgoing_frames_.front());
+          this->outgoing_frames_.pop();
+          outgoing_frame_set = true;
+        }
+        else
+        {
+          stream* prioritized_stream_ptr = this->stream_dependency_tree_.get_next_send_stream_ptr(this->outgoing_window_size_, this->rg_);
 
-          this->outgoing_frame_ = std::move(prioritized_stream_ptr->pop_next_outgoing_frame(this->connection_level_outgoing_window_size()));
-          if (this->outgoing_frame_.is<data_frame>())
-            this->root_stream_.outgoing_window_size -= this->outgoing_frame_.data_frame().data_length();
+          if (prioritized_stream_ptr)
+          {
+            this->outgoing_frame_ = std::move(prioritized_stream_ptr->pop_next_outgoing_frame(this->outgoing_window_size_));
+            if (this->outgoing_frame_.is<data_frame>())
+              this->outgoing_window_size_ -= this->outgoing_frame_.data_frame().data_length();
+            outgoing_frame_set = true;
+          }
+        }
 
-          frame::send_frame(*this->socket_,this->outgoing_frame_, [self](const std::error_code& ec)
+        if (outgoing_frame_set)
+        {
+          frame::send_frame(*this->socket_, this->outgoing_frame_, [self](const std::error_code& ec)
           {
             self->send_loop_running_ = false;
             if (ec)
@@ -931,7 +960,7 @@ namespace manifold
       std::pair<std::map<std::uint32_t,std::unique_ptr<stream>>::iterator,bool> insert_res = this->streams_.emplace(stream_id, std::unique_ptr<stream>(this->create_stream_object(stream_id)));
       if (insert_res.second)
       {
-        this->stream_dependency_tree_.insert_child(stream_dependency_tree((insert_res.first->second.get())));
+        this->stream_dependency_tree_.insert_child(stream_dependency_tree_child_node((insert_res.first->second.get())));
 
         ret = true;
       }
@@ -1069,7 +1098,7 @@ namespace manifold
     //----------------------------------------------------------------//
     void connection::send_settings(const std::list<std::pair<std::uint16_t,std::uint32_t>>& settings)
     {
-      this->root_stream_.outgoing_non_data_frames.push(http::frame(http::settings_frame(settings.begin(), settings.end()), 0x0));
+      this->outgoing_frames_.push(http::frame(http::settings_frame(settings.begin(), settings.end()), 0x0));
       this->run_send_loop();
     }
     //----------------------------------------------------------------//
@@ -1169,21 +1198,21 @@ namespace manifold
     //----------------------------------------------------------------//
     void connection::send_ping(std::uint64_t opaque_data)
     {
-      this->root_stream_.outgoing_non_data_frames.push(http::frame(http::ping_frame(opaque_data), 0x0));
+      this->outgoing_frames_.push(http::frame(http::ping_frame(opaque_data), 0x0));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void connection::send_ping_acknowledgement(std::uint64_t opaque_data)
     {
-      this->root_stream_.outgoing_non_data_frames.push(http::frame(http::ping_frame(opaque_data, true), 0x0));
+      this->outgoing_frames_.push(http::frame(http::ping_frame(opaque_data, true), 0x0));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void connection::send_goaway(http::errc error_code, const char *const data, std::uint32_t data_sz)
     {
-      this->root_stream_.outgoing_non_data_frames.push(http::frame(http::goaway_frame(this->streams_.size() ? this->streams_.rbegin()->first : 0, error_code, data, data_sz), 0x0));
+      this->outgoing_frames_.push(http::frame(http::goaway_frame(this->streams_.size() ? this->streams_.rbegin()->first : 0, error_code, data, data_sz), 0x0));
     }
     //----------------------------------------------------------------//
 
@@ -1207,7 +1236,7 @@ namespace manifold
     //----------------------------------------------------------------//
     void connection::send_connection_level_window_update(std::uint32_t amount)
     {
-      this->root_stream_.outgoing_non_data_frames.push(http::frame(http::window_update_frame(amount), 0x0));
+      this->outgoing_frames_.push(http::frame(http::window_update_frame(amount), 0x0));
       this->run_send_loop();
     }
     //----------------------------------------------------------------//

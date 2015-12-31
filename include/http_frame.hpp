@@ -83,7 +83,7 @@ namespace manifold
       bool has_padded_flag() const  { return this->flags_ & frame_flag::padded; }
     private:
       data_frame() : frame_payload_base(0) {}
-      friend class frame; // TODO: make the rest for the frame default constructors private
+      friend class frame;
     };
     //================================================================//
 
@@ -110,7 +110,6 @@ namespace manifold
       std::uint8_t bytes_needed_for_dependency_id_and_exclusive_flag() const;
       std::uint8_t bytes_needed_for_weight() const;
     public:
-      headers_frame() : frame_payload_base(0) {}
       headers_frame(const char*const header_block, std::uint32_t header_block_sz, bool end_headers, bool end_stream, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
       headers_frame(const char*const header_block, std::uint32_t header_block_sz, bool end_headers, bool end_stream, priority_options priority_ops, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
       ~headers_frame() {}
@@ -127,6 +126,9 @@ namespace manifold
       bool has_end_headers_flag() const { return this->flags_ & frame_flag::end_headers; }
       bool has_padded_flag() const  { return this->flags_ & frame_flag::padded; }
       bool has_priority_flag() const { return this->flags_ & frame_flag::priority; }
+    private:
+      headers_frame() : frame_payload_base(0) {}
+      friend class frame;
     };
     //================================================================//
 
@@ -134,13 +136,15 @@ namespace manifold
     class priority_frame : public frame_payload_base
     {
     public:
-      priority_frame() : frame_payload_base(0) {}
       priority_frame(priority_options options);
       ~priority_frame() {}
 
       std::uint8_t weight() const;
       std::uint32_t stream_dependency_id() const;
       bool exclusive_stream_dependency() const;
+    private:
+      priority_frame() : frame_payload_base(0) {}
+      friend class frame;
     };
     //================================================================//
 
@@ -148,11 +152,13 @@ namespace manifold
     class rst_stream_frame : public frame_payload_base
     {
     public:
-      rst_stream_frame() : frame_payload_base(0) {}
       rst_stream_frame(http::errc error_code);
       ~rst_stream_frame() {}
 
       std::uint32_t error_code() const;
+    private:
+      rst_stream_frame() : frame_payload_base(0) {}
+      friend class frame;
     };
     //================================================================//
 
@@ -161,10 +167,7 @@ namespace manifold
     //================================================================//
     class settings_frame : public frame_payload_base
     {
-    private:
-      void serialize_settings();
     public:
-      settings_frame() : frame_payload_base(0) {}
       settings_frame(ack_flag) : frame_payload_base(0x1) {}
       settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end);
       ~settings_frame() {}
@@ -172,6 +175,9 @@ namespace manifold
 
       bool has_ack_flag() const { return (bool)(this->flags_ & 0x1); }
       std::list<std::pair<std::uint16_t,std::uint32_t>> settings() const;
+    private:
+      settings_frame() : frame_payload_base(0) {}
+      friend class frame;
     };
     //================================================================//
 
@@ -179,7 +185,6 @@ namespace manifold
     class push_promise_frame : public frame_payload_base // TODO: Impl optional padding. Also flags need to looked at!!
     {
     public:
-      push_promise_frame() : frame_payload_base(0) {}
       push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id, bool end_headers, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
       ~push_promise_frame() {}
 
@@ -189,6 +194,9 @@ namespace manifold
       std::uint8_t pad_length() const;
       std::uint32_t promised_stream_id() const;
       bool has_end_headers_flag() const { return this->flags_ & frame_flag::end_headers; }
+    private:
+      push_promise_frame() : frame_payload_base(0) {}
+      friend class frame;
     };
     //================================================================//
 
@@ -196,12 +204,14 @@ namespace manifold
     class ping_frame : public frame_payload_base
     {
     public:
-      ping_frame() : frame_payload_base(0) {}
       ping_frame(std::uint64_t ping_data, bool ack = false);
       ~ping_frame() {}
 
       bool is_ack() const { return (bool)(this->flags_ & 0x1); }
       std::uint64_t data() const;
+    private:
+      ping_frame() : frame_payload_base(0) {}
+      friend class frame;
     };
     //================================================================//
 
@@ -209,7 +219,6 @@ namespace manifold
     class goaway_frame : public frame_payload_base
     {
     public:
-      goaway_frame() : frame_payload_base(0) {}
       goaway_frame(std::uint32_t last_stream_id, http::errc error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz);
       ~goaway_frame() {}
 
@@ -217,6 +226,9 @@ namespace manifold
       http::errc error_code() const;
       const char*const additional_debug_data() const;
       std::uint32_t additional_debug_data_length() const;
+    private:
+      goaway_frame() : frame_payload_base(0) {}
+      friend class frame;
     };
     //================================================================//
 
@@ -224,11 +236,13 @@ namespace manifold
     class window_update_frame : public frame_payload_base
     {
     public:
-      window_update_frame() : frame_payload_base(0) {}
       window_update_frame(std::uint32_t window_size_increment);
       ~window_update_frame() {}
 
       std::uint32_t window_size_increment() const;
+    private:
+      window_update_frame() : frame_payload_base(0) {}
+      friend class frame;
     };
     //================================================================//
 
@@ -236,7 +250,6 @@ namespace manifold
     class continuation_frame : public frame_payload_base
     {
     public:
-      continuation_frame() : frame_payload_base(0) {}
       continuation_frame(const char*const header_data, std::uint32_t header_data_sz, bool end_headers);
       ~continuation_frame() {}
 
@@ -244,6 +257,9 @@ namespace manifold
       std::uint32_t header_block_fragment_length() const;
 
       bool has_end_headers_flag() const { return this->flags_ & frame_flag::end_headers; }
+    private:
+      continuation_frame() : frame_payload_base(0) {}
+      friend class frame;
     };
     //================================================================//
 

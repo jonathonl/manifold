@@ -187,27 +187,56 @@ namespace manifold
       //================================================================//
 
       //================================================================//
+      class stream_dependency_tree_child_node;
       class stream_dependency_tree
+      {
+      protected:
+        //----------------------------------------------------------------//
+        std::vector<stream_dependency_tree_child_node> children_;
+        //----------------------------------------------------------------//
+      public:
+        //----------------------------------------------------------------//
+        stream_dependency_tree();
+        stream_dependency_tree(const std::vector<stream_dependency_tree_child_node>& children);
+        virtual ~stream_dependency_tree() {}
+        //----------------------------------------------------------------//
+
+
+        //----------------------------------------------------------------//
+        const std::vector<stream_dependency_tree_child_node>& children() const;
+        void insert_child(stream_dependency_tree_child_node&& child);
+        void remove(stream& stream_to_remove);
+        void clear_children();
+
+        stream* get_next_send_stream_ptr(std::uint32_t connection_window_size, std::minstd_rand& rng);
+        //----------------------------------------------------------------//
+
+        //----------------------------------------------------------------//
+        //----------------------------------------------------------------//
+      };
+      //================================================================//
+
+      //================================================================//
+      class stream_dependency_tree_child_node : public stream_dependency_tree
       {
       private:
         //----------------------------------------------------------------//
-        std::vector<stream_dependency_tree> children_;
         stream* stream_ptr_;
         //----------------------------------------------------------------//
       public:
         //----------------------------------------------------------------//
-        stream_dependency_tree(stream* stream_ptr);
-        stream_dependency_tree(stream* stream_ptr, const std::vector<stream_dependency_tree>& children);
-        ~stream_dependency_tree() {}
+        stream_dependency_tree_child_node(stream* stream_ptr)
+          : stream_ptr_(stream_ptr) {}
+        stream_dependency_tree_child_node(stream* stream_ptr, const std::vector<stream_dependency_tree_child_node>& children)
+          : stream_dependency_tree(children), stream_ptr_(stream_ptr) {}
+        ~stream_dependency_tree_child_node() {}
         //----------------------------------------------------------------//
 
 
         //----------------------------------------------------------------//
         stream* stream_ptr() const;
-        const std::vector<stream_dependency_tree>& children() const;
-        void insert_child(stream_dependency_tree&& child);
-        void remove(stream& stream_to_remove);
-        void clear_children();
+        bool check_for_outgoing_frame(bool can_send_data);
+        stream* get_next_send_stream_ptr(std::uint32_t connection_window_size, std::minstd_rand& rng);
         //----------------------------------------------------------------//
       };
       //================================================================//
@@ -225,10 +254,10 @@ namespace manifold
       std::map<setting_code,std::uint32_t> peer_settings_;
       hpack::encoder hpack_encoder_;
       hpack::decoder hpack_decoder_;
+      std::minstd_rand rg_;
       bool started_;
       bool closed_;
       bool send_loop_running_;
-      std::minstd_rand rg_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -240,19 +269,21 @@ namespace manifold
       //----------------------------------------------------------------//
       std::uint32_t last_newly_accepted_stream_id_;
       std::uint32_t last_newly_created_stream_id_;
-      stream root_stream_; // used for connection level frames
+      std::uint32_t outgoing_window_size_;
+      std::uint32_t incoming_window_size_;
+
       http::frame incoming_frame_;
       std::queue<http::frame> incoming_header_block_fragments_;
       http::frame outgoing_frame_;
+      std::queue<frame> outgoing_frames_;
       stream_dependency_tree stream_dependency_tree_;
-      std::uint32_t connection_level_outgoing_window_size() const { return this->root_stream_.outgoing_window_size; }
-      std::uint32_t connection_level_incoming_window_size() const { return this->root_stream_.incoming_window_size; }
+      std::uint32_t connection_level_outgoing_window_size() const { return this->outgoing_window_size_; }
+      std::uint32_t connection_level_incoming_window_size() const { return this->incoming_window_size_; }
       void garbage_collect_streams();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      stream* get_next_send_stream_ptr(const stream_dependency_tree& current_node);
-      bool check_tree_for_outgoing_frame(const stream_dependency_tree& current_node);
+
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
