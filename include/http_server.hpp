@@ -37,7 +37,7 @@ namespace manifold
         class stream : public http::connection::stream
         {
         public:
-          stream(std::uint32_t stream_id) : http::connection::stream(stream_id)
+          stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size) : http::connection::stream(stream_id, initial_window_size, initial_peer_window_size)
           {
 
           }
@@ -46,7 +46,10 @@ namespace manifold
         private:
 
         };
-        stream* create_stream_object(std::uint32_t stream_id) { return new stream(stream_id); }
+        stream* create_stream_object(std::uint32_t stream_id)
+        {
+          return new stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size));
+        }
 
       };
       //================================================================//

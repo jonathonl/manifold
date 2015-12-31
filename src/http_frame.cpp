@@ -104,6 +104,20 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    data_frame data_frame::split(std::uint32_t num_bytes)
+    {
+      std::uint32_t this_data_length = this->data_length();
+      if (num_bytes > this_data_length)
+        num_bytes = this_data_length;
+
+
+      data_frame ret(this->data(), num_bytes);
+      operator=(data_frame(this->data() + num_bytes, this->data_length() - num_bytes, this->flags_ & frame_flag::end_stream, this->padding(), this->pad_length()));
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     const char*const data_frame::data() const
     {
       if (this->flags_ & frame_flag::padded)
@@ -336,18 +350,11 @@ namespace manifold
     // settings_frame
     //----------------------------------------------------------------//
     settings_frame::settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end)
-      : frame_payload_base(0x0), settings_(beg, end)
+      : frame_payload_base(0x0)
     {
-      this->serialize_settings();
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void settings_frame::serialize_settings()
-    {
-      this->buf_.resize(6*this->settings_.size());
+      this->buf_.resize(6 * std::distance(beg, end));
       std::size_t pos = 0;
-      for (auto it = this->settings_.begin(); it != this->settings_.end(); ++it)
+      for (auto it = beg; it != end; ++it)
       {
         std::uint16_t key_nbo(htons(it->first));
         std::uint32_t value_nbo(htonl(it->second));
@@ -359,8 +366,10 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void settings_frame::deserialize_settings()
+    std::list<std::pair<std::uint16_t,std::uint32_t>> settings_frame::settings() const
     {
+      std::list<std::pair<std::uint16_t,std::uint32_t>> ret;
+
       std::size_t bytesToParse = this->buf_.size();
       std::size_t pos = 0;
       while (bytesToParse > 6)
@@ -369,37 +378,12 @@ namespace manifold
         std::uint32_t value;
         memcpy(&key, &this->buf_[pos], 2);
         memcpy(&value, &this->buf_[pos + 2], 4);
-        this->settings_.push_back(std::pair<std::uint16_t,std::uint32_t>(ntohs(key), ntohl(value)));
+        ret.push_back(std::pair<std::uint16_t,std::uint32_t>(ntohs(key), ntohl(value)));
         pos = pos + 6;
         bytesToParse = bytesToParse - 6;
       }
-    }
-    //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator settings_frame::begin()
-    {
-      if (this->settings_.empty())
-        this->deserialize_settings();
-      return this->settings_.begin();
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator settings_frame::end()
-    {
-      if (this->settings_.empty())
-        this->deserialize_settings();
-      return this->settings_.end();
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    std::size_t settings_frame::count()
-    {
-      if (this->settings_.empty())
-        this->deserialize_settings();
-      return this->settings_.size();
+      return ret;
     }
     //----------------------------------------------------------------//
     //****************************************************************//
@@ -596,6 +580,19 @@ namespace manifold
     //****************************************************************//
     // frame
     //----------------------------------------------------------------//
+    const http::data_frame          frame::default_data_frame_         ;
+    const http::headers_frame       frame::default_headers_frame_      ;
+    const http::priority_frame      frame::default_priority_frame_     ;
+    const http::rst_stream_frame    frame::default_rst_stream_frame_   ;
+    const http::settings_frame      frame::default_settings_frame_     ;
+    const http::push_promise_frame  frame::default_push_promise_frame_ ;
+    const http::ping_frame          frame::default_ping_frame_         ;
+    const http::goaway_frame        frame::default_goaway_frame_       ;
+    const http::window_update_frame frame::default_window_update_frame_;
+    const http::continuation_frame  frame::default_continuation_frame_ ;
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     frame::frame()
       //: metadata_{{'\0','\0','\0','\0','\0','\0','\0','\0','\0'}}
     {
@@ -609,8 +606,7 @@ namespace manifold
     frame::frame(http::data_frame&& payload, std::uint32_t stream_id)
     {
       this->init_meta(frame_type::data, payload.serialized_length(), stream_id, payload.flags());
-      new (&this->payload_.data_frame_) http::data_frame();
-      this->payload_.data_frame_ = std::move(payload);
+      new (&this->payload_.data_frame_) http::data_frame(std::move(payload));
     }
     //----------------------------------------------------------------//
 
@@ -618,8 +614,7 @@ namespace manifold
     frame::frame(http::headers_frame&& payload, std::uint32_t stream_id)
     {
       this->init_meta(frame_type::headers, payload.serialized_length(), stream_id, payload.flags());
-      new (&this->payload_.headers_frame_) http::headers_frame();
-      this->payload_.headers_frame_ = std::move(payload);
+      new (&this->payload_.headers_frame_) http::headers_frame(std::move(payload));
     }
     //----------------------------------------------------------------//
 
@@ -627,8 +622,7 @@ namespace manifold
     frame::frame(http::priority_frame&& payload, std::uint32_t stream_id)
     {
       this->init_meta(frame_type::priority, payload.serialized_length(), stream_id, payload.flags());
-      new (&this->payload_.priority_frame_) http::priority_frame();
-      this->payload_.priority_frame_ = std::move(payload);
+      new (&this->payload_.priority_frame_) http::priority_frame(std::move(payload));
     }
     //----------------------------------------------------------------//
 
@@ -636,8 +630,7 @@ namespace manifold
     frame::frame(http::rst_stream_frame&& payload, std::uint32_t stream_id)
     {
       this->init_meta(frame_type::rst_stream, payload.serialized_length(), stream_id, payload.flags());
-      new (&this->payload_.rst_stream_frame_) http::rst_stream_frame();
-      this->payload_.rst_stream_frame_ = std::move(payload);
+      new (&this->payload_.rst_stream_frame_) http::rst_stream_frame(std::move(payload));
     }
     //----------------------------------------------------------------//
 
@@ -645,8 +638,7 @@ namespace manifold
     frame::frame(http::settings_frame&& payload, std::uint32_t stream_id)
     {
       this->init_meta(frame_type::settings, payload.serialized_length(), stream_id, payload.flags());
-      new (&this->payload_.settings_frame_) http::settings_frame();
-      this->payload_.settings_frame_ = std::move(payload);
+      new (&this->payload_.settings_frame_) http::settings_frame(std::move(payload));
     }
     //----------------------------------------------------------------//
 
@@ -654,8 +646,7 @@ namespace manifold
     frame::frame(http::push_promise_frame&& payload, std::uint32_t stream_id)
     {
       this->init_meta(frame_type::push_promise, payload.serialized_length(), stream_id, payload.flags());
-      new (&this->payload_.push_promise_frame_) http::push_promise_frame();
-      this->payload_.push_promise_frame_ = std::move(payload);
+      new (&this->payload_.push_promise_frame_) http::push_promise_frame(std::move(payload));
     }
     //----------------------------------------------------------------//
 
@@ -663,8 +654,7 @@ namespace manifold
     frame::frame(http::ping_frame&& payload, std::uint32_t stream_id)
     {
       this->init_meta(frame_type::ping, payload.serialized_length(), stream_id, payload.flags());
-      new (&this->payload_.ping_frame_) http::ping_frame();
-      this->payload_.ping_frame_ = std::move(payload);
+      new (&this->payload_.ping_frame_) http::ping_frame(std::move(payload));
     }
     //----------------------------------------------------------------//
 
@@ -672,8 +662,7 @@ namespace manifold
     frame::frame(http::goaway_frame&& payload, std::uint32_t stream_id)
     {
       this->init_meta(frame_type::goaway, payload.serialized_length(), stream_id, payload.flags());
-      new (&this->payload_.goaway_frame_) http::goaway_frame();
-      this->payload_.goaway_frame_ = std::move(payload);
+      new (&this->payload_.goaway_frame_) http::goaway_frame(std::move(payload));
     }
     //----------------------------------------------------------------//
 
@@ -681,8 +670,7 @@ namespace manifold
     frame::frame(http::window_update_frame&& payload, std::uint32_t stream_id)
     {
       this->init_meta(frame_type::window_update, payload.serialized_length(), stream_id, payload.flags());
-      new (&this->payload_.window_update_frame_) http::window_update_frame();
-      this->payload_.window_update_frame_ = std::move(payload);
+      new (&this->payload_.window_update_frame_) http::window_update_frame(std::move(payload));
     }
     //----------------------------------------------------------------//
 
@@ -690,8 +678,7 @@ namespace manifold
     frame::frame(http::continuation_frame&& payload, std::uint32_t stream_id)
     {
       this->init_meta(frame_type::continuation, payload.serialized_length(), stream_id, payload.flags());
-      new (&this->payload_.continuation_frame_) http::continuation_frame();
-      this->payload_.continuation_frame_ = std::move(payload);
+      new (&this->payload_.continuation_frame_) http::continuation_frame(std::move(payload));
     }
     //----------------------------------------------------------------//
 
@@ -710,16 +697,16 @@ namespace manifold
 
         switch (t)
         {
-          case frame_type::data           : new(&this->payload_.data_frame_         ) http::data_frame()          ; this->payload_.data_frame_          = std::move(source.payload_.data_frame_)          ; break;
-          case frame_type::headers        : new(&this->payload_.headers_frame_      ) http::headers_frame()       ; this->payload_.headers_frame_       = std::move(source.payload_.headers_frame_)       ; break;
-          case frame_type::priority       : new(&this->payload_.priority_frame_     ) http::priority_frame()      ; this->payload_.priority_frame_      = std::move(source.payload_.priority_frame_)      ; break;
-          case frame_type::rst_stream     : new(&this->payload_.rst_stream_frame_   ) http::rst_stream_frame()    ; this->payload_.rst_stream_frame_    = std::move(source.payload_.rst_stream_frame_)    ; break;
-          case frame_type::settings       : new(&this->payload_.settings_frame_     ) http::settings_frame()      ; this->payload_.settings_frame_      = std::move(source.payload_.settings_frame_)      ; break;
-          case frame_type::push_promise   : new(&this->payload_.push_promise_frame_ ) http::push_promise_frame()  ; this->payload_.push_promise_frame_  = std::move(source.payload_.push_promise_frame_)  ; break;
-          case frame_type::ping           : new(&this->payload_.ping_frame_         ) http::ping_frame()          ; this->payload_.ping_frame_          = std::move(source.payload_.ping_frame_)          ; break;
-          case frame_type::goaway         : new(&this->payload_.goaway_frame_       ) http::goaway_frame()        ; this->payload_.goaway_frame_        = std::move(source.payload_.goaway_frame_)        ; break;
-          case frame_type::window_update  : new(&this->payload_.window_update_frame_) http::window_update_frame() ; this->payload_.window_update_frame_ = std::move(source.payload_.window_update_frame_) ; break;
-          case frame_type::continuation   : new(&this->payload_.continuation_frame_ ) http::continuation_frame()  ; this->payload_.continuation_frame_  = std::move(source.payload_.continuation_frame_)  ; break;
+          case frame_type::data           : new(&this->payload_.data_frame_         ) http::data_frame(std::move(source.payload_.data_frame_))                  ; break;
+          case frame_type::headers        : new(&this->payload_.headers_frame_      ) http::headers_frame(std::move(source.payload_.headers_frame_))            ; break;
+          case frame_type::priority       : new(&this->payload_.priority_frame_     ) http::priority_frame(std::move(source.payload_.priority_frame_))          ; break;
+          case frame_type::rst_stream     : new(&this->payload_.rst_stream_frame_   ) http::rst_stream_frame(std::move(source.payload_.rst_stream_frame_) )     ; break;
+          case frame_type::settings       : new(&this->payload_.settings_frame_     ) http::settings_frame(std::move(source.payload_.settings_frame_) )         ; break;
+          case frame_type::push_promise   : new(&this->payload_.push_promise_frame_ ) http::push_promise_frame(std::move(source.payload_.push_promise_frame_))  ; break;
+          case frame_type::ping           : new(&this->payload_.ping_frame_         ) http::ping_frame(std::move(source.payload_.ping_frame_) )                 ; break;
+          case frame_type::goaway         : new(&this->payload_.goaway_frame_       ) http::goaway_frame(std::move(source.payload_.goaway_frame_) )             ; break;
+          case frame_type::window_update  : new(&this->payload_.window_update_frame_) http::window_update_frame(std::move(source.payload_.window_update_frame_)); break;
+          case frame_type::continuation   : new(&this->payload_.continuation_frame_ ) http::continuation_frame(std::move(source.payload_.continuation_frame_))  ; break;
           case frame_type::invalid_type   : break;
         }
         this->metadata_ = std::move(source.metadata_);

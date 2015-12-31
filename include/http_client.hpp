@@ -80,7 +80,8 @@ namespace manifold
         class stream : public http::connection::stream
         {
         public:
-          stream(std::uint32_t stream_id) : http::connection::stream(stream_id)
+          stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size)
+            : http::connection::stream(stream_id, initial_window_size, initial_peer_window_size)
           {
             http::connection::stream::on_headers(std::bind(&stream::on_headers_handler, this, std::placeholders::_1));
             http::connection::stream::on_push_promise(std::bind(&stream::on_push_promise_handler, this, std::placeholders::_1, std::placeholders::_2));
@@ -120,7 +121,10 @@ namespace manifold
             this->on_push_promise_ ? this->on_push_promise_(request_head(std::move(headers)), promised_stream_id) : void();
           }
         };
-        stream* create_stream_object(std::uint32_t stream_id) { return new stream(stream_id); }
+        stream* create_stream_object(std::uint32_t stream_id)
+        {
+          return new stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size));
+        }
 
       };
       //================================================================//

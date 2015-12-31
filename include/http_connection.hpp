@@ -103,6 +103,11 @@ namespace manifold
       };
       //================================================================//
 
+      static const std::uint32_t default_header_table_size      ; //= 4096;
+      static const std::uint32_t default_enable_push            ; //= 1;
+      static const std::uint32_t default_initial_window_size    ; //= 65535;
+      static const std::uint32_t default_max_frame_size         ; //= 16384;
+
       //================================================================//
       enum class stream_state
       {
@@ -145,19 +150,23 @@ namespace manifold
         void on_close(const std::function<void(std::uint32_t error_code)>& fn) { this->on_close_ = fn; }
 
         stream_state state() const { return this->state_; }
+        std::uint32_t id() const { return this->id_; }
+        bool has_sendable_frame(bool can_send_data);
+        frame pop_next_outgoing_frame(std::uint32_t connection_window_size);
 
         std::queue<header_block> incoming_message_heads;
         std::queue<frame> incoming_data_frames;
         std::queue<frame> outgoing_non_data_frames;
         std::queue<frame> outgoing_data_frames;
 
-        std::uint32_t outgoing_window_size = 65535;
         std::uint32_t incoming_window_size = 65535;
+        std::uint32_t outgoing_window_size = 65535;
         std::uint32_t stream_dependency_id = 0;
         std::uint8_t weight = 16;
 
         bool end_stream_frame_received = false;
-        stream(std::uint32_t stream_id) : id_(stream_id) {}
+        stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size)
+          : id_(stream_id), incoming_window_size(initial_window_size), outgoing_window_size(initial_peer_window_size) {}
         virtual ~stream() {}
 
         //----------------------------------------------------------------//
@@ -211,7 +220,9 @@ namespace manifold
     private:
       //----------------------------------------------------------------//
       socket* socket_;
-      std::map<setting_code,std::uint32_t> settings_;
+      // TODO: Make settings class.
+      std::map<setting_code,std::uint32_t> local_settings_;
+      std::map<setting_code,std::uint32_t> peer_settings_;
       hpack::encoder hpack_encoder_;
       hpack::decoder hpack_decoder_;
       bool started_;
@@ -242,7 +253,6 @@ namespace manifold
       //----------------------------------------------------------------//
       stream* get_next_send_stream_ptr(const stream_dependency_tree& current_node);
       bool check_tree_for_outgoing_frame(const stream_dependency_tree& current_node);
-      bool stream_has_sendable_frame(const stream& stream_to_check);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -269,12 +279,18 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
+      const std::map<setting_code,std::uint32_t>& local_settings() const { return this->local_settings_; }
+      const std::map<setting_code,std::uint32_t>& peer_settings() const { return this->peer_settings_; }
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
       static const std::array<char,24> preface;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       void run();
-      void close();
+      void close(std::uint32_t ec);
+      bool is_closed() const;
       void cancelAllStreams();
       //----------------------------------------------------------------//
 

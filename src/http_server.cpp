@@ -16,7 +16,7 @@ namespace manifold
       unsigned char *out_len, const unsigned char *in,
       unsigned int in_len, void *arg)
     {
-      static const char*const h2_proto_string = "\x02h2";
+      static const char*const h2_proto_string = "\x02h2\x08http/1.1";
       std::size_t h2_proto_string_len = ::strlen(h2_proto_string);
 
       int ret = SSL_select_next_proto((unsigned char **)out, out_len, (unsigned char*)h2_proto_string, h2_proto_string_len, in, in_len) == OPENSSL_NPN_NEGOTIATED ? SSL_TLSEXT_ERR_OK : SSL_TLSEXT_ERR_ALERT_FATAL;
@@ -145,9 +145,10 @@ namespace manifold
         SSL_OP_SINGLE_ECDH_USE | SSL_OP_NO_TICKET |
         SSL_OP_CIPHER_SERVER_PREFERENCE;
 
-      SSL_CTX_set_options(ssl_context_->impl(), ssl_opts);
-      SSL_CTX_set_mode(ssl_context_->impl(), SSL_MODE_AUTO_RETRY);
-      SSL_CTX_set_mode(ssl_context_->impl(), SSL_MODE_RELEASE_BUFFERS);
+      SSL_CTX_set_options(ssl_context_->native_handle(), SSL_CTX_get_options(ssl_context_->native_handle()) | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+      //SSL_CTX_set_options(ssl_context_->impl(), ssl_opts);
+      //SSL_CTX_set_mode(ssl_context_->impl(), SSL_MODE_AUTO_RETRY);
+      //SSL_CTX_set_mode(ssl_context_->impl(), SSL_MODE_RELEASE_BUFFERS);
 
       static const char *const DEFAULT_CIPHER_LIST =
         //"HIGH:!AES256-SHA:!AES128-GCM-SHA256:!AES128-SHA:!DES-CBC3-SHA";
@@ -163,7 +164,7 @@ namespace manifold
 
 
 
-      SSL_CTX_set_cipher_list(ssl_context_->impl(), DEFAULT_CIPHER_LIST);
+      //SSL_CTX_set_cipher_list(ssl_context_->impl(), DEFAULT_CIPHER_LIST);
 
 
       SSL_CTX_set_alpn_select_cb(this->ssl_context_->impl(), alpn_select_proto_cb, nullptr);
@@ -337,10 +338,6 @@ namespace manifold
       conn->on_close([conn, this](std::uint32_t ec)
       {
         this->connections_.erase(conn);
-        this->io_service_.post([conn]()
-        {
-          conn->close();
-        });
       });
     }
     //----------------------------------------------------------------//

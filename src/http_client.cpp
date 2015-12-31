@@ -259,7 +259,6 @@ namespace manifold
                 {
                   this->connection_ = std::make_shared<connection>(std::move(*sock));
                   this->connection_->run();
-                  this->connection_->send_settings({});
                   this->on_connect_ ? this->on_connect_() : void();
                 }
               });
@@ -286,7 +285,7 @@ namespace manifold
       auto sock = std::make_shared<manifold::tls_socket>(ioservice, *this->ssl_context_);
       std::error_code e;
       ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).set_verify_mode(asio::ssl::verify_none, e);
-      ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).set_verify_callback(verify_certificate, e);
+      //((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).set_verify_callback(verify_certificate, e);
 
       this->ssl_context_->set_default_verify_paths();
 
@@ -315,7 +314,7 @@ namespace manifold
               {
                 const unsigned char* selected_alpn = nullptr;
                 unsigned int selected_alpn_sz = 1;
-                //SSL_get0_alpn_selected(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle(), &selected_alpn, &selected_alpn_sz);
+                SSL_get0_alpn_selected(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle(), &selected_alpn, &selected_alpn_sz);
                 if (ec)
                 {
                   std::cout << "ERROR: " << ec.message() << std::endl;
@@ -334,8 +333,8 @@ namespace manifold
                     else
                     {
                       this->connection_ = std::make_shared<connection>(std::move(*sock));
+                      this->connection_->on_close([this](std::uint32_t ec) { this->on_close_ ? this->on_close_(ec) : void(); });
                       this->connection_->run();
-                      this->connection_->send_settings({});
                       this->on_connect_ ? this->on_connect_() : void();
                     }
                   });
@@ -351,7 +350,7 @@ namespace manifold
     //----------------------------------------------------------------//
     client::~client()
     {
-
+      this->close();
     }
     //----------------------------------------------------------------//
 
@@ -360,19 +359,21 @@ namespace manifold
       if (!this->closed_)
       {
         this->closed_ = true;
-        this->io_service_.post([this]()
+
+
+        if (this->connection_)
         {
-          if (this->on_close_)
-            this->on_close_(this->ec_); // TODO: set with appropriate error;
-          this->on_close_ = nullptr;
-          this->on_connect_ = nullptr;
-          this->on_push_promise_ = nullptr;
-          if (this->connection_)
-          {
-            this->connection_->close();
-            this->connection_ = nullptr;
-          }
-        });
+          this->connection_->close((std::uint32_t)http::errc::cancel);
+          this->connection_ = nullptr;
+        }
+        else if (this->on_close_)
+        {
+          this->on_close_((std::uint32_t)http::errc::cancel);
+        }
+
+        this->on_close_ = nullptr;
+        this->on_connect_ = nullptr;
+        this->on_push_promise_ = nullptr;
       }
     }
 
@@ -408,21 +409,27 @@ namespace manifold
     //----------------------------------------------------------------//
     void client::on_connect(const std::function<void()>& fn)
     {
-      bool had_previous_handler = (bool)this->on_connect_;
+      //bool had_previous_handler = (bool)this->on_connect_;
       this->on_connect_ = fn;
-      if (!had_previous_handler && this->connection_ && this->on_connect_)
-        this->on_connect_();
+      /*if (!had_previous_handler && this->connection_ && this->on_connect_)
+        this->on_connect_();*/
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void client::on_close(const std::function<void(std::uint32_t ec)>& fn)
     {
-      bool had_previous_handler = (bool)this->on_close_;
+      //bool had_previous_handler = (bool)this->on_close_;
       this->on_close_ = fn;
-      // TODO: Add is_closed() to connection class.
-      /*if (!had_previous_handler && this->connection_ && this->connection_.is_closed() && this->on_close_)
-        this->on_close_(this->ec_);*/
+
+      /*if (!had_previous_handler)
+      {
+        if (this->ec_ && this->on_close_)
+          this->on_close_(this->ec_);
+        else if (this->connection_ && this->connection_->is_closed() && this->on_close_)
+          this->on_close_(this->ec_); // TODO: get error from connection;
+
+      }*/
     }
     //----------------------------------------------------------------//
 

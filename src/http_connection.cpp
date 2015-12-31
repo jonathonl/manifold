@@ -7,6 +7,11 @@ namespace manifold
 {
   namespace http
   {
+    const std::uint32_t connection::default_header_table_size      = 4096;
+    const std::uint32_t connection::default_enable_push            = 1;
+    const std::uint32_t connection::default_initial_window_size    = 65535;
+    const std::uint32_t connection::default_max_frame_size         = 16384;
+
     //----------------------------------------------------------------//
     connection::stream_dependency_tree::stream_dependency_tree(stream* stream_ptr)
       : stream_ptr_(stream_ptr)
@@ -81,7 +86,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     connection::connection(non_tls_socket&& sock)
-    : socket_(new non_tls_socket(std::move(sock))), hpack_encoder_(4096), hpack_decoder_(4096), last_newly_accepted_stream_id_(0), last_newly_created_stream_id_(0), root_stream_(0), stream_dependency_tree_(&this->root_stream_)
+    : socket_(new non_tls_socket(std::move(sock))), hpack_encoder_(4096), hpack_decoder_(4096), last_newly_accepted_stream_id_(0), last_newly_created_stream_id_(0), root_stream_(0, 65535, 65535), stream_dependency_tree_(&this->root_stream_)
     {
       std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
       this->rg_.seed(seed);
@@ -93,13 +98,15 @@ namespace manifold
       // initial_window_size    = 0x4, // 65535
       // max_frame_size         = 0x5, // 16384
       // max_header_list_size   = 0x6  // (infinite)
-      this->settings_ =
+      this->local_settings_ =
         {
-          { setting_code::header_table_size,    4096 },
-          { setting_code::enable_push,             1 },
-          { setting_code::initial_window_size, 65535 },
-          { setting_code::max_frame_size,      16384 }
+          { setting_code::header_table_size,   default_header_table_size },
+          { setting_code::enable_push,         default_enable_push },
+          { setting_code::initial_window_size, default_initial_window_size },
+          { setting_code::max_frame_size,      default_max_frame_size }
         };
+
+      this->peer_settings_ = this->local_settings_;
 
       this->started_ = false;
       this->closed_ = false;
@@ -110,7 +117,13 @@ namespace manifold
 
     //----------------------------------------------------------------//
     connection::connection(tls_socket&& sock)
-      : socket_(new tls_socket(std::move(sock))), hpack_encoder_(4096), hpack_decoder_(4096), last_newly_accepted_stream_id_(0), last_newly_created_stream_id_(0), root_stream_(0), stream_dependency_tree_(&this->root_stream_)
+      : socket_(new tls_socket(std::move(sock))),
+      hpack_encoder_(4096),
+      hpack_decoder_(4096),
+      last_newly_accepted_stream_id_(0),
+      last_newly_created_stream_id_(0),
+      root_stream_(0, default_initial_window_size, default_initial_window_size),
+      stream_dependency_tree_(&this->root_stream_)
     {
       std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
       this->rg_.seed(seed);
@@ -122,13 +135,15 @@ namespace manifold
       // initial_window_size    = 0x4, // 65535
       // max_frame_size         = 0x5, // 16384
       // max_header_list_size   = 0x6  // (infinite)
-      this->settings_ =
+      this->local_settings_ =
         {
-          { setting_code::header_table_size,    4096 },
-          { setting_code::enable_push,             1 },
-          { setting_code::initial_window_size, 65535 },
-          { setting_code::max_frame_size,      16384 }
+          { setting_code::header_table_size,   default_header_table_size },
+          { setting_code::enable_push,         default_enable_push },
+          { setting_code::initial_window_size, default_initial_window_size },
+          { setting_code::max_frame_size,      default_max_frame_size }
         };
+
+      this->peer_settings_ = this->local_settings_;
 
       this->started_ = false;
       this->closed_ = false;
@@ -145,13 +160,14 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
-    void connection::close()
+    //----------------------------------------------------------------//
+    void connection::close(std::uint32_t ec)
     {
       if (!this->closed_)
       {
         this->closed_ = true;
         if (this->on_close_)
-          this->on_close_(0); //TODO: Set error code when applicable.
+          this->on_close_(ec);
         this->on_close_ = nullptr;
         this->on_new_stream_ = nullptr;
         this->stream_dependency_tree_.clear_children();
@@ -159,13 +175,12 @@ namespace manifold
         this->socket_->close();
       }
     }
+    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::stream_has_sendable_frame(const stream& stream_to_check)
+    bool connection::is_closed() const
     {
-      return (stream_to_check.outgoing_non_data_frames.size()
-        || (stream_to_check.outgoing_data_frames.size() && stream_to_check.outgoing_window_size > 0 && this->connection_level_outgoing_window_size() > 0)
-        || (stream_to_check.outgoing_data_frames.size() && stream_to_check.outgoing_data_frames.front().payload_length() == 0));
+      return this->closed_;
     }
     //----------------------------------------------------------------//
 
@@ -174,7 +189,7 @@ namespace manifold
     {
       bool ret = false;
 
-      if (this->stream_has_sendable_frame(*current_node.stream_ptr()))
+      if (current_node.stream_ptr()->has_sendable_frame(this->connection_level_outgoing_window_size() > 0))
         ret = true;
 
       for (auto it = current_node.children().begin(); !ret && it != current_node.children().end(); ++it)
@@ -192,7 +207,7 @@ namespace manifold
       // TODO: enforce a max tree depth of 10 to avoid stack overflow from recursion.
       stream* ret = nullptr;
 
-      if (this->stream_has_sendable_frame(*current_node.stream_ptr()))
+      if (current_node.stream_ptr()->has_sendable_frame(this->connection_level_outgoing_window_size() > 0))
       {
         ret = current_node.stream_ptr();
       }
@@ -420,12 +435,48 @@ namespace manifold
             }
           }
 
-          self->run_send_loop(); // One of the handle_incoming frames may have pushed an outgoing frame.
-          self->run_recv_loop();
+          if (ec)
+            self->close((std::uint32_t)http::errc::internal_error); // TODO: make appropriate error
+          else
+          {
+            self->run_send_loop(); // One of the handle_incoming frames may have pushed an outgoing frame.
+            self->run_recv_loop();
+          }
         }
       });
     }
     //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool connection::stream::has_sendable_frame(bool can_send_data)
+    {
+      return (this->outgoing_non_data_frames.size()
+        || (can_send_data && this->outgoing_data_frames.size() && this->outgoing_window_size > 0)
+        || (this->outgoing_data_frames.size() && this->outgoing_data_frames.front().payload_length() == 0));
+    }
+    //----------------------------------------------------------------//
+
+    frame connection::stream::pop_next_outgoing_frame(std::uint32_t connection_window_size)
+    {
+      frame ret;
+      if (this->outgoing_non_data_frames.size())
+      {
+        ret = std::move(this->outgoing_non_data_frames.front());
+        this->outgoing_non_data_frames.pop();
+      }
+      else if (this->outgoing_data_frames.size() && this->outgoing_window_size > 0 && connection_window_size > 0)
+      {
+        // TODO: split data frome if needed.
+        ret = std::move(this->outgoing_data_frames.front());
+        this->outgoing_data_frames.pop();
+        this->outgoing_window_size -= ret.data_frame().data_length();
+
+        if (this->outgoing_data_frames.empty() && this->on_drain_)
+          this->on_drain_();
+      }
+
+      return ret;
+    }
 
     //----------------------------------------------------------------//
     void connection::stream::handle_incoming_frame(const data_frame& incoming_data_frame)
@@ -539,7 +590,44 @@ namespace manifold
     //----------------------------------------------------------------//
     void connection::handle_incoming_frame(const settings_frame& incoming_settings_frame)
     {
-      // TODO
+      if (incoming_settings_frame.has_ack_flag())
+      {
+        // TODO: may need to add a pending queue for settings.
+      }
+      else
+      {
+        std::list<std::pair<std::uint16_t, std::uint32_t>> settings_list(incoming_settings_frame.settings());
+        for (auto it = settings_list.begin(); it != settings_list.end(); ++it)
+        {
+          switch (it->first)
+          {
+            case (std::uint16_t)setting_code::header_table_size:
+              this->peer_settings_[setting_code::header_table_size] = it->second;
+              break;
+            case (std::uint16_t)setting_code::enable_push:
+              this->peer_settings_[setting_code::enable_push] = it->second;
+              break;
+            case (std::uint16_t)setting_code::max_concurrent_streams:
+              this->peer_settings_[setting_code::max_concurrent_streams] = it->second;
+              break;
+            case (std::uint16_t)setting_code::initial_window_size:
+              this->peer_settings_[setting_code::initial_window_size] = it->second;
+              break;
+            case (std::uint16_t)setting_code::max_frame_size:
+              this->peer_settings_[setting_code::max_frame_size] = it->second;
+              if (it->second < 4096)
+                this->hpack_encoder_.add_table_size_update(it->second);
+              else
+                this->hpack_encoder_.add_table_size_update(4096);
+              break;
+            case (std::uint16_t)setting_code::max_header_list_size:
+              this->peer_settings_[setting_code::max_header_list_size] = it->second;
+              break;
+
+          }
+        }
+        this->root_stream_.outgoing_non_data_frames.push(http::frame(http::settings_frame(ack_flag()), 0x0));
+      }
     }
     //----------------------------------------------------------------//
 
@@ -692,17 +780,10 @@ namespace manifold
 
         if (prioritized_stream_ptr)
         {
-          if (prioritized_stream_ptr->outgoing_non_data_frames.size())
-          {
-            this->outgoing_frame_ = std::move(prioritized_stream_ptr->outgoing_non_data_frames.front());
-            prioritized_stream_ptr->outgoing_non_data_frames.pop();
-          }
-          else
-          {
-            this->outgoing_frame_ = std::move(prioritized_stream_ptr->outgoing_data_frames.front());
-            prioritized_stream_ptr->outgoing_data_frames.pop();
-          }
 
+          this->outgoing_frame_ = std::move(prioritized_stream_ptr->pop_next_outgoing_frame(this->connection_level_outgoing_window_size()));
+          if (this->outgoing_frame_.is<data_frame>())
+            this->root_stream_.outgoing_window_size -= this->outgoing_frame_.data_frame().data_length();
 
           frame::send_frame(*this->socket_,this->outgoing_frame_, [self](const std::error_code& ec)
           {
@@ -733,6 +814,10 @@ namespace manifold
     {
       if (!this->started_)
       {
+        std::list<std::pair<std::uint16_t,std::uint32_t>> settings;
+        for (auto it = this->local_settings_.begin(); it != this->local_settings_.end(); ++it)
+          settings.emplace_back(static_cast<std::uint16_t>(it->first), it->second);
+        this->send_settings(settings);
         this->run_recv_loop();
 
         this->started_ = true;
@@ -870,7 +955,7 @@ namespace manifold
         std::string header_data;
         http::header_block::serialize(this->hpack_encoder_, head, header_data);
         const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
-        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->settings_[setting_code::max_frame_size])
+        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
         {
           // TODO: Handle error
         }
@@ -914,7 +999,7 @@ namespace manifold
         std::string header_data;
         http::header_block::serialize(this->hpack_encoder_, head, header_data);
         const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
-        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->settings_[setting_code::max_frame_size])
+        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
         {
           // TODO: Handle error
         }
@@ -985,6 +1070,7 @@ namespace manifold
     void connection::send_settings(const std::list<std::pair<std::uint16_t,std::uint32_t>>& settings)
     {
       this->root_stream_.outgoing_non_data_frames.push(http::frame(http::settings_frame(settings.begin(), settings.end()), 0x0));
+      this->run_send_loop();
     }
     //----------------------------------------------------------------//
 
@@ -1003,7 +1089,7 @@ namespace manifold
       {
         std::string header_data;
         http::header_block::serialize(this->hpack_encoder_, head, header_data);
-        if (header_data.size() > this->settings_[setting_code::max_frame_size])
+        if (header_data.size() > this->peer_settings_[setting_code::max_frame_size])
         {
           // TODO: Handle error
         }
@@ -1064,7 +1150,7 @@ namespace manifold
         std::string header_data;
         http::header_block::serialize(this->hpack_encoder_, head, header_data);
         const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
-        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->settings_[setting_code::max_frame_size])
+        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
         {
           // TODO: Handle error
         }
@@ -1109,7 +1195,7 @@ namespace manifold
       auto it = this->streams_.find(stream_id);
       if (it != this->streams_.end())
       {
-        it->second->outgoing_data_frames.push(http::frame(http::window_update_frame(amount), stream_id));
+        it->second->outgoing_non_data_frames.push(http::frame(http::window_update_frame(amount), stream_id));
         this->run_send_loop();
         ret = true;
       }
@@ -1121,7 +1207,7 @@ namespace manifold
     //----------------------------------------------------------------//
     void connection::send_connection_level_window_update(std::uint32_t amount)
     {
-      this->root_stream_.outgoing_data_frames.push(http::frame(http::window_update_frame(amount), 0x0));
+      this->root_stream_.outgoing_non_data_frames.push(http::frame(http::window_update_frame(amount), 0x0));
       this->run_send_loop();
     }
     //----------------------------------------------------------------//

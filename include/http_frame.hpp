@@ -69,9 +69,10 @@ namespace manifold
     class data_frame : public frame_payload_base
     {
     public:
-      data_frame() : frame_payload_base(0) {}
       data_frame(const char*const data, std::uint32_t datasz, bool end_stream = false, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
       ~data_frame() {}
+
+      data_frame split(std::uint32_t num_bytes);
 
       const char*const data() const;
       std::uint32_t data_length() const;
@@ -80,6 +81,9 @@ namespace manifold
 
       bool has_end_stream_flag() const { return this->flags_ & frame_flag::end_stream; }
       bool has_padded_flag() const  { return this->flags_ & frame_flag::padded; }
+    private:
+      data_frame() : frame_payload_base(0) {}
+      friend class frame; // TODO: make the rest for the frame default constructors private
     };
     //================================================================//
 
@@ -158,9 +162,7 @@ namespace manifold
     class settings_frame : public frame_payload_base
     {
     private:
-      std::list<std::pair<std::uint16_t,std::uint32_t>> settings_;
       void serialize_settings();
-      void deserialize_settings();
     public:
       settings_frame() : frame_payload_base(0) {}
       settings_frame(ack_flag) : frame_payload_base(0x1) {}
@@ -169,9 +171,7 @@ namespace manifold
 
 
       bool has_ack_flag() const { return (bool)(this->flags_ & 0x1); }
-      std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator begin();
-      std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end();
-      std::size_t count();
+      std::list<std::pair<std::uint16_t,std::uint32_t>> settings() const;
     };
     //================================================================//
 
@@ -269,16 +269,16 @@ namespace manifold
     {
     public:
       //----------------------------------------------------------------//
-      const http::data_frame          default_data_frame_         ;
-      const http::headers_frame       default_headers_frame_      ;
-      const http::priority_frame      default_priority_frame_     ;
-      const http::rst_stream_frame    default_rst_stream_frame_   ;
-      const http::settings_frame      default_settings_frame_     ;
-      const http::push_promise_frame  default_push_promise_frame_ ;
-      const http::ping_frame          default_ping_frame_         ;
-      const http::goaway_frame        default_goaway_frame_       ;
-      const http::window_update_frame default_window_update_frame_;
-      const http::continuation_frame  default_continuation_frame_ ;
+      static const http::data_frame          default_data_frame_         ;
+      static const http::headers_frame       default_headers_frame_      ;
+      static const http::priority_frame      default_priority_frame_     ;
+      static const http::rst_stream_frame    default_rst_stream_frame_   ;
+      static const http::settings_frame      default_settings_frame_     ;
+      static const http::push_promise_frame  default_push_promise_frame_ ;
+      static const http::ping_frame          default_ping_frame_         ;
+      static const http::goaway_frame        default_goaway_frame_       ;
+      static const http::window_update_frame default_window_update_frame_;
+      static const http::continuation_frame  default_continuation_frame_ ;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
