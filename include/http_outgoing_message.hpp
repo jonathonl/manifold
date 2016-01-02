@@ -33,7 +33,6 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void reset_stream(http::errc error_code = http::errc::no_error) { /*TODO: impl*/ }
       virtual bool send_headers(bool end_stream = false); // Must be virtual since client::request and server::response override while outgoing_message::end/send call this method.
       bool send(const char*const data, std::size_t data_sz);
       bool send(const char* cstr) { return this->send(std::string(cstr)); }

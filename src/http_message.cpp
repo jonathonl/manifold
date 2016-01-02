@@ -27,6 +27,11 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
+    void message::close(http::errc error_code)
+    {
+      this->connection_->send_reset_stream(this->stream_id_, error_code);
+    }
+
     //----------------------------------------------------------------//
     void message::on_close(const std::function<void(std::uint32_t ec)>& cb)
     {

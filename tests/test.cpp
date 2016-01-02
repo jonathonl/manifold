@@ -126,7 +126,7 @@ public:
 
     if (!this->response_.head().is_successful_status())
     {
-      this->request_.reset_stream();
+      this->request_.close();
     }
     else
     {
@@ -314,7 +314,7 @@ int main()
 
         if (!resp.head().is_successful_status())
         {
-          //req_ptr->reset_stream();
+          resp.close();
         }
         else
         {
@@ -408,7 +408,7 @@ int main()
 
           if (res.head().status_code() != 200)
           {
-            req_ptr->reset_stream();
+            req_ptr->close();
           }
           else
           {
