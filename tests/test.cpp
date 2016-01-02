@@ -37,6 +37,16 @@ std::tuple<move_only, move_only, int> return_move_only()
 void handle_push_promise(http::client::request&& req, std::uint32_t dependency_stream_id)
 {
 
+  req.on_response([](http::client::response&& resp)
+  {
+    for (auto it : resp.head().raw_headers())
+      std::cout << it.name << ": " << it.value << std::endl;
+
+    resp.on_data([](const char*const d, std::size_t sz)
+    {
+      std::cout << std::string(d, sz) << std::endl;
+    });
+  });
 }
 //================================================================//
 
@@ -221,21 +231,23 @@ int main()
   });
   app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
   {
-    auto req_ptr = std::make_shared<http::server::request>(std::move(req));
     auto res_ptr = std::make_shared<http::server::response>(std::move(res));
 
-    for (auto it : req_ptr->head().raw_headers())
+    for (auto it : req.head().raw_headers())
       std::cout << it.name << ": " << it.value << std::endl;
 
+    res_ptr->make_push_response(http::request_head("/push-url")).end("Some push data.");
+
     auto req_entity = std::make_shared<std::string>();
-    req_ptr->on_data([req_entity](const char*const data, std::size_t datasz)
+    req.on_data([req_entity](const char*const data, std::size_t datasz)
     {
       req_entity->append(data, datasz);
     });
 
-    req_ptr->on_end([res_ptr, req_entity]()
+    req.on_end([res_ptr, req_entity]()
     {
-      res_ptr->end("Received: " + *req_entity);
+      res_ptr->send("Received: " + *req_entity);
+      res_ptr->end();
     });
 
   });
@@ -289,42 +301,42 @@ int main()
     http::client c1(ioservice, "127.0.0.1", http::client::ssl_options(), 8080);
     c1.on_connect([&c1]()
     {
-      auto req_ptr = std::make_shared<http::client::request>(c1.make_request());
-      req_ptr->head() = http::request_head("/foobar", http::method::post,
+      http::client::request req = c1.make_request();
+      req.head() = http::request_head("/foobar", http::method::post,
         {
           {"content-type","application/x-www-form-urlencoded"}
         });
 
-      req_ptr->on_response([&c1](http::client::response &&res)
+      req.on_response([&c1](http::client::response&& resp)
       {
-        auto res_ptr = std::make_shared<http::client::response>(std::move(res));
-
-        for (auto it : res_ptr->head().raw_headers())
+        for (auto it : resp.head().raw_headers())
           std::cout << it.name << ": " << it.value << std::endl;
 
-        if (!res_ptr->head().is_successful_status())
+        if (!resp.head().is_successful_status())
         {
           //req_ptr->reset_stream();
         }
         else
         {
           auto response_data = std::make_shared<std::string>();
-          res_ptr->on_data([response_data](const char *const data, std::size_t datasz)
+          resp.on_data([response_data](const char *const data, std::size_t datasz)
           {
             response_data->append(data, datasz);
           });
 
-          res_ptr->on_end([&c1, response_data]()
+          resp.on_end([response_data]()
           {
             std::cout << (*response_data) << std::endl;
           });
         }
       });
 
-      req_ptr->on_close([&c1](std::uint32_t) { c1.close(); });
+      req.on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req.stream_id()));
+
+      req.on_close([&c1](std::uint32_t) { /*c1.close();*/ });
 
 
-      req_ptr->end(std::string("name=value&name2=value2"));
+      req.end(std::string("name=value&name2=value2"));
     });
 
     c1.on_close([&ioservice](std::uint32_t ec)

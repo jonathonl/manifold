@@ -107,16 +107,9 @@ namespace manifold
       }
       else
       {
-        it->second->on_push_promise([self, fn](http::request_head&& headers, std::uint32_t promised_stream_id)
+        it->second->on_push_promise([self, fn, stream_id](http::request_head&& headers, std::uint32_t promised_stream_id)
         {
-          if (!self->create_stream(promised_stream_id))
-          {
-            // TODO: Handle error
-          }
-          else
-          {
-            fn(http::client::request(std::move(headers), self, promised_stream_id));
-          }
+          fn(http::client::request(std::move(headers), self, promised_stream_id));
         });
       }
     }
@@ -125,9 +118,9 @@ namespace manifold
     client::request::request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
       : outgoing_message(conn, stream_id), head_(std::move(head))
     {
-      ((connection*)conn.get())->on_push_promise(stream_id, [stream_id, conn](http::client::request&& req)
+      conn->on_push_promise(stream_id, [conn](http::header_block&& req, std::uint32_t promised_stream_id)
       {
-        conn->send_reset_stream(stream_id, errc::refused_stream);
+        conn->send_reset_stream(promised_stream_id, errc::refused_stream);
       });
     }
     //----------------------------------------------------------------//
@@ -313,8 +306,9 @@ namespace manifold
               ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).async_handshake(asio::ssl::stream_base::client, [this, sock](const std::error_code& ec)
               {
                 const unsigned char* selected_alpn = nullptr;
-                unsigned int selected_alpn_sz = 1;
+                unsigned int selected_alpn_sz = 0;
                 SSL_get0_alpn_selected(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle(), &selected_alpn, &selected_alpn_sz);
+                std::cout << "Client ALPN: " << std::string((char*)selected_alpn, selected_alpn_sz) << std::endl;
                 if (ec)
                 {
                   std::cout << "ERROR: " << ec.message() << std::endl;
@@ -354,6 +348,7 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
+    //----------------------------------------------------------------//
     void client::close()
     {
       if (!this->closed_)
@@ -376,18 +371,6 @@ namespace manifold
         this->on_push_promise_ = nullptr;
       }
     }
-
-    //----------------------------------------------------------------//
-    std::uint32_t client::get_next_stream_id()
-    {
-      std::uint32_t ret = 0;
-      if (this->next_stream_id_ <= client::max_stream_id)
-      {
-        ret = this->next_stream_id_;
-        this->next_stream_id_ += 2;
-      }
-      return ret;
-    }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
@@ -399,10 +382,10 @@ namespace manifold
       if (!this->connection_)
         throw std::invalid_argument("No connection.");
 
-      std::uint32_t next_stream_id = this->get_next_stream_id(); // could be zero;
-      this->connection_->create_stream(next_stream_id);
 
-      return client::request(http::request_head("/", "GET", {{"user-agent", this->default_user_agent_}}), this->connection_, next_stream_id);;
+      std::uint32_t stream_id = this->connection_->create_stream(0, 0);
+
+      return client::request(http::request_head("/", "GET", {{"user-agent", this->default_user_agent_}}), this->connection_, stream_id);;
     }
     //----------------------------------------------------------------//
 

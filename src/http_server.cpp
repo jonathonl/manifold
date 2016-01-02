@@ -91,6 +91,24 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    server::response server::response::make_push_response(request_head&& push_promise_headers)
+    {
+      std::uint32_t stream_id = this->connection_->create_stream(this->stream_id_, 0);
+      this->connection_->send_push_promise(this->stream_id_, std::move(push_promise_headers), stream_id, true);
+
+      response ret(http::response_head(200, {{"server", this->head().header("server")}}), this->connection_, stream_id);
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    server::response server::response::make_push_response(const request_head& push_promise_headers)
+    {
+      return this->make_push_response(request_head(push_promise_headers));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     server::server(asio::io_service& ioService, unsigned short port, const std::string& host)
       : io_service_(ioService),
         acceptor_(io_service_)
@@ -272,7 +290,11 @@ namespace manifold
         {
           ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).async_handshake(asio::ssl::stream_base::server, [this, sock] (const std::error_code& ec)
           {
-            std::cout << "cipher: " << SSL_CIPHER_get_name(SSL_get_current_cipher(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle())) << std::endl;
+            std::cout << "Cipher: " << SSL_CIPHER_get_name(SSL_get_current_cipher(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle())) << std::endl;
+            const unsigned char* selected_alpn = nullptr;
+            unsigned int selected_alpn_sz = 0;
+            SSL_get0_alpn_selected(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle(), &selected_alpn, &selected_alpn_sz);
+            std::cout << "Server ALPN: " << std::string((char*)selected_alpn, selected_alpn_sz) << std::endl;
             if (ec)
             {
               std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
@@ -332,6 +354,11 @@ namespace manifold
         conn->on_headers(stream_id, [conn, stream_id, this](http::header_block&& headers)
         {
           this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(http::response_head(200, {{"server", this->default_server_header_}}), conn, stream_id)) : void();
+        });
+
+        conn->on_push_promise(stream_id, [stream_id, conn](http::request_head&& head, std::uint32_t promised_stream_id)
+        {
+          conn->send_goaway(errc::protocol_error, "Clients Cannot Push!");
         });
       });
 

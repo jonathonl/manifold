@@ -59,7 +59,6 @@ namespace manifold
     class client
     {
     public:
-      static const std::uint32_t max_stream_id = 0x7FFFFFFF;
       class response;
       class request;
       //================================================================//
@@ -67,9 +66,15 @@ namespace manifold
       {
       public:
         connection(non_tls_socket&& sock)
-          : http::connection(std::move(sock)) {}
+          : http::connection(std::move(sock)), next_stream_id_(1)
+        {
+          this->local_settings_[setting_code::enable_push] = 1;
+        }
         connection(tls_socket&& sock)
-          : http::connection(std::move(sock)) {}
+          : http::connection(std::move(sock)), next_stream_id_(1)
+        {
+          this->local_settings_[setting_code::enable_push] = 1;
+        }
         ~connection() {}
 
         void on_informational_headers(std::uint32_t stream_id, const std::function<void(http::response_head&& headers)>& fn);
@@ -84,7 +89,7 @@ namespace manifold
             : http::connection::stream(stream_id, initial_window_size, initial_peer_window_size)
           {
             http::connection::stream::on_headers(std::bind(&stream::on_headers_handler, this, std::placeholders::_1));
-            http::connection::stream::on_push_promise(std::bind(&stream::on_push_promise_handler, this, std::placeholders::_1, std::placeholders::_2));
+            //http::connection::stream::on_push_promise(std::bind(&stream::on_push_promise_handler, this, std::placeholders::_1, std::placeholders::_2));
           }
           ~stream() {}
 
@@ -115,15 +120,23 @@ namespace manifold
               this->on_response_headers_ ? this->on_response_headers_(std::move(headers)) : void();
             }
           }
-
-          void on_push_promise_handler(http::header_block&& headers, std::uint32_t promised_stream_id)
-          {
-            this->on_push_promise_ ? this->on_push_promise_(request_head(std::move(headers)), promised_stream_id) : void();
-          }
         };
-        stream* create_stream_object(std::uint32_t stream_id)
+
+
+        std::uint32_t next_stream_id_;
+
+        stream* create_stream_object(std::uint32_t stream_id = 0)
         {
-          return new stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size));
+          if (stream_id == 0 && this->next_stream_id_ <= connection::max_stream_id)
+          {
+            stream_id = this->next_stream_id_;
+            this->next_stream_id_ += 2;
+          }
+
+          if (stream_id)
+            return new stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size));
+          else
+            return nullptr;
         }
 
       };
@@ -200,7 +213,6 @@ namespace manifold
       std::function<void(std::uint32_t ec)> on_close_;
       std::uint32_t ec_;
 
-      std::uint32_t get_next_stream_id();
       void send_connection_preface(std::function<void(const std::error_code& ec)>& fn);
     public:
       client(asio::io_service& ioservice, const std::string& host, unsigned short port = 80);

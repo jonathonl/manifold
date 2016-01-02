@@ -303,7 +303,7 @@ namespace manifold
               if (incoming_stream_id > self->last_newly_accepted_stream_id_)
               {
                 self->last_newly_accepted_stream_id_ = incoming_stream_id;
-                if (!self->create_stream(incoming_stream_id))
+                if (!self->create_stream(0, incoming_stream_id))
                 {
                   // TODO: Handle Error
                 }
@@ -370,7 +370,7 @@ namespace manifold
                       self->incoming_header_block_fragments_.pop();
                     }
 
-                    if (!self->create_stream(pp_frame.promised_stream_id()))
+                    if (!self->create_stream(current_stream_it->second->id(), pp_frame.promised_stream_id()))
                     {
                       // TODO: Handle error.
                     }
@@ -392,7 +392,7 @@ namespace manifold
                   current_stream_it->second->handle_incoming_frame(self->incoming_frame_.headers_frame(), {}, self->hpack_decoder_);
                 else
                 {
-                  if (!self->create_stream(self->incoming_frame_.push_promise_frame().promised_stream_id()))
+                  if (!self->create_stream(current_stream_it->second->id(), self->incoming_frame_.push_promise_frame().promised_stream_id()))
                   {
                     // TODO: Handle error.
                   }
@@ -509,7 +509,7 @@ namespace manifold
           }
           break;
         }
-        case stream_state::half_close_local:
+        case stream_state::half_closed_local:
         {
           this->on_data_ ? this->on_data_(incoming_data_frame.data(), incoming_data_frame.data_length()) : void();
 
@@ -536,7 +536,8 @@ namespace manifold
       {
         case stream_state::idle:
         case stream_state::open:
-        case stream_state::half_close_local:
+        case stream_state::half_closed_local:
+        case stream_state::reserved_remote:
         {
           header_block headers;
 
@@ -552,14 +553,18 @@ namespace manifold
           }
 
 
-          if (this->state_ == stream_state::idle)
+          if (this->state_ == stream_state::reserved_remote)
+          {
+            this->state_ = stream_state::half_closed_local;
+          }
+          else if (this->state_ == stream_state::idle)
           {
             this->state_ = (incoming_headers_frame.has_end_stream_flag() ? stream_state::half_closed_remote : stream_state::open );
           }
           else
           {
             if (incoming_headers_frame.has_end_stream_flag())
-              this->state_ = (this->state_ == stream_state::half_close_local ? stream_state::closed : stream_state::half_closed_remote);
+              this->state_ = (this->state_ == stream_state::half_closed_local ? stream_state::closed : stream_state::half_closed_remote);
           }
           this->on_headers_ ? this->on_headers_(std::move(headers)) : void();
 
@@ -650,7 +655,7 @@ namespace manifold
     {
       switch (this->state_)
       {
-        case stream_state::half_close_local:
+        case stream_state::half_closed_local:
         case stream_state::open:
         {
           header_block headers;
@@ -668,6 +673,7 @@ namespace manifold
 
           idle_promised_stream.state_ = stream_state::reserved_remote;
           this->on_push_promise_ ? this->on_push_promise_(std::move(headers), incoming_push_promise_frame.promised_stream_id()) : void();
+          break;
         }
         case stream_state::closed:
         {
@@ -692,6 +698,7 @@ namespace manifold
           {
             // TODO: handle error.
           }
+          break;
         }
         default:
         {
@@ -736,7 +743,7 @@ namespace manifold
           this->state_ = stream_state::half_closed_remote;
           return true;
         case stream_state::reserved_remote:
-        case stream_state::half_close_local:
+        case stream_state::half_closed_local:
         case stream_state::closed:
           return false;
         case stream_state::open:
@@ -752,7 +759,7 @@ namespace manifold
       switch (this->state_)
       {
         case stream_state::open:
-          this->state_ = stream_state::half_close_local;
+          this->state_ = stream_state::half_closed_local;
           return true;
         case stream_state::half_closed_remote:
           this->state_ = stream_state::closed;
@@ -760,7 +767,7 @@ namespace manifold
         case stream_state::reserved_remote:
         case stream_state::idle:
         case stream_state::reserved_local:
-        case stream_state::half_close_local:
+        case stream_state::half_closed_local:
         case stream_state::closed:
           return false;
       }
@@ -953,16 +960,20 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::create_stream(std::uint32_t stream_id) //TODO: allow for dependency other than root.
+    std::uint32_t connection::create_stream(std::uint32_t dependency_stream_id, std::uint32_t stream_id) //TODO: allow for dependency other than root.
     {
-      bool ret = false;
+      std::uint32_t ret = 0;
 
-      std::pair<std::map<std::uint32_t,std::unique_ptr<stream>>::iterator,bool> insert_res = this->streams_.emplace(stream_id, std::unique_ptr<stream>(this->create_stream_object(stream_id)));
-      if (insert_res.second)
+      std::unique_ptr<stream> s(this->create_stream_object(stream_id));
+      if (s)
       {
-        this->stream_dependency_tree_.insert_child(stream_dependency_tree_child_node((insert_res.first->second.get())));
+        std::pair<std::map<std::uint32_t,std::unique_ptr<stream>>::iterator,bool> insert_res = this->streams_.emplace(s->id(), std::move(s));
+        if (insert_res.second)
+        {
+          this->stream_dependency_tree_.insert_child(stream_dependency_tree_child_node((insert_res.first->second.get())));
 
-        ret = true;
+          ret = insert_res.first->first;
+        }
       }
 
       return ret;
@@ -1164,7 +1175,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_push_promise(std::uint32_t stream_id, const header_block&head, std::uint32_t promised_stream_id, bool end_headers)
+    bool connection::send_push_promise(std::uint32_t stream_id, const header_block& head, std::uint32_t promised_stream_id, bool end_headers)
     {
       bool ret = false;
 

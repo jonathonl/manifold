@@ -115,7 +115,7 @@ namespace manifold
         reserved_local,
         reserved_remote,
         open,
-        half_close_local,
+        half_closed_local,
         half_closed_remote,
         closed
       };
@@ -244,13 +244,13 @@ namespace manifold
 
       //----------------------------------------------------------------//
       std::map<std::uint32_t,std::unique_ptr<stream>> streams_;
+      std::map<setting_code,std::uint32_t> local_settings_;
       virtual stream* create_stream_object(std::uint32_t stream_id) = 0;
       //----------------------------------------------------------------//
     private:
       //----------------------------------------------------------------//
       socket* socket_;
       // TODO: Make settings class.
-      std::map<setting_code,std::uint32_t> local_settings_;
       std::map<setting_code,std::uint32_t> peer_settings_;
       hpack::encoder hpack_encoder_;
       hpack::decoder hpack_decoder_;
@@ -316,6 +316,7 @@ namespace manifold
 
       //----------------------------------------------------------------//
       static const std::array<char,24> preface;
+      static const std::uint32_t max_stream_id = 0x7FFFFFFF;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -345,7 +346,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      bool create_stream(std::uint32_t stream_id);
+      std::uint32_t create_stream(std::uint32_t dependency_stream_id, std::uint32_t stream_id);
       bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream);
       bool send_headers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream);
       bool send_headers(std::uint32_t stream_id, const header_block& head, priority_options priority, bool end_headers, bool end_stream);

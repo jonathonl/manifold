@@ -69,7 +69,7 @@ namespace manifold
       if (!this->ended_)
       {
         if (!this->headers_sent_)
-          ret =this->send_headers();
+          ret = this->send_headers();
 
         if (ret)
         {

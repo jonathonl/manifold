@@ -29,9 +29,15 @@ namespace manifold
       {
       public:
         connection(non_tls_socket&& sock)
-          : http::connection(std::move(sock)) {}
+          : http::connection(std::move(sock)), next_stream_id_(2)
+        {
+          this->local_settings_[setting_code::enable_push] = 0;
+        }
         connection(tls_socket&& sock)
-          : http::connection(std::move(sock)) {}
+          : http::connection(std::move(sock)), next_stream_id_(2)
+        {
+          this->local_settings_[setting_code::enable_push] = 0;
+        }
         ~connection() {}
       private:
         class stream : public http::connection::stream
@@ -46,9 +52,21 @@ namespace manifold
         private:
 
         };
-        stream* create_stream_object(std::uint32_t stream_id)
+
+        std::uint32_t next_stream_id_;
+
+        stream* create_stream_object(std::uint32_t stream_id = 0)
         {
-          return new stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size));
+          if (stream_id == 0 && this->next_stream_id_ <= connection::max_stream_id)
+          {
+            stream_id = this->next_stream_id_;
+            this->next_stream_id_ += 2;
+          }
+
+          if (stream_id)
+            return new stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size));
+          else
+            return nullptr;
         }
 
       };
@@ -97,6 +115,8 @@ namespace manifold
         //----------------------------------------------------------------//
         response_head& head();
         bool send_headers(bool end_stream = false);
+        response make_push_response(request_head&& push_promise_headers);
+        response make_push_response(const request_head& push_promise_headers);
         //----------------------------------------------------------------//
       };
       //================================================================//
