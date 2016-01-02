@@ -11,16 +11,15 @@ asio::io_service ioservice;
 http::router app;
 app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
 {
-  auto req_ptr = std::make_shared<http::server::request>(std::move(req));
   auto res_ptr = std::make_shared<http::server::response>(std::move(res));
 
   auto req_entity = std::make_shared<std::string>();
-  req_ptr->on_data([req_entity](const char*const data, std::size_t datasz)
+  req.on_data([req_entity](const char*const data, std::size_t datasz)
   {
     req_entity->append(data, datasz);
   });
 
-  req_ptr->on_end([res_ptr, req_entity]()
+  req.on_end([res_ptr, req_entity]()
   {
     res_ptr->end("Received: " + *req_entity);
   });
@@ -43,30 +42,28 @@ asio::io_service ioservice;
 http::client conn(ioservice, "www.example.com", http::client::ssl_options());
 conn.on_connect([&conn]()
 {
-  auto request = std::make_shared<http::client::request>(conn.make_request());
+  auto req = conn.make_request();
 
-  request->on_response([request](http::client::response&& resp)
+  req.on_response([](http::client::response&& resp)
   {
-    auto response = std::make_shared<http::client::response>(std::move(resp));
-
-    if (!response->head().is_successful_status())
-      request->reset_stream();
+    if (!resp.head().is_successful_status())
+      resp.close();
     else
     {
-      response->on_data([](const char *const data, std::size_t datasz)
+      resp.on_data([](const char *const data, std::size_t datasz)
       {
         // ...
       });
 
-      response->on_end([]()
+      resp.on_end([]()
       {
         // ...
       });
     }
   });
 
-  request->head() = http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}});
-  request->end("name=value&name2=value2");
+  req.head() = http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}});
+  req.end("name=value&name2=value2");
 });
 
 ioservice.run();
