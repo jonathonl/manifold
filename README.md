@@ -13,7 +13,7 @@ app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http
 {
   auto res_ptr = std::make_shared<http::server::response>(std::move(res));
 
-  auto req_entity = std::make_shared<std::string>();
+  auto req_entity = std::make_shared<std::stringstream>();
   req.on_data([req_entity](const char*const data, std::size_t datasz)
   {
     req_entity->append(data, datasz);
@@ -21,7 +21,7 @@ app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http
 
   req.on_end([res_ptr, req_entity]()
   {
-    res_ptr->end("Received: " + *req_entity);
+    res_ptr->end("Received: " + req_entity->str());
   });
 });
 
