@@ -10,14 +10,14 @@
 namespace manifold
 {
   //================================================================//
-  class TCP
+  class tcp
   {
   private:
     static void recvline(asio::ip::tcp::socket& sock, char* buf, std::size_t bufSize, std::size_t putPosition,
                          char* bufEnd,
                          const std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>& handler,
                          const std::string& delim = "\r\n");
-    TCP() = delete;
+    tcp() = delete;
   public:
     //----------------------------------------------------------------//
 //    static Socket connect(unsigned short port, const std::string& host, std::int64_t microseconds = 0);

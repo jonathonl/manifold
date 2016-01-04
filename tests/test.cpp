@@ -238,15 +238,15 @@ int main()
 
     res_ptr->make_push_response(http::request_head("/push-url")).end("Some push data.");
 
-    auto req_entity = std::make_shared<std::string>();
+    auto req_entity = std::make_shared<std::stringstream>();
     req.on_data([req_entity](const char*const data, std::size_t datasz)
     {
-      req_entity->append(data, datasz);
+      req_entity->write(data, datasz);
     });
 
     req.on_end([res_ptr, req_entity]()
     {
-      res_ptr->send("Received: " + *req_entity);
+      res_ptr->send("Received: " + req_entity->str());
       res_ptr->end();
     });
 
@@ -318,15 +318,15 @@ int main()
         }
         else
         {
-          auto response_data = std::make_shared<std::string>();
+          auto response_data = std::make_shared<std::stringstream>();
           resp.on_data([response_data](const char *const data, std::size_t datasz)
           {
-            response_data->append(data, datasz);
+            response_data->write(data, datasz);
           });
 
           resp.on_end([response_data]()
           {
-            std::cout << (*response_data) << std::endl;
+            std::cout << response_data->rdbuf() << std::endl;
           });
         }
       });

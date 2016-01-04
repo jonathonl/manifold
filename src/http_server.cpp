@@ -94,7 +94,9 @@ namespace manifold
     server::response server::response::make_push_response(request_head&& push_promise_headers)
     {
       std::uint32_t stream_id = this->connection_->create_stream(this->stream_id_, 0);
-      this->connection_->send_push_promise(this->stream_id_, std::move(push_promise_headers), stream_id, true);
+
+      if (stream_id)
+        this->connection_->send_push_promise(this->stream_id_, std::move(push_promise_headers), stream_id, true);
 
       response ret(http::response_head(200, {{"server", this->head().header("server")}}), this->connection_, stream_id);
       return ret;

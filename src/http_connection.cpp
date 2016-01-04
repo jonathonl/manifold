@@ -161,7 +161,11 @@ namespace manifold
     connection::~connection()
     {
       std::cout << "~connection()" << std::endl;
-      //this->socket().close();
+
+      this->close((std::uint32_t)errc::no_error);
+
+      if (this->socket_)
+        delete this->socket_;
     }
     //----------------------------------------------------------------//
 
@@ -481,8 +485,12 @@ namespace manifold
       }
       else if (this->outgoing_data_frames.size() && this->outgoing_window_size > 0 && connection_window_size > 0)
       {
-        // TODO: split data frome if needed.
-        ret = std::move(this->outgoing_data_frames.front());
+        if (connection_window_size > this->outgoing_window_size)
+          connection_window_size = this->outgoing_window_size;
+        if (this->outgoing_data_frames.front().data_frame().data_length() > connection_window_size)
+          ret = frame(this->outgoing_data_frames.front().data_frame().split(connection_window_size), this->id_);
+        else
+          ret = std::move(this->outgoing_data_frames.front());
         this->outgoing_data_frames.pop();
         this->outgoing_window_size -= ret.data_frame().data_length();
 

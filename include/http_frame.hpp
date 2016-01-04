@@ -363,6 +363,17 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
+      http::data_frame&           data_frame()         ;
+      http::headers_frame&        headers_frame()      ;
+      http::priority_frame&       priority_frame()     ;
+      http::rst_stream_frame&     rst_stream_frame()   ;
+      http::settings_frame&       settings_frame()     ;
+      http::push_promise_frame&   push_promise_frame() ;
+      http::ping_frame&           ping_frame()         ;
+      http::goaway_frame&         goaway_frame()       ;
+      http::window_update_frame&  window_update_frame();
+      http::continuation_frame&   continuation_frame() ;
+
       const http::data_frame&           data_frame()          const;
       const http::headers_frame&        headers_frame()       const;
       const http::priority_frame&       priority_frame()      const;

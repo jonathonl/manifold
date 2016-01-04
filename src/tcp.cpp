@@ -115,7 +115,7 @@ namespace manifold
 //  //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  void TCP::recvline(asio::ip::tcp::socket& sock, char* buf, std::size_t bufSize, std::size_t putPosition, char* bufEnd,
+  void tcp::recvline(asio::ip::tcp::socket& sock, char* buf, std::size_t bufSize, std::size_t putPosition, char* bufEnd,
                      const std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>& cb,
                      const std::string& delim)
   {
@@ -165,7 +165,7 @@ namespace manifold
           else if (bufOutputSize == bufSize)
             cb ? cb(make_error_code(std::errc::value_too_large), bufOutputSize) : void();
           else
-            TCP::recvline(sock, buf, bufSize, putPosition, bufEnd, cb, delim);
+            tcp::recvline(sock, buf, bufSize, putPosition, bufEnd, cb, delim);
         }
       }
     });
@@ -173,12 +173,12 @@ namespace manifold
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  void TCP::recvline(asio::ip::tcp::socket& sock, char* buf, std::size_t bufSize, const std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>& cb, const std::string& delim)
+  void tcp::recvline(asio::ip::tcp::socket& sock, char* buf, std::size_t bufSize, const std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>& cb, const std::string& delim)
   {
     if (!bufSize)
       cb ? cb(make_error_code(std::errc::value_too_large), 0) : void();
     else
-      TCP::recvline(sock, buf, bufSize, 0, buf, cb, delim);
+      tcp::recvline(sock, buf, bufSize, 0, buf, cb, delim);
   };
   //  //----------------------------------------------------------------//
 

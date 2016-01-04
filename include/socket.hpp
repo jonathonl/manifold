@@ -26,6 +26,12 @@ namespace manifold
     virtual ~socket() {}
     virtual void recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
     virtual void recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
+//    template <typename CompletionCondition>
+//    virtual void recv(asio::streambuf& buf, CompletionCondition completion_condition, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
+//    template <typename CompletionCondition>
+//    virtual void recv(asio::streambuf& buf, CompletionCondition completion_condition, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
+    virtual void recv_until(asio::streambuf& buf, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
+    virtual void recv_until(asio::streambuf& buf, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
     virtual void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
     virtual void send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
     virtual void close() = 0;
@@ -54,6 +60,18 @@ namespace manifold
 
     void recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     void recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+//    template <typename CompletionCondition>
+//    void recv(asio::streambuf& buf, CompletionCondition completion_condition, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+//    {
+//      asio::async_read(*this->s_, buf, completion_condition, std::move(cb));
+//    }
+//    template <typename CompletionCondition>
+//    void recv(asio::streambuf& buf, CompletionCondition completion_condition, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+//    {
+//      asio::async_read(*this->s_, buf, completion_condition, cb);
+//    }
+    void recv_until(asio::streambuf& buf, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
+    void recv_until(asio::streambuf& buf, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
     void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     void send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
     void close();
@@ -87,6 +105,18 @@ namespace manifold
 
     void recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     void recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+//    template <typename CompletionCondition>
+//    void recv(asio::streambuf& buf, CompletionCondition completion_condition, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+//    {
+//      asio::async_read(*this->s_, buf, completion_condition, std::move(cb));
+//    }
+//    template <typename CompletionCondition>
+//    void recv(asio::streambuf& buf, CompletionCondition completion_condition, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+//    {
+//      asio::async_read(*this->s_, buf, completion_condition, cb);
+//    }
+    void recv_until(asio::streambuf& buf, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
+    void recv_until(asio::streambuf& buf, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
     void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     void send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
     void close();

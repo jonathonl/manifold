@@ -24,6 +24,20 @@ namespace manifold
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
+  void non_tls_socket::recv_until(asio::streambuf& buf, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+  {
+    asio::async_read_until(*this->s_, buf, delim, std::move(cb));
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void non_tls_socket::recv_until(asio::streambuf& buf, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+  {
+    asio::async_read_until(*this->s_, buf, delim, cb);
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
   void non_tls_socket::send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
   {
     asio::async_write(*this->s_, asio::buffer(data, data_sz), std::move(cb));
@@ -55,6 +69,20 @@ namespace manifold
   void tls_socket::recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
   {
     this->recv(data, data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb));
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void tls_socket::recv_until(asio::streambuf& buf, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+  {
+    asio::async_read_until(*this->s_, buf, delim, std::move(cb));
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void tls_socket::recv_until(asio::streambuf& buf, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+  {
+    asio::async_read_until(*this->s_, buf, delim, cb);
   }
   //----------------------------------------------------------------//
 

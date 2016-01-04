@@ -800,6 +800,19 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    http::data_frame&           frame::data_frame()          { this->payload_.data_frame_         ; }
+    http::headers_frame&        frame::headers_frame()       { this->payload_.headers_frame_      ; }
+    http::priority_frame&       frame::priority_frame()      { this->payload_.priority_frame_     ; }
+    http::rst_stream_frame&     frame::rst_stream_frame()    { this->payload_.rst_stream_frame_   ; }
+    http::settings_frame&       frame::settings_frame()      { this->payload_.settings_frame_     ; }
+    http::push_promise_frame&   frame::push_promise_frame()  { this->payload_.push_promise_frame_ ; }
+    http::ping_frame&           frame::ping_frame()          { this->payload_.ping_frame_         ; }
+    http::goaway_frame&         frame::goaway_frame()        { this->payload_.goaway_frame_       ; }
+    http::window_update_frame&  frame::window_update_frame() { this->payload_.window_update_frame_; }
+    http::continuation_frame&   frame::continuation_frame()  { this->payload_.continuation_frame_ ; }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     const http::data_frame&           frame::data_frame()          const { return this->type() == frame_type::data           ? this->payload_.data_frame_           : frame::default_data_frame_          ; }
     const http::headers_frame&        frame::headers_frame()       const { return this->type() == frame_type::headers        ? this->payload_.headers_frame_        : frame::default_headers_frame_       ; }
     const http::priority_frame&       frame::priority_frame()      const { return this->type() == frame_type::priority       ? this->payload_.priority_frame_       : frame::default_priority_frame_      ; }
