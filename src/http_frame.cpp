@@ -5,6 +5,7 @@
 #include "asio/ssl.hpp"
 #include "http_frame.hpp"
 
+
 namespace manifold
 {
   namespace http
@@ -800,16 +801,16 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    http::data_frame&           frame::data_frame()          { this->payload_.data_frame_         ; }
-    http::headers_frame&        frame::headers_frame()       { this->payload_.headers_frame_      ; }
-    http::priority_frame&       frame::priority_frame()      { this->payload_.priority_frame_     ; }
-    http::rst_stream_frame&     frame::rst_stream_frame()    { this->payload_.rst_stream_frame_   ; }
-    http::settings_frame&       frame::settings_frame()      { this->payload_.settings_frame_     ; }
-    http::push_promise_frame&   frame::push_promise_frame()  { this->payload_.push_promise_frame_ ; }
-    http::ping_frame&           frame::ping_frame()          { this->payload_.ping_frame_         ; }
-    http::goaway_frame&         frame::goaway_frame()        { this->payload_.goaway_frame_       ; }
-    http::window_update_frame&  frame::window_update_frame() { this->payload_.window_update_frame_; }
-    http::continuation_frame&   frame::continuation_frame()  { this->payload_.continuation_frame_ ; }
+    http::data_frame&           frame::data_frame()          { return this->payload_.data_frame_         ; }
+    http::headers_frame&        frame::headers_frame()       { return this->payload_.headers_frame_      ; }
+    http::priority_frame&       frame::priority_frame()      { return this->payload_.priority_frame_     ; }
+    http::rst_stream_frame&     frame::rst_stream_frame()    { return this->payload_.rst_stream_frame_   ; }
+    http::settings_frame&       frame::settings_frame()      { return this->payload_.settings_frame_     ; }
+    http::push_promise_frame&   frame::push_promise_frame()  { return this->payload_.push_promise_frame_ ; }
+    http::ping_frame&           frame::ping_frame()          { return this->payload_.ping_frame_         ; }
+    http::goaway_frame&         frame::goaway_frame()        { return this->payload_.goaway_frame_       ; }
+    http::window_update_frame&  frame::window_update_frame() { return this->payload_.window_update_frame_; }
+    http::continuation_frame&   frame::continuation_frame()  { return this->payload_.continuation_frame_ ; }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//

@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <system_error>
 
-#include "http_v1_header_block.hpp"
+#include "http_v1_message_head.hpp"
 
 namespace manifold
 {
@@ -155,8 +155,6 @@ namespace manifold
     //----------------------------------------------------------------//
     void v1_header_block::serialize(const v1_header_block& source, std::ostream& destination)
     {
-      destination << source.start_line_ << "\r\n";
-
       for (auto it = source.headers_.begin(); it != source.headers_.end(); ++it)
       {
         destination << it->first << ": " << it->second << "\r\n";
@@ -169,9 +167,6 @@ namespace manifold
     //----------------------------------------------------------------//
     bool v1_header_block::deserialize(std::istream& source, v1_header_block& destination)
     {
-      std::getline(source, destination.start_line_);
-      destination.start_line_.erase(destination.start_line_.find_last_not_of(" \r")+1);
-
       while (source.good())
       {
         std::string header_line;
@@ -196,6 +191,25 @@ namespace manifold
       }
 
       return true;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void v1_message_head::serialize(const v1_message_head& source, std::ostream& destination)
+    {
+      destination << source.start_line_ << "\r\n";
+
+      v1_header_block::serialize(source, destination);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool v1_message_head::deserialize(std::istream& source, v1_message_head& destination)
+    {
+      std::getline(source, destination.start_line_);
+      destination.start_line_.erase(destination.start_line_.find_last_not_of(" \r")+1);
+
+      return v1_header_block::deserialize(source, destination);
     }
     //----------------------------------------------------------------//
   }

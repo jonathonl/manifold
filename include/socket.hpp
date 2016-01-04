@@ -24,14 +24,10 @@ namespace manifold
   public:
     socket() {}
     virtual ~socket() {}
-    virtual void recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
-    virtual void recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
-//    template <typename CompletionCondition>
-//    virtual void recv(asio::streambuf& buf, CompletionCondition completion_condition, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
-//    template <typename CompletionCondition>
-//    virtual void recv(asio::streambuf& buf, CompletionCondition completion_condition, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
-    virtual void recv_until(asio::streambuf& buf, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
-    virtual void recv_until(asio::streambuf& buf, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
+    virtual void recv(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
+    virtual void recv(char* buf, std::size_t buf_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
+    virtual void recvline(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb, const std::string& delim = "\r\n") = 0;
+    virtual void recvline(char* buf, std::size_t buf_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb, const std::string& delim = "\r\n") = 0;
     virtual void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
     virtual void send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
     virtual void close() = 0;
@@ -60,18 +56,8 @@ namespace manifold
 
     void recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     void recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
-//    template <typename CompletionCondition>
-//    void recv(asio::streambuf& buf, CompletionCondition completion_condition, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
-//    {
-//      asio::async_read(*this->s_, buf, completion_condition, std::move(cb));
-//    }
-//    template <typename CompletionCondition>
-//    void recv(asio::streambuf& buf, CompletionCondition completion_condition, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
-//    {
-//      asio::async_read(*this->s_, buf, completion_condition, cb);
-//    }
-    void recv_until(asio::streambuf& buf, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
-    void recv_until(asio::streambuf& buf, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+    void recvline(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb, const std::string& delim = "\r\n");
+    void recvline(char* buf, std::size_t buf_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb, const std::string& delim = "\r\n");
     void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     void send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
     void close();
@@ -81,6 +67,8 @@ namespace manifold
     operator asio::ip::tcp::socket& () { return *this->s_; }
   private:
     asio::ip::tcp::socket* s_;
+
+    void recvline(char* buf, std::size_t bufSize, std::size_t putPosition, char* bufEnd, std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>&& cb, const std::string& delim);
   };
   //================================================================//
 
@@ -105,18 +93,8 @@ namespace manifold
 
     void recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     void recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
-//    template <typename CompletionCondition>
-//    void recv(asio::streambuf& buf, CompletionCondition completion_condition, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
-//    {
-//      asio::async_read(*this->s_, buf, completion_condition, std::move(cb));
-//    }
-//    template <typename CompletionCondition>
-//    void recv(asio::streambuf& buf, CompletionCondition completion_condition, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
-//    {
-//      asio::async_read(*this->s_, buf, completion_condition, cb);
-//    }
-    void recv_until(asio::streambuf& buf, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
-    void recv_until(asio::streambuf& buf, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+    void recvline(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb, const std::string& delim = "\r\n");
+    void recvline(char* buf, std::size_t buf_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb, const std::string& delim = "\r\n");
     void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     void send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
     void close();
@@ -126,6 +104,8 @@ namespace manifold
     operator asio::ssl::stream<asio::ip::tcp::socket>& () { return *this->s_; }
   private:
     asio::ssl::stream<asio::ip::tcp::socket>* s_;
+
+    void recvline(char* buf, std::size_t bufSize, std::size_t putPosition, char* bufEnd, std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>&& cb, const std::string& delim);
   };
   //================================================================//
 

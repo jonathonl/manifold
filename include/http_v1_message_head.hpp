@@ -48,9 +48,19 @@ namespace manifold
       //----------------------------------------------------------------//
     protected:
       //----------------------------------------------------------------//
-      std::string start_line_;
       std::list<std::pair<std::string,std::string>> headers_;
       //----------------------------------------------------------------//
+    };
+
+    class v1_message_head : public v1_header_block
+    {
+    public:
+      //----------------------------------------------------------------//
+      static void serialize(const v1_message_head& source, std::ostream& destination);
+      static bool deserialize(std::istream& source, v1_message_head& destination);
+      //----------------------------------------------------------------//
+    protected:
+      std::string start_line_;
     };
     //================================================================//
   }

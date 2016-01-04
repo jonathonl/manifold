@@ -6,6 +6,8 @@
 
 #include "socket.hpp"
 
+#include <assert.h>
+
 //################################################################//
 namespace manifold
 {
@@ -24,16 +26,72 @@ namespace manifold
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  void non_tls_socket::recv_until(asio::streambuf& buf, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+  void non_tls_socket::recvline(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb, const std::string& delim)
   {
-    asio::async_read_until(*this->s_, buf, delim, std::move(cb));
+    if (buf_sz < delim.size())
+      cb ? cb(make_error_code(std::errc::value_too_large), 0) : void();
+    else
+      this->recvline(buf, buf_sz, 0, buf, std::move(cb), delim);
   }
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  void non_tls_socket::recv_until(asio::streambuf& buf, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+  void non_tls_socket::recvline(char* buf, std::size_t buf_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb, const std::string& delim)
   {
-    asio::async_read_until(*this->s_, buf, delim, cb);
+    this->recvline(buf, buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb), delim);
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void non_tls_socket::recvline(char* buf, std::size_t buf_size, std::size_t put_position, char* buf_end, std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>&& cb, const std::string& delim)
+  {
+    this->s_->async_receive(asio::null_buffers(), 0, [this, buf, buf_size, put_position, buf_end, delim, cb](const std::error_code& ec, std::size_t bytes_transferred) mutable
+    {
+      if (ec)
+      {
+        cb ? cb(ec, 0) : void();
+      }
+      else
+      {
+        std::error_code err;
+        const size_t discard_buffer_size = 8;
+        std::size_t bytes_to_read = buf_size - put_position;
+        if (bytes_to_read > discard_buffer_size)
+          bytes_to_read = discard_buffer_size;
+
+        const std::size_t bytes_actually_read = this->s_->receive(asio::buffer(buf + put_position, bytes_to_read), asio::ip::tcp::socket::message_peek, err);
+        if (err)
+        {
+          cb ? cb(ec, 0) : void();
+        }
+        else
+        {
+          assert(bytes_actually_read > 0);
+          buf_end += bytes_actually_read;
+
+          bool delim_found = false;
+          char* search_result = std::search(buf, buf_end, delim.begin(), delim.end());
+          if (search_result != buf_end)
+          {
+            buf_end = search_result + delim.size();
+            delim_found = true;
+          }
+
+          std::array<char, discard_buffer_size> discard;
+          size_t bytes_to_discard = buf_end - &buf[put_position];
+          this->s_->receive(asio::buffer(discard.data(), bytes_to_discard), 0, err);
+          put_position += bytes_to_discard;
+
+          std::size_t buf_output_size = buf_end - buf;
+          if (delim_found || err)
+            cb ? cb(err, buf_output_size) : void();
+          else if (buf_output_size == buf_size)
+            cb ? cb(make_error_code(std::errc::value_too_large), buf_output_size) : void();
+          else
+            this->recvline(buf, buf_size, put_position, buf_end, std::move(cb), delim);
+        }
+      }
+    });
   }
   //----------------------------------------------------------------//
 
@@ -73,16 +131,73 @@ namespace manifold
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  void tls_socket::recv_until(asio::streambuf& buf, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+  void tls_socket::recvline(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb, const std::string& delim)
   {
-    asio::async_read_until(*this->s_, buf, delim, std::move(cb));
+    if (buf_sz < delim.size())
+      cb ? cb(make_error_code(std::errc::value_too_large), 0) : void();
+    else
+      this->recvline(buf, buf_sz, 0, buf, std::move(cb), delim);
   }
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  void tls_socket::recv_until(asio::streambuf& buf, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+  void tls_socket::recvline(char* buf, std::size_t buf_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb, const std::string& delim)
   {
-    asio::async_read_until(*this->s_, buf, delim, cb);
+    this->recvline(buf, buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb), delim);
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void tls_socket::recvline(char* buf, std::size_t buf_size, std::size_t put_position, char* buf_end, std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>&& cb, const std::string& delim)
+  {
+    asio::async_read(*this->s_, asio::null_buffers(), [this, buf, buf_size, put_position, buf_end, delim, cb](const std::error_code& ec, std::size_t bytes_transferred) mutable
+    {
+      if (ec)
+      {
+        cb ? cb(ec, 0) : void();
+      }
+      else
+      {
+        std::error_code err;
+        const size_t discard_buffer_size = 8;
+        std::size_t bytes_to_read = buf_size - put_position;
+        if (bytes_to_read > discard_buffer_size)
+          bytes_to_read = discard_buffer_size;
+
+        //const std::size_t bytes_actually_read = sock.receive(asio::buffer(buf + put_position, bytes_to_read), asio::ip::tcp::socket::message_peek, err);
+        int bytes_actually_read = SSL_peek(this->s_->native_handle(), buf + put_position, bytes_to_read);
+        if (SSL_get_error(this->s_->native_handle(), bytes_actually_read))
+        {
+          cb ? cb(asio::error::make_error_code(asio::error::ssl_errors()), 0) : void();
+        }
+        else
+        {
+          assert(bytes_actually_read > 0);
+          buf_end += bytes_actually_read;
+
+          bool delim_found = false;
+          char* search_result = std::search(buf, buf_end, delim.begin(), delim.end());
+          if (search_result != buf_end)
+          {
+            buf_end = search_result + delim.size();
+            delim_found = true;
+          }
+
+          std::array<char, discard_buffer_size> discard;
+          size_t bytes_to_discard = buf_end - &buf[put_position];
+          asio::read(*this->s_, asio::buffer(discard.data(), bytes_to_discard), err);
+          put_position += bytes_to_discard;
+
+          std::size_t buf_output_size = buf_end - buf;
+          if (delim_found || err)
+            cb ? cb(err, buf_output_size) : void();
+          else if (buf_output_size == buf_size)
+            cb ? cb(make_error_code(std::errc::value_too_large), buf_output_size) : void();
+          else
+            this->recvline(buf, buf_size, put_position, buf_end, std::move(cb), delim);
+        }
+      }
+    });
   }
   //----------------------------------------------------------------//
 

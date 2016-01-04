@@ -180,7 +180,76 @@ namespace manifold
     else
       tcp::recvline(sock, buf, bufSize, 0, buf, cb, delim);
   };
-  //  //----------------------------------------------------------------//
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void tcp::recvline(asio::ssl::stream<asio::ip::tcp::socket>& ssl_stream, char* buf, std::size_t bufSize, std::size_t putPosition, char* bufEnd,
+                     const std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>& cb,
+                     const std::string& delim)
+  {
+    asio::async_read(ssl_stream, asio::null_buffers(), [&ssl_stream, buf, bufSize, putPosition, bufEnd, delim, cb](const std::error_code& ec, std::size_t bytes_transferred) mutable
+    {
+      if (ec)
+      {
+        cb ? cb(ec, 0) : void();
+      }
+      else
+      {
+        std::error_code err;
+        const size_t discardBufferSize = 8;
+        std::size_t bytesToRead = bufSize - putPosition;
+        if (bytesToRead > discardBufferSize)
+          bytesToRead = discardBufferSize;
+
+        //const std::size_t bytesActuallyRead = sock.receive(asio::buffer(buf + putPosition, bytesToRead), asio::ip::tcp::socket::message_peek, err);
+        int bytesActuallyRead = SSL_peek(ssl_stream.native_handle(), buf + putPosition, bytesToRead);
+        if (SSL_get_error(ssl_stream.native_handle(), bytesActuallyRead))
+        {
+          cb ? cb(asio::error::make_error_code(asio::error::ssl_errors()), 0) : void();
+        }
+        else if (!bytesActuallyRead)
+        {
+          std::cout << "Zero Bytes Received: " __FILE__ << "/" << __LINE__ << std::endl;
+        }
+        else
+        {
+          bufEnd += bytesActuallyRead;
+
+          bool delimFound = false;
+          char* searchResult = std::search(buf, bufEnd, delim.begin(), delim.end());
+          if (searchResult != bufEnd)
+          {
+            bufEnd = searchResult + delim.size();
+            delimFound = true;
+          }
+
+          std::array<char, discardBufferSize> discard;
+          size_t bytesToDiscard = bufEnd - &buf[putPosition];
+          asio::read(ssl_stream, asio::buffer(discard.data(), bytesToDiscard), err);
+          putPosition += bytesToDiscard;
+
+          std::size_t bufOutputSize = bufEnd - buf;
+          if (delimFound || err)
+            cb ? cb(err, bufOutputSize) : void();
+          else if (bufOutputSize == bufSize)
+            cb ? cb(make_error_code(std::errc::value_too_large), bufOutputSize) : void();
+          else
+            tcp::recvline(ssl_stream, buf, bufSize, putPosition, bufEnd, cb, delim);
+        }
+      }
+    });
+  }
+  //----------------------------------------------------------------//
+
+  //----------------------------------------------------------------//
+  void tcp::recvline(asio::ssl::stream<asio::ip::tcp::socket>& ssl_stream, char* buf, std::size_t bufSize, const std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>& cb, const std::string& delim)
+  {
+    if (!bufSize)
+      cb ? cb(make_error_code(std::errc::value_too_large), 0) : void();
+    else
+      tcp::recvline(ssl_stream, buf, bufSize, 0, buf, cb, delim);
+  };
+  //----------------------------------------------------------------//
 
 //  //----------------------------------------------------------------//
 //  bool TCP::sendAll(Socket& sock, const char* buf, std::size_t bufSize)
