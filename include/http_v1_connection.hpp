@@ -6,6 +6,7 @@
 #include "http_v1_message_head.hpp"
 
 #include <functional>
+#include <deque>
 #include <queue>
 #include <memory>
 
@@ -32,9 +33,9 @@ namespace manifold
       void on_drain(const std::function<void()>& fn);
 
       std::uint64_t start_message();
-      void send_message_head(std::uint64_t transaction_id, v1_message_head&& head);
-      void send_message_body(std::uint64_t transaction_id, std::vector<char>&& body);
-      void end_message(std::uint64_t transaction_id, v1_header_block&& trailers = v1_header_block());
+      void send_message_head(std::uint64_t transaction_id, const v1_message_head& head);
+      void send_message_body(std::uint64_t transaction_id, const char*const data, std::size_t data_sz);
+      void end_message(std::uint64_t transaction_id, const v1_header_block& trailers = v1_header_block());
     private:
       struct queued_message
       {
@@ -52,7 +53,7 @@ namespace manifold
 
       socket* socket_;
       std::array<char, 8192> recv_buffer_;
-      std::queue<queued_message> send_queue_;
+      std::deque<queued_message> send_queue_;
       std::uint64_t next_transaction_id_;
       bool send_loop_running_;
 

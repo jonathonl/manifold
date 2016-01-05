@@ -45,6 +45,7 @@ namespace manifold
   //----------------------------------------------------------------//
   void non_tls_socket::recvline(char* buf, std::size_t buf_size, std::size_t put_position, char* buf_end, std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>&& cb, const std::string& delim)
   {
+    // TODO: Create functor to to move cb.
     this->s_->async_receive(asio::null_buffers(), 0, [this, buf, buf_size, put_position, buf_end, delim, cb](const std::error_code& ec, std::size_t bytes_transferred) mutable
     {
       if (ec)
