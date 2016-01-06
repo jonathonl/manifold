@@ -24,7 +24,7 @@ namespace manifold
       //----------------------------------------------------------------//
     protected:
       //----------------------------------------------------------------//
-      virtual header_block& message_head() = 0;
+      virtual v2_header_block& message_head() = 0;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
@@ -42,17 +42,17 @@ namespace manifold
         return this->send(dataBuffer.data(), dataBuffer.size());
       }
       void on_drain(const std::function<void()>& fn);
-      bool end(const char*const data, std::size_t data_sz, const http::header_block& trailers = {});
-      bool end(const char* cstr, const http::header_block& trailers = {})
+      bool end(const char*const data, std::size_t data_sz, const v2_header_block& trailers = {});
+      bool end(const char* cstr, const v2_header_block& trailers = {})
       {
         return this->end(std::string(cstr), trailers);
       }
       template <typename BufferT>
-      bool end(const BufferT& dataBuffer, const http::header_block& trailers = {})
+      bool end(const BufferT& dataBuffer, const v2_header_block& trailers = {})
       {
         return this->end(dataBuffer.data(), dataBuffer.size(), trailers);
       }
-      bool end(const http::header_block& trailers = {});
+      bool end(const v2_header_block& trailers = {});
       //----------------------------------------------------------------//
     };
     //================================================================//

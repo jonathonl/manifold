@@ -10,8 +10,8 @@
 #include <ctime>
 
 #include "asio.hpp"
-#include "http_request_head.hpp"
-#include "http_response_head.hpp"
+#include "http_v2_request_head.hpp"
+#include "http_v2_response_head.hpp"
 #include "http_outgoing_message.hpp"
 #include "http_incoming_message.hpp"
 #include "http_connection.hpp"
@@ -77,20 +77,20 @@ namespace manifold
       {
       private:
         //----------------------------------------------------------------//
-        request_head head_;
+        v2_request_head head_;
         //----------------------------------------------------------------//
       protected:
         //----------------------------------------------------------------//
-        header_block& message_head() { return this->head_; }
+        v2_header_block& message_head() { return this->head_; }
         //----------------------------------------------------------------//
       public:
         //----------------------------------------------------------------//
-        request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+        request(v2_request_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
         ~request();
         //----------------------------------------------------------------//
 
         //----------------------------------------------------------------//
-        const request_head& head() const;
+        const v2_request_head& head() const;
         //----------------------------------------------------------------//
       };
       //================================================================//
@@ -100,23 +100,23 @@ namespace manifold
       {
       private:
         //----------------------------------------------------------------//
-        response_head head_;
+        v2_response_head head_;
         //----------------------------------------------------------------//
       protected:
         //----------------------------------------------------------------//
-        header_block& message_head() { return this->head_; }
+        v2_header_block& message_head() { return this->head_; }
         //----------------------------------------------------------------//
       public:
         //----------------------------------------------------------------//
-        response(response_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+        response(v2_response_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
         ~response();
         //----------------------------------------------------------------//
 
         //----------------------------------------------------------------//
-        response_head& head();
+        v2_response_head& head();
         bool send_headers(bool end_stream = false);
-        response make_push_response(request_head&& push_promise_headers);
-        response make_push_response(const request_head& push_promise_headers);
+        response make_push_response(v2_request_head&& push_promise_headers);
+        response make_push_response(const v2_request_head& push_promise_headers);
         //----------------------------------------------------------------//
       };
       //================================================================//

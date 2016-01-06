@@ -40,7 +40,7 @@ void handle_push_promise(http::client::request&& req, std::uint32_t dependency_s
   req.on_response([](http::client::response&& resp)
   {
     for (auto it : resp.head().raw_headers())
-      std::cout << it.name << ": " << it.value << std::endl;
+      std::cout << it.first << ": " << it.second << std::endl;
 
     resp.on_data([](const char*const d, std::size_t sz)
     {
@@ -48,102 +48,6 @@ void handle_push_promise(http::client::request&& req, std::uint32_t dependency_s
     });
   });
 }
-//================================================================//
-
-//================================================================//
-class client_stream_wrapper
-{
-private:
-  http::client::request req_;
-  http::client::response resp_;
-
-  std::function<void()> on_response_headers_fn_;
-
-  void set_response(http::client::response&& r)
-  {
-    this->resp_ = std::move(r);
-  }
-public:
-  client_stream_wrapper()
-    : req_(http::request_head(), nullptr, 0), resp_(http::response_head(), nullptr, 0)
-  {}
-  client_stream_wrapper(http::client::request&& req)
-    : req_(std::move(req)), resp_(http::response_head(), nullptr, 0)
-  {
-    req_.on_response(std::bind(&client_stream_wrapper::set_response, this, std::placeholders::_1));
-  }
-
-  void on_data();
-  void on_end();
-  void on_close();
-  void on_drain();
-  void send();
-  void end();
-  void reset_stream();
-
-
-};
-//================================================================//
-
-//================================================================//
-class my_request_class
-{
-private:
-  http::client& c_;
-  http::client::request request_;
-  http::client::response response_;
-public:
-  my_request_class(http::client& c) : c_(c), request_(http::request_head(), nullptr, 0), response_(http::response_head(), nullptr, 0)
-  {
-    this->c_.on_connect(std::bind(&my_request_class::run, this));
-  }
-
-  void run()
-  {
-    this->handle_request(this->c_.make_request());
-  }
-
-  void handle_request(http::client::request&& req)
-  {
-    this->request_ = std::move(req);
-    this->request_.head() = http::request_head("/foobar", http::method::post,
-      {
-        {"content-type","application/x-www-form-urlencoded"}
-      });
-
-    this->request_.on_response(std::bind(&my_request_class::handle_response, this, std::placeholders::_1));
-
-
-    this->request_.end(std::string("name=value&name2=value2"));
-  }
-
-  void handle_response(http::client::response &&res)
-  {
-    this->response_ = std::move(res);
-
-    for (auto it : this->response_.head().raw_headers())
-      std::cout << it.name << ": " << it.value << std::endl;
-
-    if (!this->response_.head().is_successful_status())
-    {
-      this->request_.close();
-    }
-    else
-    {
-      auto response_data = std::make_shared<std::string>();
-      this->response_.on_data([response_data](const char *const data, std::size_t datasz)
-      {
-        response_data->append(data, datasz);
-      });
-
-      this->response_.on_end([this, response_data]()
-      {
-        std::cout << (*response_data) << std::endl;
-        this->c_.close();
-      });
-    }
-  }
-};
 //================================================================//
 
 //################################################################//
@@ -234,9 +138,9 @@ int main()
     auto res_ptr = std::make_shared<http::server::response>(std::move(res));
 
     for (auto it : req.head().raw_headers())
-      std::cout << it.name << ": " << it.value << std::endl;
+      std::cout << it.first << ": " << it.second << std::endl;
 
-    res_ptr->make_push_response(http::request_head("/push-url")).end("Some push data.");
+    res_ptr->make_push_response(http::v2_request_head("/push-url")).end("Some push data.");
 
     auto req_entity = std::make_shared<std::stringstream>();
     req.on_data([req_entity](const char*const data, std::size_t datasz)
@@ -302,7 +206,7 @@ int main()
     c1.on_connect([&c1]()
     {
       http::client::request req = c1.make_request();
-      req.head() = http::request_head("/foobar", http::method::post,
+      req.head() = http::v2_request_head("/foobar", http::method::post,
         {
           {"content-type","application/x-www-form-urlencoded"}
         });
@@ -310,9 +214,9 @@ int main()
       req.on_response([&c1](http::client::response&& resp)
       {
         for (auto it : resp.head().raw_headers())
-          std::cout << it.name << ": " << it.value << std::endl;
+          std::cout << it.first << ": " << it.second << std::endl;
 
-        if (!resp.head().is_successful_status())
+        if (!(resp.head().status_code() == 200))
         {
           resp.close();
         }

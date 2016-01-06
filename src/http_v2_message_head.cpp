@@ -2,34 +2,34 @@
 #include <algorithm>
 #include <system_error>
 
-#include "http_message_head.hpp"
+#include "http_v2_message_head.hpp"
 
 namespace manifold
 {
   namespace http
   {
     //----------------------------------------------------------------//
-    header_block::header_block()
+    v2_header_block::v2_header_block()
     {
 
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    header_block::header_block(std::list<hpack::header_field>&& raw_headers)
+    v2_header_block::v2_header_block(std::list<hpack::header_field>&& raw_headers)
       : headers_(std::move(raw_headers))
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    header_block::~header_block()
+    v2_header_block::~v2_header_block()
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void header_block::pseudo_header(const std::string& name, const std::string& value)
+    void v2_header_block::pseudo_header(const std::string& name, const std::string& value)
     {
       std::string n(name);
       std::string v(value);
@@ -38,7 +38,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void header_block::pseudo_header(std::string&& name, std::string&& value)
+    void v2_header_block::pseudo_header(std::string&& name, std::string&& value)
     {
       const std::string whitespace(" \t\f\v\r\n");
       value.erase(0, value.find_first_not_of(whitespace));
@@ -67,7 +67,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void header_block::header(const std::string& name, const std::string& value)
+    void v2_header_block::header(const std::string& name, const std::string& value)
     {
       std::string n(name);
       std::string v(value);
@@ -76,7 +76,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void header_block::header(std::string&& name, std::string&& value)
+    void v2_header_block::header(std::string&& name, std::string&& value)
     {
       // trim
       const std::string whitespace(" \t\f\v\r\n");
@@ -100,7 +100,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void header_block::multi_header(const std::string& name, const std::list<std::string>& values)
+    void v2_header_block::multi_header(const std::string& name, const std::list<std::string>& values)
     {
       std::string n(name);
       std::list<std::string> v(values);
@@ -109,7 +109,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void header_block::multi_header(std::string&& name, std::list<std::string>&& values)
+    void v2_header_block::multi_header(std::string&& name, std::list<std::string>&& values)
     {
       // trim
       const std::string whitespace(" \t\f\v\r\n");
@@ -139,7 +139,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string header_block::header(const std::string& name) const
+    std::string v2_header_block::header(const std::string& name) const
     {
       std::string ret;
       std::string nameToLower(name);
@@ -156,7 +156,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::list<std::string> header_block::multi_header(const std::string& name) const
+    std::list<std::string> v2_header_block::multi_header(const std::string& name) const
     {
       std::list<std::string> ret;
       std::string nameToLower(name);
@@ -173,9 +173,15 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::list<hpack::header_field>& header_block::raw_headers() const
+    const std::list<std::pair<std::string,std::string>>& v2_header_block::raw_headers() const
     {
-      return this->headers_;
+      std::list<std::pair<std::string,std::string>> ret;
+      for (auto it = this->headers_.begin(); it != this->headers_.end(); ++it)
+      {
+        if (it->name.front() != ':')
+          ret.emplace_back(it->name, it->value);
+      }
+      return ret;
     }
     //----------------------------------------------------------------//
 
@@ -194,14 +200,14 @@ namespace manifold
 //    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void header_block::serialize(hpack::encoder& enc, const header_block& source, std::string& destination)
+    void v2_header_block::serialize(hpack::encoder& enc, const v2_header_block& source, std::string& destination)
     {
       enc.encode(source.headers_, destination);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool header_block::deserialize(hpack::decoder& dec, const std::string& source, header_block& destination)
+    bool v2_header_block::deserialize(hpack::decoder& dec, const std::string& source, v2_header_block& destination)
     {
       return dec.decode(source.begin(), source.end(), destination.headers_);
     }

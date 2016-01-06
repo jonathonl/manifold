@@ -12,8 +12,8 @@
 #include <iostream>
 
 #include "http_connection.hpp"
-#include "http_request_head.hpp"
-#include "http_response_head.hpp"
+#include "http_v2_request_head.hpp"
+#include "http_v2_response_head.hpp"
 #include "http_outgoing_message.hpp"
 #include "http_incoming_message.hpp"
 
@@ -77,9 +77,9 @@ namespace manifold
         }
         ~connection() {}
 
-        void on_informational_headers(std::uint32_t stream_id, const std::function<void(http::response_head&& headers)>& fn);
+        void on_informational_headers(std::uint32_t stream_id, const std::function<void(v2_response_head&& headers)>& fn);
         void on_response(std::uint32_t stream_id, const std::function<void(http::client::response&& resp)>& fn);
-        void on_trailers(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn);
+        void on_trailers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn);
         void on_push_promise(std::uint32_t stream_id, const std::function<void(http::client::request&& resp)>& fn);
       private:
         class stream : public http::connection::stream
@@ -93,17 +93,17 @@ namespace manifold
           }
           ~stream() {}
 
-          void on_informational_headers(const std::function<void(http::response_head&& headers)>& fn) { this->on_informational_headers_ = fn; }
-          void on_response_headers(const std::function<void(http::response_head&& headers)>& fn) { this->on_response_headers_ = fn; }
-          void on_trailers(const std::function<void(http::header_block&& headers)>& fn) { this->on_trailers_ = fn; }
-          void on_push_promise_headers(const std::function<void(http::request_head&& headers, std::uint32_t)>& fn) { this->on_push_promise_repsonse_head_ = fn; }
+          void on_informational_headers(const std::function<void(v2_response_head&& headers)>& fn) { this->on_informational_headers_ = fn; }
+          void on_response_headers(const std::function<void(v2_response_head&& headers)>& fn) { this->on_response_headers_ = fn; }
+          void on_trailers(const std::function<void(v2_header_block&& headers)>& fn) { this->on_trailers_ = fn; }
+          void on_push_promise_headers(const std::function<void(v2_request_head&& headers, std::uint32_t)>& fn) { this->on_push_promise_repsonse_head_ = fn; }
         private:
-          std::function<void(http::response_head&& headers)> on_informational_headers_;
-          std::function<void(http::response_head&& headers)> on_response_headers_;
-          std::function<void(http::header_block&& headers)> on_trailers_;
-          std::function<void(http::request_head&& req_head, std::uint32_t)> on_push_promise_repsonse_head_;
+          std::function<void(v2_response_head&& headers)> on_informational_headers_;
+          std::function<void(v2_response_head&& headers)> on_response_headers_;
+          std::function<void(v2_header_block&& headers)> on_trailers_;
+          std::function<void(v2_request_head&& req_head, std::uint32_t)> on_push_promise_repsonse_head_;
 
-          void on_headers_handler(http::header_block&& headers)
+          void on_headers_handler(v2_header_block&& headers)
           {
             // TODO: need to make sure response is only received once and that all of thes happen in the correct order.
             int status_code = atoi(headers.header(":status").c_str());
@@ -146,16 +146,16 @@ namespace manifold
       class response : public incoming_message
       {
       private:
-        response_head head_;
+        v2_response_head head_;
       protected:
         //----------------------------------------------------------------//
-        header_block& message_head() { return this->head_; }
+        v2_header_block& message_head() { return this->head_; }
         //----------------------------------------------------------------//
       public:
-        response(response_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
+        response(v2_response_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
         ~response();
 
-        const response_head& head() const;
+        const v2_response_head& head() const;
       };
       //================================================================//
 
@@ -163,26 +163,26 @@ namespace manifold
       class request : public outgoing_message
       {
       public:
-        request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
+        request(v2_request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id);
         request(request&& source);
         request& operator=(request&& source);
         ~request();
 
-        request_head& head();
+        v2_request_head& head();
 
         bool send_headers(bool end_stream = false);
 
         void on_push_promise(const std::function<void(http::client::request&& request)>& cb);
         void on_response(const std::function<void(http::client::response&& resp)>& cb);
-        void on_informational_headers(const std::function<void(http::response_head&& resp_head)>& cb);
+        void on_informational_headers(const std::function<void(v2_response_head&& resp_head)>& cb);
       private:
-        request_head head_;
+        v2_request_head head_;
 
         request(const request&) = delete;
         request& operator=(const request&) = delete;
       protected:
         //----------------------------------------------------------------//
-        header_block& message_head() { return this->head_; }
+        v2_header_block& message_head() { return this->head_; }
         //----------------------------------------------------------------//
       };
       //================================================================//

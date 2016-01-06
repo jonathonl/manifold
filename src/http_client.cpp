@@ -48,7 +48,7 @@ namespace manifold
     }
 
     //----------------------------------------------------------------//
-    void client::connection::on_informational_headers(std::uint32_t stream_id, const std::function<void(http::response_head&& headers)>& fn)
+    void client::connection::on_informational_headers(std::uint32_t stream_id, const std::function<void(v2_response_head&& headers)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -73,7 +73,7 @@ namespace manifold
       }
       else
       {
-        ((stream*)it->second.get())->on_response_headers([self, fn, stream_id](http::response_head&& headers)
+        ((stream*)it->second.get())->on_response_headers([self, fn, stream_id](v2_response_head&& headers)
         {
           fn(http::client::response(std::move(headers), self, stream_id));
         });
@@ -82,7 +82,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void client::connection::on_trailers(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn)
+    void client::connection::on_trailers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -107,7 +107,7 @@ namespace manifold
       }
       else
       {
-        it->second->on_push_promise([self, fn, stream_id](http::request_head&& headers, std::uint32_t promised_stream_id)
+        it->second->on_push_promise([self, fn, stream_id](v2_request_head&& headers, std::uint32_t promised_stream_id)
         {
           fn(http::client::request(std::move(headers), self, promised_stream_id));
         });
@@ -115,10 +115,10 @@ namespace manifold
     }
 
     //----------------------------------------------------------------//
-    client::request::request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
+    client::request::request(v2_request_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
       : outgoing_message(conn, stream_id), head_(std::move(head))
     {
-      conn->on_push_promise(stream_id, [conn](http::header_block&& req, std::uint32_t promised_stream_id)
+      conn->on_push_promise(stream_id, [conn](v2_header_block&& req, std::uint32_t promised_stream_id)
       {
         conn->send_reset_stream(promised_stream_id, errc::refused_stream);
       });
@@ -152,7 +152,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    request_head& client::request::head()
+    v2_request_head& client::request::head()
     {
       return this->head_;
     }
@@ -176,7 +176,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void client::request::on_informational_headers(const std::function<void(http::response_head&& resp_head)>& cb)
+    void client::request::on_informational_headers(const std::function<void(v2_response_head&& resp_head)>& cb)
     {
       ((client::connection*)this->connection_.get())->on_informational_headers(this->stream_id_, cb) ;
     }
@@ -192,7 +192,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    client::response::response(response_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
+    client::response::response(v2_response_head&& head, const std::shared_ptr<http::connection>& conn, std::uint32_t stream_id)
       : incoming_message(conn, stream_id)
     {
       this->head_ = std::move(head);
@@ -207,7 +207,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const response_head& client::response::head() const
+    const v2_response_head& client::response::head() const
     {
       return this->head_;
     }
@@ -385,7 +385,7 @@ namespace manifold
 
       std::uint32_t stream_id = this->connection_->create_stream(0, 0);
 
-      return client::request(http::request_head("/", "GET", {{"user-agent", this->default_user_agent_}}), this->connection_, stream_id);;
+      return client::request(v2_request_head("/", "GET", {{"user-agent", this->default_user_agent_}}), this->connection_, stream_id);;
     }
     //----------------------------------------------------------------//
 

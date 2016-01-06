@@ -39,7 +39,7 @@ namespace manifold
     }
 
     //----------------------------------------------------------------//
-    server::request::request(request_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
+    server::request::request(v2_request_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
       : incoming_message(conn, stream_id)
     {
       this->head_ = std::move(head);
@@ -53,14 +53,14 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const request_head& server::request::head() const
+    const v2_request_head& server::request::head() const
     {
       return this->head_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::response::response(response_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
+    server::response::response(v2_response_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
       : outgoing_message(conn, stream_id)
     {
       this->head_ = std::move(head);
@@ -75,7 +75,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    response_head& server::response::head()
+    v2_response_head& server::response::head()
     {
       return this->head_;
     }
@@ -91,28 +91,28 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::response server::response::make_push_response(request_head&& push_promise_headers)
+    server::response server::response::make_push_response(v2_request_head&& push_promise_headers)
     {
       std::uint32_t stream_id = this->connection_->create_stream(this->stream_id_, 0);
 
       if (stream_id)
         this->connection_->send_push_promise(this->stream_id_, std::move(push_promise_headers), stream_id, true);
 
-      response ret(http::response_head(200, {{"server", this->head().header("server")}}), this->connection_, stream_id);
+      response ret(v2_response_head(200, {{"server", this->head().header("server")}}), this->connection_, stream_id);
       return ret;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::response server::response::make_push_response(const request_head& push_promise_headers)
+    server::response server::response::make_push_response(const v2_request_head& push_promise_headers)
     {
-      return this->make_push_response(request_head(push_promise_headers));
+      return this->make_push_response(v2_request_head(push_promise_headers));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::server(asio::io_service& ioService, unsigned short port, const std::string& host)
-      : io_service_(ioService),
+    server::server(asio::io_service& ioservice, unsigned short port, const std::string& host)
+      : io_service_(ioservice),
         acceptor_(io_service_)
     {
       this->port_ = port;
@@ -121,8 +121,8 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::server(asio::io_service& ioService, ssl_options options, unsigned short port, const std::string& host)
-      : io_service_(ioService),
+    server::server(asio::io_service& ioservice, ssl_options options, unsigned short port, const std::string& host)
+      : io_service_(ioservice),
       acceptor_(io_service_),
       ssl_context_(new asio::ssl::context(options.method))
     {
@@ -353,12 +353,12 @@ namespace manifold
     {
       conn->on_new_stream([this, conn](std::int32_t stream_id)
       {
-        conn->on_headers(stream_id, [conn, stream_id, this](http::header_block&& headers)
+        conn->on_headers(stream_id, [conn, stream_id, this](v2_header_block&& headers)
         {
-          this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(http::response_head(200, {{"server", this->default_server_header_}}), conn, stream_id)) : void();
+          this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(v2_response_head(200, {{"server", this->default_server_header_}}), conn, stream_id)) : void();
         });
 
-        conn->on_push_promise(stream_id, [stream_id, conn](http::request_head&& head, std::uint32_t promised_stream_id)
+        conn->on_push_promise(stream_id, [stream_id, conn](v2_request_head&& head, std::uint32_t promised_stream_id)
         {
           conn->send_goaway(errc::protocol_error, "Clients Cannot Push!");
         });

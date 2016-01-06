@@ -4,7 +4,7 @@
 #define MANIFOLD_HTTP_MESSAGE_HPP
 
 #include "http_connection.hpp"
-#include "http_message_head.hpp"
+#include "http_v2_message_head.hpp"
 #include "hpack.hpp"
 
 namespace manifold

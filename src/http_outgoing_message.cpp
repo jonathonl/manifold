@@ -63,7 +63,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool outgoing_message::end(const char*const data, std::size_t data_sz, const http::header_block& trailers)
+    bool outgoing_message::end(const char*const data, std::size_t data_sz, const v2_header_block& trailers)
     {
       bool ret = true;
       if (!this->ended_)
@@ -86,7 +86,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool outgoing_message::end(const http::header_block& trailers)
+    bool outgoing_message::end(const v2_header_block& trailers)
     {
       return this->end(nullptr, 0, trailers);
     }

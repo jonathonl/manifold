@@ -13,7 +13,7 @@
 
 #include "socket.hpp"
 #include "http_frame.hpp"
-#include "http_message_head.hpp"
+#include "http_v2_message_head.hpp"
 
 #define MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL "\x2h2"
 
@@ -126,9 +126,9 @@ namespace manifold
         const std::uint32_t id_;
         stream_state state_ = stream_state::idle;
         std::function<void(const char* const buf, std::size_t buf_size)> on_data_;
-        std::function<void(http::header_block&& headers)> on_headers_;
+        std::function<void(v2_header_block&& headers)> on_headers_;
         std::function<void(std::uint32_t error_code)> on_rst_stream_;
-        std::function<void(http::header_block&& headers, std::uint32_t promised_stream_id)> on_push_promise_;
+        std::function<void(v2_header_block&& headers, std::uint32_t promised_stream_id)> on_push_promise_;
         std::function<void()> on_end_;
         std::function<void()> on_drain_;
         std::function<void(std::uint32_t error_code)> on_close_;
@@ -142,9 +142,9 @@ namespace manifold
         //const std::function<void(std::uint32_t error_code)>& on_close() const { return this->on_close_; }
 
         void on_data(const std::function<void(const char* const buf, std::size_t buf_size)>& fn) { this->on_data_ = fn; }
-        void on_headers(const std::function<void(http::header_block&& headers)>& fn) { this->on_headers_ = fn; }
+        void on_headers(const std::function<void(v2_header_block&& headers)>& fn) { this->on_headers_ = fn; }
         void on_rst_stream(const std::function<void(std::uint32_t error_code)>& fn) { this->on_rst_stream_ = fn; }
-        void on_push_promise(const std::function<void(http::header_block&& headers, std::uint32_t promised_stream_id)>& fn)  { this->on_push_promise_ = fn; }
+        void on_push_promise(const std::function<void(v2_header_block&& headers, std::uint32_t promised_stream_id)>& fn)  { this->on_push_promise_ = fn; }
         void on_end(const std::function<void()>& fn) { this->on_end_ = fn; }
         void on_drain(const std::function<void()>& fn)  { this->on_drain_ = fn; }
         void on_close(const std::function<void(std::uint32_t error_code)>& fn) { this->on_close_ = fn; }
@@ -154,7 +154,7 @@ namespace manifold
         bool has_sendable_frame(bool can_send_data);
         frame pop_next_outgoing_frame(std::uint32_t connection_window_size);
 
-        std::queue<header_block> incoming_message_heads;
+        std::queue<v2_header_block> incoming_message_heads;
         std::queue<frame> incoming_data_frames;
         std::queue<frame> outgoing_non_data_frames;
         std::queue<frame> outgoing_data_frames;
@@ -335,9 +335,9 @@ namespace manifold
       // connection-only frames: settings, ping, goaway
       // window_update is for both.
       void on_data(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
-      void on_headers(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn);
+      void on_headers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn);
       void on_close(std::uint32_t stream_id, const std::function<void(std::uint32_t error_code)>& fn);
-      void on_push_promise(std::uint32_t stream_id, const std::function<void(http::header_block&& headers, std::uint32_t promised_stream_id)>& fn);
+      void on_push_promise(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers, std::uint32_t promised_stream_id)>& fn);
 
 
       void on_end(std::uint32_t stream_id, const std::function<void()>& fn);
@@ -348,16 +348,16 @@ namespace manifold
       //----------------------------------------------------------------//
       std::uint32_t create_stream(std::uint32_t dependency_stream_id, std::uint32_t stream_id);
       bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream);
-      bool send_headers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream);
-      bool send_headers(std::uint32_t stream_id, const header_block& head, priority_options priority, bool end_headers, bool end_stream);
+      bool send_headers(std::uint32_t stream_id, const v2_header_block& head, bool end_headers, bool end_stream);
+      bool send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream);
       bool send_priority(std::uint32_t stream_id, priority_options options);
       bool send_reset_stream(std::uint32_t stream_id, http::errc error_code);
       void send_settings(const std::list<std::pair<std::uint16_t,std::uint32_t>>& settings);
-      bool send_push_promise(std::uint32_t stream_id, const header_block& head, std::uint32_t promised_stream_id, bool end_headers);
+      bool send_push_promise(std::uint32_t stream_id, const v2_header_block& head, std::uint32_t promised_stream_id, bool end_headers);
       void send_ping(std::uint64_t opaque_data);
       void send_goaway(http::errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0);
       bool send_window_update(std::uint32_t stream_id, std::uint32_t amount);
-      bool send_countinuation(std::uint32_t stream_id, const header_block& head, bool end_headers);
+      bool send_countinuation(std::uint32_t stream_id, const v2_header_block& head, bool end_headers);
       //----------------------------------------------------------------//
 
 

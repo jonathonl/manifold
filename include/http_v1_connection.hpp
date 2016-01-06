@@ -14,7 +14,7 @@ namespace manifold
 {
   namespace http
   {
-    class v1_connection
+    class v1_connection : public std::enable_shared_from_this<v1_connection>
     {
     public:
       v1_connection(non_tls_socket&& sock)

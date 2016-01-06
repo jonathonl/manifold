@@ -19,10 +19,11 @@ namespace manifold
       // successful
       ok                              = 200,
       created                         = 201,
-      non_authoritative_information   = 202,
-      no_content                      = 203,
-      reset_content                   = 204,
-      partial_content                 = 205,
+      accepted                        = 202,
+      non_authoritative_information   = 203,
+      no_content                      = 204,
+      reset_content                   = 205,
+      partial_content                 = 206,
 
       // redirection
       multiple_choices                = 300,
@@ -36,10 +37,10 @@ namespace manifold
 
       // client error
       bad_request                     = 400,
-      unauthorize                     = 401,
+      unauthorized                    = 401,
       payment_required                = 402,
       forbidden                       = 403,
-      notfound                        = 404,
+      not_found                       = 404,
       method_not_allowed              = 405,
       not_acceptable                  = 406,
       proxy_authentication_required   = 407,
@@ -48,7 +49,7 @@ namespace manifold
       gone                            = 410,
       length_required                 = 411,
       precondition_failed             = 412,
-      requestentity_too_large         = 413,
+      request_entity_too_large         = 413,
       request_uri_too_long            = 414,
       unsupported_media_type          = 415,
       requested_range_not_satisfiable = 416,
@@ -64,32 +65,26 @@ namespace manifold
     };
     //================================================================//
 
+    std::string status_code_to_reason_phrase(unsigned short status_code);
+
     //================================================================//
     class response_head : public header_block
     {
     private:
     public:
       //----------------------------------------------------------------//
-      response_head();
-      response_head(header_block&& hb);
-      response_head(unsigned short status, std::list<hpack::header_field>&& headers = {});
-      response_head(http::status_code status, std::list<hpack::header_field>&& headers = {});
-      ~response_head();
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-      unsigned short status_code() const;
-      void status_code(unsigned short value);
-      void status_code(http::status_code value);
-      bool is_informational_status() const;
-      bool is_successful_status() const;
-      bool is_redirection_status() const;
-      bool is_client_error_status() const;
-      bool is_server_error_status() const;
+      virtual unsigned short status_code() const = 0;
+      virtual void status_code(unsigned short value) = 0;
+      virtual void status_code(http::status_code value) = 0;
+      virtual bool is_informational_status() const;
+      virtual bool is_successful_status() const;
+      virtual bool is_redirection_status() const;
+      virtual bool is_client_error_status() const;
+      virtual bool is_server_error_status() const;
       //----------------------------------------------------------------//
     };
     //================================================================//
-  };
+  }
 }
 
-#endif // MANIFOLD_HTTP_RESPONSE_HEAD_HPP
+#endif //MANIFOLD_HTTP_RESPONSE_HEAD_HPP

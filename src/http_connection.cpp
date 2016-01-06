@@ -547,17 +547,17 @@ namespace manifold
         case stream_state::half_closed_local:
         case stream_state::reserved_remote:
         {
-          header_block headers;
+          v2_header_block headers;
 
           {
             std::string header_data(incoming_headers_frame.header_block_fragment(), incoming_headers_frame.header_block_fragment_length());
-            header_block::deserialize(dec, header_data, headers);
+            v2_header_block::deserialize(dec, header_data, headers);
           }
 
           for (auto it = continuation_frames.begin(); it != continuation_frames.end(); ++it)
           {
             std::string header_data(it->header_block_fragment(), it->header_block_fragment_length());
-            header_block::deserialize(dec, header_data, headers);
+            v2_header_block::deserialize(dec, header_data, headers);
           }
 
 
@@ -666,17 +666,17 @@ namespace manifold
         case stream_state::half_closed_local:
         case stream_state::open:
         {
-          header_block headers;
+          v2_header_block headers;
 
           {
             std::string header_data(incoming_push_promise_frame.header_block_fragment(), incoming_push_promise_frame.header_block_fragment_length());
-            header_block::deserialize(dec, header_data, headers);
+            v2_header_block::deserialize(dec, header_data, headers);
           }
 
           for (auto it = continuation_frames.begin(); it != continuation_frames.end(); ++it)
           {
             std::string header_data(it->header_block_fragment(), it->header_block_fragment_length());
-            header_block::deserialize(dec, header_data, headers);
+            v2_header_block::deserialize(dec, header_data, headers);
           }
 
           idle_promised_stream.state_ = stream_state::reserved_remote;
@@ -898,7 +898,7 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
-    void connection::on_headers(std::uint32_t stream_id, const std::function<void(http::header_block&& headers)>& fn)
+    void connection::on_headers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -924,7 +924,7 @@ namespace manifold
       }
     }
 
-    void connection::on_push_promise(std::uint32_t stream_id, const std::function<void(http::header_block&& headers, std::uint32_t promised_stream_id)>& fn)
+    void connection::on_push_promise(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers, std::uint32_t promised_stream_id)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -989,7 +989,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_headers(std::uint32_t stream_id, const header_block&head, bool end_headers, bool end_stream)
+    bool connection::send_headers(std::uint32_t stream_id, const v2_header_block& head, bool end_headers, bool end_stream)
     {
       bool ret = false;
 
@@ -1001,7 +1001,7 @@ namespace manifold
       else
       {
         std::string header_data;
-        http::header_block::serialize(this->hpack_encoder_, head, header_data);
+        v2_header_block::serialize(this->hpack_encoder_, head, header_data);
         const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
         if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
         {
@@ -1032,7 +1032,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_headers(std::uint32_t stream_id, const header_block& head, priority_options priority, bool end_headers, bool end_stream)
+    bool connection::send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream)
     {
       bool ret = false;
 
@@ -1045,7 +1045,7 @@ namespace manifold
       else
       {
         std::string header_data;
-        http::header_block::serialize(this->hpack_encoder_, head, header_data);
+        v2_header_block::serialize(this->hpack_encoder_, head, header_data);
         const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
         if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
         {
@@ -1123,7 +1123,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_countinuation(std::uint32_t stream_id, const header_block&head, bool end_headers)
+    bool connection::send_countinuation(std::uint32_t stream_id, const v2_header_block& head, bool end_headers)
     {
       bool ret = false;
 
@@ -1136,7 +1136,7 @@ namespace manifold
       else
       {
         std::string header_data;
-        http::header_block::serialize(this->hpack_encoder_, head, header_data);
+        v2_header_block::serialize(this->hpack_encoder_, head, header_data);
         if (header_data.size() > this->peer_settings_[setting_code::max_frame_size])
         {
           // TODO: Handle error
@@ -1183,7 +1183,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool connection::send_push_promise(std::uint32_t stream_id, const header_block& head, std::uint32_t promised_stream_id, bool end_headers)
+    bool connection::send_push_promise(std::uint32_t stream_id, const v2_header_block& head, std::uint32_t promised_stream_id, bool end_headers)
     {
       bool ret = false;
 
@@ -1196,7 +1196,7 @@ namespace manifold
       else
       {
         std::string header_data;
-        http::header_block::serialize(this->hpack_encoder_, head, header_data);
+        v2_header_block::serialize(this->hpack_encoder_, head, header_data);
         const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
         if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
         {
@@ -1290,7 +1290,7 @@ namespace manifold
 //        {
 //
 //          http::request_head requestHead;
-//          http::header_block::deserialize(std::string(self->incomingHeadBuffer_.data(), bytes_transferred), requestHead);
+//          v2_header_block::deserialize(std::string(self->incomingHeadBuffer_.data(), bytes_transferred), requestHead);
 //
 //          std::cout << requestHead.url() << ":" __FILE__ << "/" << __LINE__ << std::endl;
 //
