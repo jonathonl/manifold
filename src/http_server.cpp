@@ -6,7 +6,7 @@
 #include "asio.hpp"
 #include "tcp.hpp"
 #include "http_server.hpp"
-#include "http_connection.hpp"
+#include "http_v2_connection.hpp"
 
 namespace manifold
 {
@@ -39,7 +39,7 @@ namespace manifold
     }
 
     //----------------------------------------------------------------//
-    server::request::request(v2_request_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
+    server::request::request(request_head&& head, const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id)
       : incoming_message(conn, stream_id)
     {
       this->head_ = std::move(head);
@@ -53,14 +53,14 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const v2_request_head& server::request::head() const
+    const request_head& server::request::head() const
     {
       return this->head_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::response::response(v2_response_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
+    server::response::response(response_head&& head, const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id)
       : outgoing_message(conn, stream_id)
     {
       this->head_ = std::move(head);
@@ -75,7 +75,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    v2_response_head& server::response::head()
+    response_head& server::response::head()
     {
       return this->head_;
     }
@@ -349,7 +349,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void server::manage_connection(const std::shared_ptr<http::connection>& conn)
+    void server::manage_connection(const std::shared_ptr<http::v2_connection>& conn)
     {
       conn->on_new_stream([this, conn](std::int32_t stream_id)
       {

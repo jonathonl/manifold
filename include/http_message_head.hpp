@@ -15,23 +15,32 @@ namespace manifold
     {
     public:
       //----------------------------------------------------------------//
-      virtual void header(const std::string& name, const std::string& value) = 0;
-      virtual void header(std::string&& name, std::string&& value) = 0;
-      virtual void multi_header(const std::string& name, const std::list<std::string>& values) = 0;
-      virtual void multi_header(std::string&& name, std::list<std::string>&& values) = 0;
-      virtual std::string header(const std::string& name) const = 0;
-      virtual std::list<std::string> multi_header(const std::string& name) const = 0;
-      virtual const std::list<std::pair<std::string,std::string>>& raw_headers() const = 0;
+      header_block();
+      virtual ~header_block();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      virtual bool empty() const = 0;
-      virtual std::size_t size() const = 0;
+      void header(const std::string& name, const std::string& value);
+      void header(std::string&& name, std::string&& value);
+      void multi_header(const std::string& name, const std::list<std::string>& values);
+      void multi_header(std::string&& name, std::list<std::string>&& values);
+      std::string header(const std::string& name) const;
+      std::list<std::string> multi_header(const std::string& name) const;
+      const std::list<std::pair<std::string,std::string>>& raw_headers() const;
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      bool empty() const;
+      std::size_t size() const;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
 //      const std::string& http_version() const;
 //      void http_version(const std::string& version); // TODO: Make this an enum.
+      //----------------------------------------------------------------//
+    protected:
+      //----------------------------------------------------------------//
+      std::list<std::pair<std::string,std::string>> headers_;
       //----------------------------------------------------------------//
     };
     //================================================================//

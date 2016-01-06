@@ -19,17 +19,24 @@ namespace manifold
     {
     public:
       //----------------------------------------------------------------//
-      virtual std::string method() const = 0;
-      virtual void method(const std::string& value) = 0;
-      virtual void method(http::method value) = 0;
-      virtual bool method_is(http::method methodToCheck) const;
-      virtual std::string path() const = 0;
-      virtual void path(const std::string& value) = 0;
-      virtual std::string scheme() const = 0;
-      virtual void scheme(const std::string& value) = 0;
-      virtual std::string authority() const = 0;
-      virtual void authority(const std::string& value) = 0;
+      request_head();
+      ~request_head();
+      std::string method() const;
+      void method(const std::string& value);
+      void method(http::method value);
+      bool method_is(http::method methodToCheck) const;
+      std::string path() const;
+      void path(const std::string& value);
+      std::string scheme() const;
+      void scheme(const std::string& value);
+      std::string authority() const;
+      void authority(const std::string& value);
       //----------------------------------------------------------------//
+    private:
+      std::string method_;
+      std::string path_;
+      std::string authority_;
+      std::string scheme_;
     };
     //================================================================//
   };

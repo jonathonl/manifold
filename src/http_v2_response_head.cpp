@@ -15,6 +15,14 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    v2_response_head::v2_response_head(const response_head& generic_head)
+      : v2_header_block(generic_head)
+    {
+      this->status_code(generic_head.status_code());
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     v2_response_head::v2_response_head(v2_header_block&& hb)
       : v2_header_block(std::move(hb))
     {

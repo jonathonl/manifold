@@ -17,6 +17,7 @@ namespace manifold
     public:
       //----------------------------------------------------------------//
       v2_request_head(v2_header_block&& hb);
+      v2_request_head(const request_head& generic_head);
       v2_request_head(const std::string& url = "/", const std::string& method = "get", std::list<hpack::header_field>&& headers = {});
       v2_request_head(const std::string& url, http::method meth, std::list<hpack::header_field>&& headers = {});
       ~v2_request_head();

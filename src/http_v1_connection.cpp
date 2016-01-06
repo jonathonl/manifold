@@ -66,10 +66,11 @@ namespace manifold
 
           if (transfer_encoding.empty() || transfer_encoding == "identity")
           {
+            self->recv_known_length_body(content_length);
           }
           else
           {
-
+            self->recv_chunk_encoded_body();
           }
         }
       }, "\r\n\r\n");
@@ -102,7 +103,7 @@ namespace manifold
       }, "\r\n\r\n");
     }
 
-    void v1_connection::recv_chunk()
+    void v1_connection::recv_chunk_encoded_body()
     {
       auto self = shared_from_this();
       this->socket_->recvline(this->recv_buffer_.data(), this->recv_buffer_.size(), [self](const std::error_code& ec, std::size_t bytes_read)
@@ -154,7 +155,7 @@ namespace manifold
                     else
                     {
                       assert(bytes_read == 2);
-                      self->recv_chunk();
+                      self->recv_chunk_encoded_body();
                     }
                   });
                 }

@@ -16,6 +16,14 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    v2_header_block::v2_header_block(const header_block& generic_head)
+    {
+      for (auto it = generic_head.raw_headers().begin(); it != generic_head.raw_headers().end(); ++it)
+        this->header(it->first, it->second);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     v2_header_block::v2_header_block(std::list<hpack::header_field>&& raw_headers)
       : headers_(std::move(raw_headers))
     {

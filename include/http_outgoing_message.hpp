@@ -10,6 +10,7 @@ namespace manifold
   namespace http
   {
     //================================================================//
+    template <typename MessageHeadType>
     class outgoing_message : public message
     {
     private:
@@ -24,11 +25,11 @@ namespace manifold
       //----------------------------------------------------------------//
     protected:
       //----------------------------------------------------------------//
-      virtual v2_header_block& message_head() = 0;
+      virtual MessageHeadType& message_head() = 0;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      outgoing_message(const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+      outgoing_message(const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id);
       virtual ~outgoing_message();
       //----------------------------------------------------------------//
 
@@ -42,17 +43,17 @@ namespace manifold
         return this->send(dataBuffer.data(), dataBuffer.size());
       }
       void on_drain(const std::function<void()>& fn);
-      bool end(const char*const data, std::size_t data_sz, const v2_header_block& trailers = {});
-      bool end(const char* cstr, const v2_header_block& trailers = {})
+      bool end(const char*const data, std::size_t data_sz, const header_block& trailers = {});
+      bool end(const char* cstr, const header_block& trailers = {})
       {
         return this->end(std::string(cstr), trailers);
       }
       template <typename BufferT>
-      bool end(const BufferT& dataBuffer, const v2_header_block& trailers = {})
+      bool end(const BufferT& dataBuffer, const header_block& trailers = {})
       {
         return this->end(dataBuffer.data(), dataBuffer.size(), trailers);
       }
-      bool end(const v2_header_block& trailers = {});
+      bool end(const header_block& trailers = {});
       //----------------------------------------------------------------//
     };
     //================================================================//

@@ -65,7 +65,7 @@ namespace manifold
       std::function<void()> on_drain_;
 
       void run_recv_loop();
-      void recv_chunk();
+      void recv_chunk_encoded_body();
       void recv_trailers();
       void recv_known_length_body(std::uint64_t content_length);
       void run_send_loop();

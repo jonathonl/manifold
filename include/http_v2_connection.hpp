@@ -14,6 +14,8 @@
 #include "socket.hpp"
 #include "http_frame.hpp"
 #include "http_v2_message_head.hpp"
+#include "http_response_head.hpp"
+#include "http_request_head.hpp"
 
 #define MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL "\x2h2"
 
@@ -88,7 +90,7 @@ namespace manifold
 //    //================================================================//
 
     //================================================================//
-    class connection : public std::enable_shared_from_this<connection>
+    class v2_connection : public std::enable_shared_from_this<v2_connection>
     {
     protected:
       //================================================================//
@@ -304,9 +306,9 @@ namespace manifold
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      connection(non_tls_socket&& sock);
-      connection(tls_socket&& sock);
-      virtual ~connection();
+      v2_connection(non_tls_socket&& sock);
+      v2_connection(tls_socket&& sock);
+      virtual ~v2_connection();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -348,6 +350,9 @@ namespace manifold
       //----------------------------------------------------------------//
       std::uint32_t create_stream(std::uint32_t dependency_stream_id, std::uint32_t stream_id);
       bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream);
+      bool send_headers(std::uint32_t stream_id, const request_head& head, bool end_headers, bool end_stream);
+      bool send_headers(std::uint32_t stream_id, const response_head& head, bool end_headers, bool end_stream);
+      bool send_headers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream);
       bool send_headers(std::uint32_t stream_id, const v2_header_block& head, bool end_headers, bool end_stream);
       bool send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream);
       bool send_priority(std::uint32_t stream_id, priority_options options);

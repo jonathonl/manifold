@@ -17,6 +17,7 @@ namespace manifold
     public:
       //----------------------------------------------------------------//
       v2_response_head();
+      v2_response_head(const response_head& generic_head);
       v2_response_head(v2_header_block&& hb);
       v2_response_head(unsigned short status, std::list<hpack::header_field>&& headers = {});
       v2_response_head(http::status_code status, std::list<hpack::header_field>&& headers = {});

@@ -14,7 +14,7 @@
 #include "http_v2_response_head.hpp"
 #include "http_outgoing_message.hpp"
 #include "http_incoming_message.hpp"
-#include "http_connection.hpp"
+#include "http_v2_connection.hpp"
 
 namespace manifold
 {
@@ -25,25 +25,25 @@ namespace manifold
     {
     private:
       //================================================================//
-      class connection : public http::connection
+      class connection : public http::v2_connection
       {
       public:
         connection(non_tls_socket&& sock)
-          : http::connection(std::move(sock)), next_stream_id_(2)
+          : http::v2_connection(std::move(sock)), next_stream_id_(2)
         {
           this->local_settings_[setting_code::enable_push] = 0;
         }
         connection(tls_socket&& sock)
-          : http::connection(std::move(sock)), next_stream_id_(2)
+          : http::v2_connection(std::move(sock)), next_stream_id_(2)
         {
           this->local_settings_[setting_code::enable_push] = 0;
         }
         ~connection() {}
       private:
-        class stream : public http::connection::stream
+        class stream : public http::v2_connection::stream
         {
         public:
-          stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size) : http::connection::stream(stream_id, initial_window_size, initial_peer_window_size)
+          stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size) : http::v2_connection::stream(stream_id, initial_window_size, initial_peer_window_size)
           {
 
           }
@@ -77,46 +77,46 @@ namespace manifold
       {
       private:
         //----------------------------------------------------------------//
-        v2_request_head head_;
+        request_head head_;
         //----------------------------------------------------------------//
       protected:
         //----------------------------------------------------------------//
-        v2_header_block& message_head() { return this->head_; }
+        //header_block& message_head() { return this->head_; }
         //----------------------------------------------------------------//
       public:
         //----------------------------------------------------------------//
-        request(v2_request_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+        request(request_head&& head, const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id);
         ~request();
         //----------------------------------------------------------------//
 
         //----------------------------------------------------------------//
-        const v2_request_head& head() const;
+        const request_head& head() const;
         //----------------------------------------------------------------//
       };
       //================================================================//
 
       //================================================================//
-      class response : public outgoing_message
+      class response : public outgoing_message<response_head>
       {
       private:
         //----------------------------------------------------------------//
-        v2_response_head head_;
+        response_head head_;
         //----------------------------------------------------------------//
       protected:
         //----------------------------------------------------------------//
-        v2_header_block& message_head() { return this->head_; }
+        response_head& message_head() { return this->head_; }
         //----------------------------------------------------------------//
       public:
         //----------------------------------------------------------------//
-        response(v2_response_head&& head, const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+        response(response_head&& head, const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id);
         ~response();
         //----------------------------------------------------------------//
 
         //----------------------------------------------------------------//
-        v2_response_head& head();
+        response_head& head();
         bool send_headers(bool end_stream = false);
-        response make_push_response(v2_request_head&& push_promise_headers);
-        response make_push_response(const v2_request_head& push_promise_headers);
+        response make_push_response(request_head&& push_promise_headers);
+        response make_push_response(const request_head& push_promise_headers);
         //----------------------------------------------------------------//
       };
       //================================================================//
@@ -145,7 +145,7 @@ namespace manifold
       std::unique_ptr<asio::ssl::context> ssl_context_;
       unsigned short port_;
       std::string host_;
-      std::set<std::shared_ptr<http::connection>> connections_;
+      std::set<std::shared_ptr<http::v2_connection>> connections_;
       std::function<void(server::request&& req, server::response&& res)> request_handler_;
       std::string default_server_header_ = "Manifold";
       //std::list<std::pair<std::regex,std::function<void(server::request&& req, server::response&& res)>>> stream_handlers_;
@@ -154,7 +154,7 @@ namespace manifold
       //----------------------------------------------------------------//
       void accept();
       void accept(asio::ssl::context& ctx);
-      void manage_connection(const std::shared_ptr<http::connection>& conn);
+      void manage_connection(const std::shared_ptr<http::v2_connection>& conn);
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//

@@ -5,6 +5,7 @@ namespace manifold
 {
   namespace http
   {
+    //----------------------------------------------------------------//
     std::string status_code_to_reason_phrase(unsigned short status_code)
     {
       std::string ret;
@@ -137,11 +138,45 @@ namespace manifold
 
       return ret;
     }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    response_head::response_head() : status_code_(200)
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    response_head::~response_head()
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    std::uint16_t response_head::status_code() const
+    {
+      return this->status_code_;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void response_head::status_code(std::uint16_t value)
+    {
+      this->status_code_ = value;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void response_head::status_code(http::status_code value)
+    {
+      this->status_code_ = (std::uint16_t)value;
+    }
+    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     bool response_head::is_informational_status() const
     {
-      unsigned short status = this->status_code();
+      std::uint16_t status = this->status_code();
       return (status >= 100 && status < 200);
     }
     //----------------------------------------------------------------//
@@ -149,7 +184,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool response_head::is_successful_status() const
     {
-      unsigned short status = this->status_code();
+      std::uint16_t status = this->status_code();
       return (status >= 200 && status < 300);
     }
     //----------------------------------------------------------------//
@@ -157,7 +192,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool response_head::is_redirection_status() const
     {
-      unsigned short status = this->status_code();
+      std::uint16_t status = this->status_code();
       return (status >= 300 && status < 400);
     }
     //----------------------------------------------------------------//
@@ -165,7 +200,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool response_head::is_client_error_status() const
     {
-      unsigned short status = this->status_code();
+      std::uint16_t status = this->status_code();
       return (status >= 400 && status < 500);
     }
     //----------------------------------------------------------------//
@@ -173,7 +208,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool response_head::is_server_error_status() const
     {
-      unsigned short status = this->status_code();
+      std::uint16_t status = this->status_code();
       return (status >= 500 && status < 600);
     }
     //----------------------------------------------------------------//

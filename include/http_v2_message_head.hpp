@@ -33,6 +33,7 @@ namespace manifold
     public:
       //----------------------------------------------------------------//
       v2_header_block();
+      v2_header_block(const header_block& generic_head);
       v2_header_block(std::list<hpack::header_field>&& raw_headers);
       virtual ~v2_header_block();
       //----------------------------------------------------------------//

@@ -16,6 +16,17 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    v2_request_head::v2_request_head(const request_head& generic_head)
+      : v2_header_block(generic_head)
+    {
+      this->path(generic_head.path());
+      this->method(generic_head.method());
+      this->authority(generic_head.authority());
+      this->scheme(generic_head.scheme());
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     v2_request_head::v2_request_head(const std::string& path, const std::string& method, std::list<hpack::header_field>&& headers)
     {
       this->headers_ = std::move(headers);

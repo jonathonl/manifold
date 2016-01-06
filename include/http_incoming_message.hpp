@@ -27,13 +27,13 @@ namespace manifold
       //ssize_t recvKnownLengthEntity(char* buff, std::size_t buffSize);
       //----------------------------------------------------------------//
     protected:
-      //----------------------------------------------------------------//
-      virtual v2_header_block& message_head() = 0;
-      //----------------------------------------------------------------//
+//      //----------------------------------------------------------------//
+//      virtual v2_header_block& message_head() = 0;
+//      //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
       //incoming_message(const header_block& head, Socket&& sock);
-      incoming_message(const std::shared_ptr<http::connection>& conn, std::int32_t stream_id);
+      incoming_message(const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id);
       virtual ~incoming_message();
       //----------------------------------------------------------------//
 

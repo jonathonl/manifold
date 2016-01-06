@@ -34,10 +34,10 @@ std::tuple<move_only, move_only, int> return_move_only()
   return std::make_tuple(std::move(ret), std::move(ret2), 5);
 }
 //================================================================//
-void handle_push_promise(http::client::request&& req, std::uint32_t dependency_stream_id)
+void handle_push_promise(http::client::v2_request && req, std::uint32_t dependency_stream_id)
 {
 
-  req.on_response([](http::client::response&& resp)
+  req.on_response([](http::client::v2_response && resp)
   {
     for (auto it : resp.head().raw_headers())
       std::cout << it.first << ": " << it.second << std::endl;
@@ -205,13 +205,13 @@ int main()
     http::client c1(ioservice, "127.0.0.1", http::client::ssl_options(), 8080);
     c1.on_connect([&c1]()
     {
-      http::client::request req = c1.make_request();
+      http::client::v2_request req = c1.make_request();
       req.head() = http::v2_request_head("/foobar", http::method::post,
         {
           {"content-type","application/x-www-form-urlencoded"}
         });
 
-      req.on_response([&c1](http::client::response&& resp)
+      req.on_response([&c1](http::client::v2_response && resp)
       {
         for (auto it : resp.head().raw_headers())
           std::cout << it.first << ": " << it.second << std::endl;
@@ -264,11 +264,11 @@ int main()
     {
       if (false)
       {
-        auto request = std::make_shared<http::client::request>(c2.make_request());
+        auto request = std::make_shared<http::client::v2_request>(c2.make_request());
 
-        request->on_response([request, &c2](http::client::response&& resp)
+        request->on_response([request, &c2](http::client::v2_response && resp)
         {
-          auto response = std::make_shared<http::client::response>(std::move(resp));
+          auto response = std::make_shared<http::client::v2_response>(std::move(resp));
 
 
           response->on_data([](const char *const data, std::size_t datasz)
@@ -300,15 +300,15 @@ int main()
         auto req2(c2.make_request());
 
 
-        auto req_ptr = std::make_shared<http::client::request>(std::move(req2));
+        auto req_ptr = std::make_shared<http::client::v2_request>(std::move(req2));
 
         // Create file stream for response.
         auto ofs = std::make_shared<std::ofstream>("./reponse_file.txt.tmp");
 
         // Set on response handler.
-        req_ptr->on_response([&ofs, req_ptr](http::client::response &&res)
+        req_ptr->on_response([&ofs, req_ptr](http::client::v2_response &&res)
         {
-          auto res_ptr = std::make_shared<http::client::response>(std::move(res));
+          auto res_ptr = std::make_shared<http::client::v2_response>(std::move(res));
 
           if (res.head().status_code() != 200)
           {

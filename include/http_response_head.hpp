@@ -10,7 +10,7 @@ namespace manifold
   namespace http
   {
     //================================================================//
-    enum class status_code : unsigned short
+    enum class status_code : std::uint16_t
     {
       // informational
       continue_status                 = 100,
@@ -70,17 +70,22 @@ namespace manifold
     //================================================================//
     class response_head : public header_block
     {
-    private:
     public:
       //----------------------------------------------------------------//
-      virtual unsigned short status_code() const = 0;
-      virtual void status_code(unsigned short value) = 0;
-      virtual void status_code(http::status_code value) = 0;
-      virtual bool is_informational_status() const;
-      virtual bool is_successful_status() const;
-      virtual bool is_redirection_status() const;
-      virtual bool is_client_error_status() const;
-      virtual bool is_server_error_status() const;
+      response_head();
+      ~response_head();
+      std::uint16_t status_code() const;
+      void status_code(std::uint16_t value);
+      void status_code(http::status_code value);
+      bool is_informational_status() const;
+      bool is_successful_status() const;
+      bool is_redirection_status() const;
+      bool is_client_error_status() const;
+      bool is_server_error_status() const;
+      //----------------------------------------------------------------//
+    private:
+      //----------------------------------------------------------------//
+      std::uint16_t status_code_;
       //----------------------------------------------------------------//
     };
     //================================================================//

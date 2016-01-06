@@ -2,14 +2,13 @@
 #include <sstream>
 
 #include "http_outgoing_message.hpp"
-#include "tcp.hpp"
 
 namespace manifold
 {
   namespace http
   {
     //----------------------------------------------------------------//
-    outgoing_message::outgoing_message(const std::shared_ptr<http::connection>& conn, std::int32_t stream_id)
+    outgoing_message::outgoing_message(const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id)
       : message(conn, stream_id),
         bytes_sent_(0),
         headers_sent_(false)
@@ -63,7 +62,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool outgoing_message::end(const char*const data, std::size_t data_sz, const v2_header_block& trailers)
+    bool outgoing_message::end(const char*const data, std::size_t data_sz, const header_block& trailers)
     {
       bool ret = true;
       if (!this->ended_)
@@ -86,10 +85,15 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool outgoing_message::end(const v2_header_block& trailers)
+    bool outgoing_message::end(const header_block& trailers)
     {
       return this->end(nullptr, 0, trailers);
     }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template class outgoing_message<request_head>;
+    template class outgoing_message<response_head>;
     //----------------------------------------------------------------//
 
 //    //----------------------------------------------------------------//

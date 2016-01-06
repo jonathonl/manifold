@@ -14,7 +14,7 @@ set(HEADER_FILES
     include/tcp.hpp
     include/http_error_category.hpp
     include/http_frame.hpp
-    include/http_connection.hpp
+        include/http_v2_connection.hpp
     include/http_v2_message_head.hpp
     include/http_request_head.hpp
     include/http_v2_response_head.hpp
@@ -38,7 +38,7 @@ set(SOURCE_FILES
     src/tcp.cpp
     src/http_error_category.cpp
     src/http_frame.cpp
-    src/http_connection.cpp
+        src/http_v2_connection.cpp
     src/http_v2_message_head.cpp
     src/http_request_head.cpp
     src/http_v2_response_head.cpp
@@ -54,7 +54,7 @@ set(SOURCE_FILES
     src/http_v1_response_head.cpp
     src/http_response_head.cpp
     src/http_v2_request_head.cpp
-    src/http_v1_request_head.cpp)
+    src/http_v1_request_head.cpp src/http_message_head.cpp)
 
 add_library(manifold SHARED ${SOURCE_FILES} ${HEADER_FILES})
 #target_link_libraries(manifold libssl.dylib)
