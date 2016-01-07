@@ -39,8 +39,8 @@ namespace manifold
     }
 
     //----------------------------------------------------------------//
-    server::request::request(request_head&& head, const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id)
-      : incoming_message(conn, stream_id)
+    server::request::request(request_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id)
+      : incoming_message<response_head, request_head>(conn, stream_id)
     {
       this->head_ = std::move(head);
     }
@@ -60,8 +60,8 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::response::response(response_head&& head, const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id)
-      : outgoing_message(conn, stream_id)
+    server::response::response(response_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id)
+      : outgoing_message<response_head, request_head>(conn, stream_id)
     {
       this->head_ = std::move(head);
     }
@@ -328,7 +328,7 @@ namespace manifold
                   }
                   else
                   {
-                    auto it = this->connections_.emplace(std::make_shared<connection>(std::move(*sock)));
+                    auto it = this->connections_.emplace(std::make_shared<v2_connection<response_head, request_head>>(std::move(*sock)));
                     if (it.second)
                     {
                       this->manage_connection(*it.first);

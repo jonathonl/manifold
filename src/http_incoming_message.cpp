@@ -10,27 +10,31 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    incoming_message::incoming_message(const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id)
-      : message(conn, stream_id), bytesReceived_(0), bytesRemainingInChunk_(0)
+    template <typename SendMsg, typename RecvMsg>
+    incoming_message<SendMsg, RecvMsg>::incoming_message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::int32_t stream_id)
+      : message<SendMsg, RecvMsg>(conn, stream_id), bytesReceived_(0), bytesRemainingInChunk_(0)
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    incoming_message::~incoming_message()
+    template <typename SendMsg, typename RecvMsg>
+    incoming_message<SendMsg, RecvMsg>::~incoming_message()
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void incoming_message::on_data(const std::function<void(const char*const buff, std::size_t buff_size)>& fn)
+    template <typename SendMsg, typename RecvMsg>
+    void incoming_message<SendMsg, RecvMsg>::on_data(const std::function<void(const char*const buff, std::size_t buff_size)>& fn)
     {
       this->connection_->on_data(this->stream_id_, fn);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void incoming_message::on_end(const std::function<void()>& fn)
+    template <typename SendMsg, typename RecvMsg>
+    void incoming_message<SendMsg, RecvMsg>::on_end(const std::function<void()>& fn)
     {
       this->connection_->on_end(this->stream_id_, fn);
     }

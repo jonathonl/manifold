@@ -27,10 +27,6 @@ namespace manifold
       std::string header(const std::string& name) const;
       std::list<std::string> multi_header(const std::string& name) const;
       const std::list<std::pair<std::string,std::string>>& raw_headers() const;
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-      bool empty() const;
       std::size_t size() const;
       //----------------------------------------------------------------//
 

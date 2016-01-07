@@ -11,7 +11,8 @@ namespace manifold
   namespace http
   {
     //================================================================//
-    class incoming_message : public message
+    template <typename SendMsg, typename RecvMsg>
+    class incoming_message : public message<SendMsg, RecvMsg>
     {
     private:
       //----------------------------------------------------------------//
@@ -33,7 +34,7 @@ namespace manifold
     public:
       //----------------------------------------------------------------//
       //incoming_message(const header_block& head, Socket&& sock);
-      incoming_message(const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id);
+      incoming_message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::int32_t stream_id);
       virtual ~incoming_message();
       //----------------------------------------------------------------//
 

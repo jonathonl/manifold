@@ -10,8 +10,8 @@ namespace manifold
   namespace http
   {
     //================================================================//
-    template <typename MessageHeadType>
-    class outgoing_message : public message
+    template <typename SendMsg, typename RecvMsg>
+    class outgoing_message : public message<SendMsg, RecvMsg>
     {
     private:
       //----------------------------------------------------------------//
@@ -25,11 +25,11 @@ namespace manifold
       //----------------------------------------------------------------//
     protected:
       //----------------------------------------------------------------//
-      virtual MessageHeadType& message_head() = 0;
+      virtual SendMsg& message_head() = 0;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      outgoing_message(const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id);
+      outgoing_message(const std::shared_ptr<http::connection<SendMsg,RecvMsg>>& conn, std::int32_t stream_id);
       virtual ~outgoing_message();
       //----------------------------------------------------------------//
 

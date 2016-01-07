@@ -47,75 +47,75 @@ namespace manifold
       return SSL_TLSEXT_ERR_NOACK;
     }
 
-    //----------------------------------------------------------------//
-    void client::v2_connection::on_informational_headers(std::uint32_t stream_id, const std::function<void(v2_response_head&& headers)>& fn)
-    {
-      auto it = this->streams_.find(stream_id);
-      if (it == this->streams_.end())
-      {
-        // TODO: Handle error
-      }
-      else
-      {
-        ((stream*)it->second.get())->on_informational_headers(fn);
-      }
-    }
-    //----------------------------------------------------------------//
+//    //----------------------------------------------------------------//
+//    void client::v2_connection::on_informational_headers(std::uint32_t stream_id, const std::function<void(v2_response_head&& headers)>& fn)
+//    {
+//      auto it = this->streams_.find(stream_id);
+//      if (it == this->streams_.end())
+//      {
+//        // TODO: Handle error
+//      }
+//      else
+//      {
+//        ((stream*)it->second.get())->on_informational_headers(fn);
+//      }
+//    }
+//    //----------------------------------------------------------------//
+//
+//    //----------------------------------------------------------------//
+//    void client::v2_connection::on_response(std::uint32_t stream_id, const std::function<void(http::client::v2_response && resp)>& fn)
+//    {
+//      auto self = shared_from_this();
+//      auto it = this->streams_.find(stream_id);
+//      if (it == this->streams_.end())
+//      {
+//        // TODO: Handle error
+//      }
+//      else
+//      {
+//        ((stream*)it->second.get())->on_response_headers([self, fn, stream_id](v2_response_head&& headers)
+//        {
+//          fn(http::client::response(std::move(headers), self, stream_id));
+//        });
+//      }
+//    }
+//    //----------------------------------------------------------------//
+//
+//    //----------------------------------------------------------------//
+//    void client::v2_connection::on_trailers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn)
+//    {
+//      auto it = this->streams_.find(stream_id);
+//      if (it == this->streams_.end())
+//      {
+//        // TODO: Handle error
+//      }
+//      else
+//      {
+//        ((stream*)it->second.get())->on_trailers(fn);
+//      }
+//    }
+//    //----------------------------------------------------------------//
+//
+//    //----------------------------------------------------------------//
+//    void client::v2_connection::on_push_promise(std::uint32_t stream_id, const std::function<void(http::client::v2_request && req)>& fn)
+//    {
+//      auto self = this->shared_from_this();
+//      auto it = this->streams_.find(stream_id);
+//      if (it == this->streams_.end())
+//      {
+//      // TODO: Handle error
+//      }
+//      else
+//      {
+//        it->second->on_push_promise([self, fn, stream_id](v2_request_head&& headers, std::uint32_t promised_stream_id)
+//        {
+//          fn(http::client::request(std::move(headers), self, promised_stream_id));
+//        });
+//      }
+//    }
 
     //----------------------------------------------------------------//
-    void client::v2_connection::on_response(std::uint32_t stream_id, const std::function<void(http::client::v2_response && resp)>& fn)
-    {
-      auto self = shared_from_this();
-      auto it = this->streams_.find(stream_id);
-      if (it == this->streams_.end())
-      {
-        // TODO: Handle error
-      }
-      else
-      {
-        ((stream*)it->second.get())->on_response_headers([self, fn, stream_id](v2_response_head&& headers)
-        {
-          fn(http::client::v2_response(std::move(headers), self, stream_id));
-        });
-      }
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void client::v2_connection::on_trailers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn)
-    {
-      auto it = this->streams_.find(stream_id);
-      if (it == this->streams_.end())
-      {
-        // TODO: Handle error
-      }
-      else
-      {
-        ((stream*)it->second.get())->on_trailers(fn);
-      }
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void client::v2_connection::on_push_promise(std::uint32_t stream_id, const std::function<void(http::client::v2_request && req)>& fn)
-    {
-      auto self = this->shared_from_this();
-      auto it = this->streams_.find(stream_id);
-      if (it == this->streams_.end())
-      {
-      // TODO: Handle error
-      }
-      else
-      {
-        it->second->on_push_promise([self, fn, stream_id](v2_request_head&& headers, std::uint32_t promised_stream_id)
-        {
-          fn(http::client::request(std::move(headers), self, promised_stream_id));
-        });
-      }
-    }
-
-    //----------------------------------------------------------------//
-    client::request::request(request_head&& head, const std::shared_ptr<http::v2_connection>& conn, std::uint32_t stream_id)
+    client::request::request(request_head&& head, const std::shared_ptr<http::connection<request_head, response_head>>& conn, std::uint32_t stream_id)
       : outgoing_message(conn, stream_id), head_(std::move(head))
     {
       conn->on_push_promise(stream_id, [conn](v2_header_block&& req, std::uint32_t promised_stream_id)
@@ -171,14 +171,18 @@ namespace manifold
     void client::request::on_push_promise(const std::function<void(http::client::request && request)>& cb)
     {
       auto c = this->connection_;
-      ((client::v2_connection*)this->connection_.get())->on_push_promise(this->stream_id_, cb);
+      std::uint32_t stream_id = this->stream_id_;
+      this->connection_->on_push_promise(this->stream_id_, [cb, c, stream_id](request_head&& headers, std::uint32_t promised_stream_id)
+      {
+        cb ? cb(http::client::request(std::move(headers), c, promised_stream_id)) : void();
+      });
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void client::request::on_informational_headers(const std::function<void(response_head&& resp_head)>& cb)
     {
-      ((client::v2_connection*)this->connection_.get())->on_informational_headers(this->stream_id_, cb) ;
+      this->connection_->on_informational_headers(this->stream_id_, cb) ;
     }
     //----------------------------------------------------------------//
 
@@ -187,12 +191,15 @@ namespace manifold
     {
       auto c = this->connection_;
       std::uint32_t stream_id = this->stream_id_;
-      ((client::v2_connection*)this->connection_.get())->on_response(this->stream_id_, cb);
+      this->connection_->on_headers(this->stream_id_, [cb, c, stream_id](response_head&& headers)
+      {
+        cb ? cb(http::client::response(std::move(headers), c, stream_id)) : void();
+      });
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    client::response::response(response_head&& head, const std::shared_ptr<http::v2_connection>& conn, std::uint32_t stream_id)
+    client::response::response(response_head&& head, const std::shared_ptr<http::connection<request_head, response_head>>& conn, std::uint32_t stream_id)
       : incoming_message(conn, stream_id)
     {
       this->head_ = std::move(head);
@@ -250,7 +257,7 @@ namespace manifold
                 }
                 else
                 {
-                  this->connection_ = std::make_shared<v2_connection>(std::move(*sock));
+                  this->connection_ = std::make_shared<v2_connection<request_head, response_head>>(std::move(*sock));
                   this->connection_->run();
                   this->on_connect_ ? this->on_connect_() : void();
                 }
@@ -326,7 +333,7 @@ namespace manifold
                     }
                     else
                     {
-                      this->connection_ = std::make_shared<v2_connection>(std::move(*sock));
+                      this->connection_ = std::make_shared<v2_connection<request_head, response_head>>(std::move(*sock));
                       this->connection_->on_close([this](std::uint32_t ec) { this->on_close_ ? this->on_close_(ec) : void(); });
                       this->connection_->run();
                       this->on_connect_ ? this->on_connect_() : void();
@@ -385,7 +392,7 @@ namespace manifold
 
       std::uint32_t stream_id = this->connection_->create_stream(0, 0);
 
-      return client::v2_request(v2_request_head("/", "GET", {{"user-agent", this->default_user_agent_}}), this->connection_, stream_id);;
+      return client::request(request_head("/", "GET", {{"user-agent", this->default_user_agent_}}), this->connection_, stream_id);;
     }
     //----------------------------------------------------------------//
 

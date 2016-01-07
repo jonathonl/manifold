@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef MANIFOLD_HTTP_CONNECTION_HPP
-#define MANIFOLD_HTTP_CONNECTION_HPP
+#ifndef MANIFOLD_HTTP_V2_CONNECTION_HPP
+#define MANIFOLD_HTTP_V2_CONNECTION_HPP
 
 #include <random>
 #include <list>
@@ -16,6 +16,7 @@
 #include "http_v2_message_head.hpp"
 #include "http_response_head.hpp"
 #include "http_request_head.hpp"
+#include "http_connection.hpp"
 
 #define MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL "\x2h2"
 
@@ -90,7 +91,8 @@ namespace manifold
 //    //================================================================//
 
     //================================================================//
-    class v2_connection : public std::enable_shared_from_this<v2_connection>
+    template <typename SendMsg, typename RecvMsg>
+    class v2_connection : public std::enable_shared_from_this<v2_connection<SendMsg, RecvMsg>>, public connection<SendMsg, RecvMsg>
     {
     protected:
       //================================================================//
@@ -128,9 +130,10 @@ namespace manifold
         const std::uint32_t id_;
         stream_state state_ = stream_state::idle;
         std::function<void(const char* const buf, std::size_t buf_size)> on_data_;
-        std::function<void(v2_header_block&& headers)> on_headers_;
+        std::function<void(RecvMsg&& headers)> on_headers_;
+        std::function<void(RecvMsg&& headers)> on_informational_headers_;
         std::function<void(std::uint32_t error_code)> on_rst_stream_;
-        std::function<void(v2_header_block&& headers, std::uint32_t promised_stream_id)> on_push_promise_;
+        std::function<void(request_head&& headers, std::uint32_t promised_stream_id)> on_push_promise_;
         std::function<void()> on_end_;
         std::function<void()> on_drain_;
         std::function<void(std::uint32_t error_code)> on_close_;
@@ -336,6 +339,9 @@ namespace manifold
       //----------------------------------------------------------------//
       // connection-only frames: settings, ping, goaway
       // window_update is for both.
+      void on_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&& headers)>& fn);
+      void on_informational_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&& headers)>& fn);
+      void on_trailers(std::uint32_t stream_id, const std::function<void(header_block&& headers)>& fn);
       void on_data(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
       void on_headers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn);
       void on_close(std::uint32_t stream_id, const std::function<void(std::uint32_t error_code)>& fn);
@@ -375,4 +381,4 @@ namespace manifold
 
 
 
-#endif //MANIFOLD_HTTP_CONNECTION_HPP
+#endif //MANIFOLD_HTTP_V2_CONNECTION_HPP

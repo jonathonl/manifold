@@ -12,6 +12,7 @@ namespace manifold
   namespace http
   {
     //================================================================//
+    template <typename SendMsg, typename RecvMsg>
     class message
     {
     public:
@@ -21,13 +22,13 @@ namespace manifold
       //----------------------------------------------------------------//
     protected:
       //----------------------------------------------------------------//
-      std::shared_ptr<http::v2_connection> connection_;
+      std::shared_ptr<http::connection<SendMsg, RecvMsg>> connection_;
       std::uint32_t stream_id_;
       bool ended_ = false;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      message(const std::shared_ptr<http::v2_connection>& conn, std::uint32_t stream_id);
+      message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::uint32_t stream_id);
       //message(message&& source) {}
       //message& operator=(message&& source) { return *this; }
 

@@ -7,7 +7,8 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    message::message(const std::shared_ptr<http::v2_connection>& conn, std::uint32_t stream_id)
+    template <typename SendMsg, typename RecvMsg>
+    message<SendMsg,RecvMsg>::message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::uint32_t stream_id)
       : connection_(conn),
         stream_id_(stream_id)
     {
@@ -15,25 +16,29 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    message::~message()
+    template <typename SendMsg, typename RecvMsg>
+    message<SendMsg,RecvMsg>::~message()
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::uint32_t message::stream_id() const
+    template <typename SendMsg, typename RecvMsg>
+    std::uint32_t message<SendMsg,RecvMsg>::stream_id() const
     {
       return this->stream_id_;
     }
     //----------------------------------------------------------------//
 
-    void message::close(http::errc error_code)
+    template <typename SendMsg, typename RecvMsg>
+    void message<SendMsg,RecvMsg>::close(http::errc error_code)
     {
       this->connection_->send_reset_stream(this->stream_id_, error_code);
     }
 
     //----------------------------------------------------------------//
-    void message::on_close(const std::function<void(std::uint32_t ec)>& cb)
+    template <typename SendMsg, typename RecvMsg>
+    void message<SendMsg,RecvMsg>::on_close(const std::function<void(std::uint32_t ec)>& cb)
     {
       this->connection_->on_close(this->stream_id_, cb);
     }

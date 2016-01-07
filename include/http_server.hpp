@@ -25,25 +25,25 @@ namespace manifold
     {
     private:
       //================================================================//
-      class connection : public http::v2_connection
+      class connection : public http::v2_connection<response_head, request_head>
       {
       public:
         connection(non_tls_socket&& sock)
-          : http::v2_connection(std::move(sock)), next_stream_id_(2)
+          : http::v2_connection<response_head, request_head>(std::move(sock)), next_stream_id_(2)
         {
           this->local_settings_[setting_code::enable_push] = 0;
         }
         connection(tls_socket&& sock)
-          : http::v2_connection(std::move(sock)), next_stream_id_(2)
+          : http::v2_connection<response_head, request_head>(std::move(sock)), next_stream_id_(2)
         {
           this->local_settings_[setting_code::enable_push] = 0;
         }
         ~connection() {}
       private:
-        class stream : public http::v2_connection::stream
+        class stream : public http::v2_connection<response_head, request_head>::stream
         {
         public:
-          stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size) : http::v2_connection::stream(stream_id, initial_window_size, initial_peer_window_size)
+          stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size) : http::v2_connection<response_head, request_head>::stream(stream_id, initial_window_size, initial_peer_window_size)
           {
 
           }
@@ -73,7 +73,7 @@ namespace manifold
       //================================================================//
     public:
       //================================================================//
-      class request : public incoming_message
+      class request : public incoming_message<response_head, request_head>
       {
       private:
         //----------------------------------------------------------------//
@@ -85,7 +85,7 @@ namespace manifold
         //----------------------------------------------------------------//
       public:
         //----------------------------------------------------------------//
-        request(request_head&& head, const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id);
+        request(request_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id);
         ~request();
         //----------------------------------------------------------------//
 
@@ -96,7 +96,7 @@ namespace manifold
       //================================================================//
 
       //================================================================//
-      class response : public outgoing_message<response_head>
+      class response : public outgoing_message<response_head, request_head>
       {
       private:
         //----------------------------------------------------------------//
@@ -108,7 +108,7 @@ namespace manifold
         //----------------------------------------------------------------//
       public:
         //----------------------------------------------------------------//
-        response(response_head&& head, const std::shared_ptr<http::v2_connection>& conn, std::int32_t stream_id);
+        response(response_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id);
         ~response();
         //----------------------------------------------------------------//
 
@@ -145,7 +145,7 @@ namespace manifold
       std::unique_ptr<asio::ssl::context> ssl_context_;
       unsigned short port_;
       std::string host_;
-      std::set<std::shared_ptr<http::v2_connection>> connections_;
+      std::set<std::shared_ptr<http::v2_connection<response_head, request_head>>> connections_;
       std::function<void(server::request&& req, server::response&& res)> request_handler_;
       std::string default_server_header_ = "Manifold";
       //std::list<std::pair<std::regex,std::function<void(server::request&& req, server::response&& res)>>> stream_handlers_;
@@ -154,7 +154,7 @@ namespace manifold
       //----------------------------------------------------------------//
       void accept();
       void accept(asio::ssl::context& ctx);
-      void manage_connection(const std::shared_ptr<http::v2_connection>& conn);
+      void manage_connection(const std::shared_ptr<http::v2_connection<response_head, request_head>>& conn);
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
