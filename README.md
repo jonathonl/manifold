@@ -9,7 +9,7 @@ In progress.
 asio::io_service ioservice;
 
 http::router app;
-app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
+app.register_handler(std::regex("^/(.*)$"), [&app](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
 {
   auto res_ptr = std::make_shared<http::server::response>(std::move(res));
 
@@ -19,9 +19,14 @@ app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http
     req_entity->write(data, datasz);
   });
 
-  req.on_end([res_ptr, req_entity]()
+  req.on_end([res_ptr, req_entity, &app]()
   {
+    auto push_promise = res_ptr->send_push_promise(http::request_head("/main.css"));
+
     res_ptr->end("Received: " + req_entity->str());
+
+    push_promise.fulfill(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+
   });
 });
 
