@@ -257,7 +257,7 @@ namespace manifold
                 }
                 else
                 {
-                  this->connection_ = std::make_shared<v2_connection<request_head, response_head>>(std::move(*sock));
+                  this->connection_ = std::make_shared<v1_connection<request_head, response_head>>(std::move(*sock));
                   this->connection_->run();
                   this->on_connect_ ? this->on_connect_() : void();
                 }
@@ -333,7 +333,7 @@ namespace manifold
                     }
                     else
                     {
-                      this->connection_ = std::make_shared<v2_connection<request_head, response_head>>(std::move(*sock));
+                      this->connection_ = std::make_shared<v2_connection>(std::move(*sock));
                       this->connection_->on_close([this](std::uint32_t ec) { this->on_close_ ? this->on_close_(ec) : void(); });
                       this->connection_->run();
                       this->on_connect_ ? this->on_connect_() : void();
@@ -381,7 +381,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    http::client::v2_request client::make_request()
+    http::client::request client::make_request()
     {
 
       //TODO: this method needs better error handling.

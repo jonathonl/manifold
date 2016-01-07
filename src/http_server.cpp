@@ -91,22 +91,37 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::response server::response::make_push_response(v2_request_head&& push_promise_headers)
+    server::push_promise server::response::send_push_promise(request_head&& push_promise_headers)
     {
-      std::uint32_t stream_id = this->connection_->create_stream(this->stream_id_, 0);
+      std::uint32_t promised_stream_id = this->connection_->send_push_promise(this->stream_id_, push_promise_headers);
 
-      if (stream_id)
-        this->connection_->send_push_promise(this->stream_id_, std::move(push_promise_headers), stream_id, true);
-
-      response ret(v2_response_head(200, {{"server", this->head().header("server")}}), this->connection_, stream_id);
+      push_promise ret(server::request(std::move(push_promise_headers), this->connection_, promised_stream_id), server::response(response_head(200, {{"server", this->head().header("server")}}), this->connection_, promised_stream_id));
       return ret;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::response server::response::make_push_response(const v2_request_head& push_promise_headers)
+    server::push_promise server::response::send_push_promise(const request_head& push_promise_headers)
     {
-      return this->make_push_response(v2_request_head(push_promise_headers));
+      return this->send_push_promise(request_head(push_promise_headers));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    server::push_promise::push_promise(request&& req, response&& res)
+      : req_(std::move(req)), res_(std::move(res)), fulfilled_(false)
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void server::push_promise::fulfill(const std::function<void(server::request&& req, server::response&& res)>& handler)
+    {
+      if (!this->fulfilled_)
+      {
+        this->fulfilled_ = true;
+        handler(std::move(req_), std::move(res_));
+      }
     }
     //----------------------------------------------------------------//
 
@@ -234,8 +249,8 @@ namespace manifold
 
         if (!ec)
         {
-          auto* preface_buf = new std::array<char,connection::preface.size()>();
-          sock->recv(preface_buf->data(), connection::preface.size(), [this, sock, preface_buf](const std::error_code& ec, std::size_t bytes_read)
+          auto* preface_buf = new std::array<char, v2_connection::preface.size()>();
+          sock->recv(preface_buf->data(), v2_connection::preface.size(), [this, sock, preface_buf](const std::error_code& ec, std::size_t bytes_read)
           {
             if (ec)
             {
@@ -243,13 +258,13 @@ namespace manifold
             }
             else
             {
-              if (*preface_buf != connection::preface)
+              if (*preface_buf != v2_connection::preface)
               {
                 std::cout << "Invalid Connection Preface" << ":" __FILE__ << "/" << __LINE__ << std::endl;
               }
               else
               {
-                auto it = this->connections_.emplace(std::make_shared<connection>(std::move(*sock)));
+                auto it = this->connections_.emplace(std::make_shared<v2_connection>(std::move(*sock)));
                 if (it.second)
                 {
                   this->manage_connection(*it.first);
@@ -303,8 +318,8 @@ namespace manifold
             }
             else
             {
-              auto* preface_buf = new std::array<char,connection::preface.size()>();
-              sock->recv(preface_buf->data(), connection::preface.size(), [this, sock, preface_buf](const std::error_code& ec, std::size_t bytes_read)
+              auto* preface_buf = new std::array<char,v2_connection::preface.size()>();
+              sock->recv(preface_buf->data(), v2_connection::preface.size(), [this, sock, preface_buf](const std::error_code& ec, std::size_t bytes_read)
               {
                 if (ec)
                 {
@@ -322,13 +337,13 @@ namespace manifold
                 else
                 {
                   const char* t = preface_buf->data();
-                  if (*preface_buf != connection::preface)
+                  if (*preface_buf != v2_connection::preface)
                   {
                     std::cout << "Invalid Connection Preface" << ":" __FILE__ << "/" << __LINE__ << std::endl;
                   }
                   else
                   {
-                    auto it = this->connections_.emplace(std::make_shared<v2_connection<response_head, request_head>>(std::move(*sock)));
+                    auto it = this->connections_.emplace(std::make_shared<server::v2_connection>(std::move(*sock)));
                     if (it.second)
                     {
                       this->manage_connection(*it.first);
@@ -349,16 +364,16 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void server::manage_connection(const std::shared_ptr<http::v2_connection>& conn)
+    void server::manage_connection(const std::shared_ptr<http::v2_connection<response_head, request_head>>& conn)
     {
       conn->on_new_stream([this, conn](std::int32_t stream_id)
       {
-        conn->on_headers(stream_id, [conn, stream_id, this](v2_header_block&& headers)
+        conn->on_headers(stream_id, [conn, stream_id, this](request_head&& headers)
         {
-          this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(v2_response_head(200, {{"server", this->default_server_header_}}), conn, stream_id)) : void();
+          this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(response_head(200, {{"server", this->default_server_header_}}), conn, stream_id)) : void();
         });
 
-        conn->on_push_promise(stream_id, [stream_id, conn](v2_request_head&& head, std::uint32_t promised_stream_id)
+        conn->on_push_promise(stream_id, [stream_id, conn](response_head&& head, std::uint32_t promised_stream_id)
         {
           conn->send_goaway(errc::protocol_error, "Clients Cannot Push!");
         });

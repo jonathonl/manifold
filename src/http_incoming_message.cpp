@@ -40,6 +40,11 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
+    //----------------------------------------------------------------//
+    template class incoming_message<request_head, response_head>;
+    template class incoming_message<response_head, request_head>;
+    //----------------------------------------------------------------//
+
 //    //----------------------------------------------------------------//
 //    ssize_t incoming_message::recv(char* buff, std::size_t buffSize)
 //    {

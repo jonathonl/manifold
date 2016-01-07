@@ -132,7 +132,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::list<std::pair<std::string,std::string>> v1_header_block::raw_headers() const
+    const std::list<std::pair<std::string,std::string>>& v1_header_block::raw_headers() const
     {
       return this->headers_;
     }

@@ -12,7 +12,7 @@ namespace manifold
   {
     //**********************************************************************//
     // custom error conditions enum type:
-    enum class errc : std::uint32_t
+    enum class errc : std::int32_t
     {
       no_error            = 0x0,
       protocol_error      = 0x1,

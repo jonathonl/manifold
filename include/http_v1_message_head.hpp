@@ -29,7 +29,7 @@ namespace manifold
       void multi_header(std::string&& name, std::list<std::string>&& values);
       std::string header(const std::string& name) const;
       std::list<std::string> multi_header(const std::string& name) const;
-      std::list<std::pair<std::string, std::string>> raw_headers() const;
+      const std::list<std::pair<std::string, std::string>>& raw_headers() const;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//

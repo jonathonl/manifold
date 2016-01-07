@@ -181,15 +181,9 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    const std::list<std::pair<std::string,std::string>>& v2_header_block::raw_headers() const
+    const std::list<hpack::header_field>& v2_header_block::raw_headers() const
     {
-      std::list<std::pair<std::string,std::string>> ret;
-      for (auto it = this->headers_.begin(); it != this->headers_.end(); ++it)
-      {
-        if (it->name.front() != ':')
-          ret.emplace_back(it->name, it->value);
-      }
-      return ret;
+      return this->headers_;
     }
     //----------------------------------------------------------------//
 

@@ -16,6 +16,9 @@ namespace manifold
     public:
       //----------------------------------------------------------------//
       header_block();
+      header_block(const class v1_header_block& v1_headers);
+      header_block(const class v2_header_block& v2_headers);
+      header_block(std::list<std::pair<std::string,std::string>>&& headers);
       virtual ~header_block();
       //----------------------------------------------------------------//
 

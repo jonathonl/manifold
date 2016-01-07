@@ -81,7 +81,7 @@ namespace manifold
           this->connection_->send_data(this->stream_id_, data, data_sz, trailers.size() == 0);
           // TODO: Check content length against amount sent;
           if (trailers.size())
-            this->connection_->send_headers(this->stream_id_, trailers, true, true);
+            this->connection_->send_trailers(this->stream_id_, trailers, true, true);
           this->ended_ = true;
         }
       }
@@ -98,10 +98,10 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
-//    //----------------------------------------------------------------//
-//    template class outgoing_message<request_head>;
-//    template class outgoing_message<response_head>;
-//    //----------------------------------------------------------------//
+    //----------------------------------------------------------------//
+    template class outgoing_message<response_head, request_head>;
+    template class outgoing_message<request_head, response_head>;
+    //----------------------------------------------------------------//
 
 //    //----------------------------------------------------------------//
 //    bool outgoing_message::send(const char* data, std::size_t dataSize)

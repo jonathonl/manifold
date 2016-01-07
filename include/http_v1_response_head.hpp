@@ -20,6 +20,7 @@ namespace manifold
       //----------------------------------------------------------------//
       v1_response_head();
       v1_response_head(v1_message_head&& hb);
+      v1_response_head(const v1_message_head& hb);
       v1_response_head(unsigned short status, std::list<std::pair<std::string,std::string>>&& headers = {});
       v1_response_head(http::status_code status, std::list<std::pair<std::string,std::string>>&& headers = {});
       ~v1_response_head();

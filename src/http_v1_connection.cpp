@@ -7,44 +7,58 @@ namespace manifold
 {
   namespace http
   {
-    void v1_connection::on_data(const std::function<void(const char* const, std::size_t)>& fn)
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::on_data(std::uint32_t transaction_id, const std::function<void(const char* const, std::size_t)>& fn)
     {
       this->on_data_ = fn;
     }
 
-    void v1_connection::on_headers(const std::function<void(v1_message_head&&)>& fn)
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::on_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&&)>& fn)
     {
       this->on_headers_ = fn;
     }
 
-    void v1_connection::on_trailers(const std::function<void(v1_header_block&&)>& fn)
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::on_informational_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&& headers)>& fn)
+    {
+      this->on_headers_ = fn;
+    }
+
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::on_trailers(std::uint32_t transaction_id, const std::function<void(header_block&&)>& fn)
     {
       this->on_trailers_ = fn;
     }
 
-    void v1_connection::on_close(const std::function<void(std::uint32_t)>& fn)
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::on_close(std::uint32_t transaction_id, const std::function<void(std::uint32_t)>& fn)
     {
       this->on_close_ = fn;
     }
 
-    void v1_connection::on_end(const std::function<void()>& fn)
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::on_end(std::uint32_t transaction_id, const std::function<void()>& fn)
     {
       this->on_end_ = fn;
     }
 
-    void v1_connection::on_drain(const std::function<void()>& fn)
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::on_drain(std::uint32_t transaction_id, const std::function<void()>& fn)
     {
       this->on_drain_ = fn;
     }
 
-    void v1_connection::run()
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::run()
     {
       this->run_recv_loop();
     }
 
-    void v1_connection::run_recv_loop()
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::run_recv_loop()
     {
-      auto self = shared_from_this();
+      auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
       this->socket_->recvline(this->recv_buffer_.data(), this->recv_buffer_.size(), [self](const std::error_code& ec, std::size_t bytes_read)
       {
         if (ec)
@@ -76,9 +90,10 @@ namespace manifold
       }, "\r\n\r\n");
     }
 
-    void v1_connection::recv_trailers()
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::recv_trailers()
     {
-      auto self = shared_from_this();
+      auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
       this->socket_->recvline(this->recv_buffer_.data(), this->recv_buffer_.size(), [self](const std::error_code& ec, std::size_t bytes_read)
       {
         if (ec)
@@ -103,9 +118,10 @@ namespace manifold
       }, "\r\n\r\n");
     }
 
-    void v1_connection::recv_chunk_encoded_body()
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::recv_chunk_encoded_body()
     {
-      auto self = shared_from_this();
+      auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
       this->socket_->recvline(this->recv_buffer_.data(), this->recv_buffer_.size(), [self](const std::error_code& ec, std::size_t bytes_read)
       {
         if (ec)
@@ -166,7 +182,8 @@ namespace manifold
       });
     }
 
-    void v1_connection::recv_known_length_body(std::uint64_t content_length)
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::recv_known_length_body(std::uint64_t content_length)
     {
       if (content_length == 0)
       {
@@ -179,7 +196,7 @@ namespace manifold
         if (bytes_to_read > content_length)
           bytes_to_read = content_length;
 
-        auto self = shared_from_this();
+        auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
         this->socket_->recv(this->recv_buffer_.data(), bytes_to_read, [self, content_length](const std::error_code& ec, std::size_t bytes_read)
         {
           if (ec)
@@ -195,7 +212,8 @@ namespace manifold
       }
     }
 
-    void v1_connection::run_send_loop()
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::run_send_loop()
     {
       if (!this->send_loop_running_)
       {
@@ -210,7 +228,7 @@ namespace manifold
             {
               current_message.head_sent = true;
 
-              auto self = shared_from_this();
+              auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
               this->socket_->send(current_message.head_data.data(), current_message.head_data.size(), [self](const std::error_code &ec, std::size_t bytes_sent)
               {
                 if (ec)
@@ -237,7 +255,7 @@ namespace manifold
             }
             else
             {
-              auto self = shared_from_this();
+              auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
               this->socket_->send(current_message.body.front().data(), current_message.body.front().size(), [self, &current_message](const std::error_code &ec, std::size_t bytes_sent)
               {
                 if (ec)
@@ -259,7 +277,7 @@ namespace manifold
           {
             if (current_message.trailer_data.size())
             {
-              auto self = shared_from_this();
+              auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
               this->socket_->send(current_message.trailer_data.data(), current_message.trailer_data.size(), [self, &current_message](const std::error_code &ec, std::size_t bytes_sent)
               {
                 if (ec)
@@ -291,13 +309,15 @@ namespace manifold
       }
     }
 
-    std::uint64_t v1_connection::start_message()
+    template <typename SendMsg, typename RecvMsg>
+    std::uint64_t v1_connection<SendMsg, RecvMsg>::start_message()
     {
       this->send_queue_.emplace_back(queued_message(this->next_transaction_id_));
       return this->next_transaction_id_++;
     }
 
-    void v1_connection::send_message_head(std::uint64_t transaction_id, const v1_message_head& head)
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::send_message_head(std::uint64_t transaction_id, const v1_message_head& head)
     {
       auto it = std::find_if(this->send_queue_.begin(), this->send_queue_.end(), [transaction_id](const queued_message& m) { return m.id == transaction_id; });
       if (it != this->send_queue_.end() && !it->head_sent)
@@ -315,7 +335,8 @@ namespace manifold
       }
     }
 
-    void v1_connection::send_message_body(std::uint64_t transaction_id, const char*const data, std::size_t data_sz)
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::send_message_body(std::uint64_t transaction_id, const char*const data, std::size_t data_sz)
     {
       auto it = std::find_if(this->send_queue_.begin(), this->send_queue_.end(), [transaction_id](const queued_message& m) { return m.id == transaction_id; });
       if (it != this->send_queue_.end() && !it->ended && data_sz)
@@ -342,7 +363,8 @@ namespace manifold
       }
     }
 
-    void v1_connection::end_message(std::uint64_t transaction_id, const v1_header_block& trailers)
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::end_message(std::uint64_t transaction_id, const v1_header_block& trailers)
     {
       auto it = std::find_if(this->send_queue_.begin(), this->send_queue_.end(), [transaction_id](const queued_message& m) { return m.id == transaction_id; });
       if (it != this->send_queue_.end() && !it->ended)
@@ -362,6 +384,9 @@ namespace manifold
         this->run_send_loop();
       }
     }
+
+    template class v1_connection<request_head, response_head>;
+    template class v1_connection<response_head, request_head>;
   }
 }
 

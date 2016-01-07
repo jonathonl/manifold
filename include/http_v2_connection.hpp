@@ -129,14 +129,18 @@ namespace manifold
       protected:
         const std::uint32_t id_;
         stream_state state_ = stream_state::idle;
+        bool on_headers_called_ = false;
         std::function<void(const char* const buf, std::size_t buf_size)> on_data_;
         std::function<void(RecvMsg&& headers)> on_headers_;
         std::function<void(RecvMsg&& headers)> on_informational_headers_;
+        std::function<void(header_block&& headers)> on_trailers_;
         std::function<void(std::uint32_t error_code)> on_rst_stream_;
-        std::function<void(request_head&& headers, std::uint32_t promised_stream_id)> on_push_promise_;
+        std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)> on_push_promise_;
         std::function<void()> on_end_;
         std::function<void()> on_drain_;
         std::function<void(std::uint32_t error_code)> on_close_;
+
+        static bool header_is_informational(const RecvMsg& head);
       public:
         //const std::function<void(const char* const buf, std::size_t buf_size)>& on_data() const { return this->on_data_; }
         //const std::function<void(http::header_block&& headers)>& on_headers() const { return this->on_headers_; }
@@ -147,9 +151,11 @@ namespace manifold
         //const std::function<void(std::uint32_t error_code)>& on_close() const { return this->on_close_; }
 
         void on_data(const std::function<void(const char* const buf, std::size_t buf_size)>& fn) { this->on_data_ = fn; }
-        void on_headers(const std::function<void(v2_header_block&& headers)>& fn) { this->on_headers_ = fn; }
+        void on_headers(const std::function<void(RecvMsg&& headers)>& fn) { this->on_headers_ = fn; }
+        void on_informational_headers(const std::function<void(RecvMsg&& headers)>& fn) { this->on_informational_headers_ = fn; }
+        void on_trailers(const std::function<void(header_block&& headers)>& fn) { this->on_trailers_ = fn; }
         void on_rst_stream(const std::function<void(std::uint32_t error_code)>& fn) { this->on_rst_stream_ = fn; }
-        void on_push_promise(const std::function<void(v2_header_block&& headers, std::uint32_t promised_stream_id)>& fn)  { this->on_push_promise_ = fn; }
+        void on_push_promise(const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn)  { this->on_push_promise_ = fn; }
         void on_end(const std::function<void()>& fn) { this->on_end_ = fn; }
         void on_drain(const std::function<void()>& fn)  { this->on_drain_ = fn; }
         void on_close(const std::function<void(std::uint32_t error_code)>& fn) { this->on_close_ = fn; }
@@ -172,7 +178,31 @@ namespace manifold
         bool end_stream_frame_received = false;
         stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size)
           : id_(stream_id), incoming_window_size(initial_window_size), outgoing_window_size(initial_peer_window_size) {}
-        virtual ~stream() {}
+        stream(stream&& source)
+          : id_(std::move(source.id_)),
+            state_(std::move(source.state_)),
+            on_headers_called_(std::move(source.on_headers_called_)),
+            on_data_(std::move(source.on_data_)),
+            on_headers_(std::move(source.on_headers_)),
+            on_informational_headers_(std::move(source.on_informational_headers_)),
+            on_trailers_(std::move(source.on_trailers_)),
+            on_rst_stream_(std::move(source.on_rst_stream_)),
+            on_push_promise_(std::move(source.on_push_promise_)),
+            on_end_(std::move(source.on_end_)),
+            on_drain_(std::move(source.on_drain_)),
+            on_close_(std::move(source.on_close_)),
+            incoming_message_heads(std::move(source.incoming_message_heads)),
+            incoming_data_frames(std::move(source.incoming_data_frames)),
+            outgoing_non_data_frames(std::move(source.outgoing_non_data_frames)),
+            outgoing_data_frames(std::move(source.outgoing_data_frames)),
+            incoming_window_size(std::move(source.incoming_window_size)),
+            outgoing_window_size(std::move(source.outgoing_window_size)),
+            stream_dependency_id(std::move(source.stream_dependency_id)),
+            weight(std::move(source.weight)),
+            end_stream_frame_received(std::move(source.end_stream_frame_received))
+        {
+        }
+        ~stream() {}
 
         //----------------------------------------------------------------//
         void handle_incoming_frame(const data_frame& incoming_data_frame);
@@ -248,9 +278,10 @@ namespace manifold
 
 
       //----------------------------------------------------------------//
-      std::map<std::uint32_t,std::unique_ptr<stream>> streams_;
+      std::map<std::uint32_t,stream> streams_;
       std::map<setting_code,std::uint32_t> local_settings_;
-      virtual stream* create_stream_object(std::uint32_t stream_id) = 0;
+      stream* create_stream_object(std::uint32_t stream_id);
+      std::uint32_t get_next_stream_id();
       //----------------------------------------------------------------//
     private:
       //----------------------------------------------------------------//
@@ -273,7 +304,7 @@ namespace manifold
 
       //----------------------------------------------------------------//
       std::uint32_t last_newly_accepted_stream_id_;
-      std::uint32_t last_newly_created_stream_id_;
+      std::uint32_t next_stream_id_;
       std::uint32_t outgoing_window_size_;
       std::uint32_t incoming_window_size_;
 
@@ -285,6 +316,8 @@ namespace manifold
       std::uint32_t connection_level_outgoing_window_size() const { return this->outgoing_window_size_; }
       std::uint32_t connection_level_incoming_window_size() const { return this->incoming_window_size_; }
       void garbage_collect_streams();
+      bool receiving_push_promise_is_allowed();
+      bool sending_push_promise_is_allowed();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -322,6 +355,7 @@ namespace manifold
       //----------------------------------------------------------------//
       static const std::array<char,24> preface;
       static const std::uint32_t max_stream_id = 0x7FFFFFFF;
+      static const std::uint32_t initial_stream_id;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -332,7 +366,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void on_new_stream(const std::function<void(std::int32_t stream_id)>& fn);
+      void on_new_stream(const std::function<void(std::uint32_t stream_id)>& fn);
       void on_close(const std::function<void(std::uint32_t error_code)>& fn);
       //----------------------------------------------------------------//
 
@@ -343,9 +377,9 @@ namespace manifold
       void on_informational_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&& headers)>& fn);
       void on_trailers(std::uint32_t stream_id, const std::function<void(header_block&& headers)>& fn);
       void on_data(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
-      void on_headers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn);
+      //void on_headers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn);
       void on_close(std::uint32_t stream_id, const std::function<void(std::uint32_t error_code)>& fn);
-      void on_push_promise(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers, std::uint32_t promised_stream_id)>& fn);
+      void on_push_promise(std::uint32_t stream_id, const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn);
 
 
       void on_end(std::uint32_t stream_id, const std::function<void()>& fn);
@@ -356,15 +390,14 @@ namespace manifold
       //----------------------------------------------------------------//
       std::uint32_t create_stream(std::uint32_t dependency_stream_id, std::uint32_t stream_id);
       bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream);
-      bool send_headers(std::uint32_t stream_id, const request_head& head, bool end_headers, bool end_stream);
-      bool send_headers(std::uint32_t stream_id, const response_head& head, bool end_headers, bool end_stream);
-      bool send_headers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream);
+      bool send_headers(std::uint32_t stream_id, const SendMsg& head, bool end_headers, bool end_stream);
+      bool send_trailers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream);
       bool send_headers(std::uint32_t stream_id, const v2_header_block& head, bool end_headers, bool end_stream);
       bool send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream);
       bool send_priority(std::uint32_t stream_id, priority_options options);
       bool send_reset_stream(std::uint32_t stream_id, http::errc error_code);
       void send_settings(const std::list<std::pair<std::uint16_t,std::uint32_t>>& settings);
-      bool send_push_promise(std::uint32_t stream_id, const v2_header_block& head, std::uint32_t promised_stream_id, bool end_headers);
+      std::uint32_t send_push_promise(std::uint32_t stream_id, const RecvMsg& head);
       void send_ping(std::uint64_t opaque_data);
       void send_goaway(http::errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0);
       bool send_window_update(std::uint32_t stream_id, std::uint32_t amount);

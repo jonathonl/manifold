@@ -3,6 +3,7 @@
 #define MANIFOLD_HTTP_V1_CONNECTION_HPP
 
 #include "socket.hpp"
+#include "http_connection.hpp"
 #include "http_v1_message_head.hpp"
 
 #include <functional>
@@ -14,23 +15,46 @@ namespace manifold
 {
   namespace http
   {
-    class v1_connection : public std::enable_shared_from_this<v1_connection>
+    template <typename SendMsg, typename RecvMsg>
+    class v1_connection : public std::enable_shared_from_this<v1_connection<SendMsg, RecvMsg>>, public connection<SendMsg, RecvMsg>
     {
     public:
       v1_connection(non_tls_socket&& sock)
-        : socket_(new non_tls_socket(std::move(sock))), send_loop_running_(false), next_transaction_id_(1) {}
+        : socket_(new non_tls_socket(std::move(sock))),
+          send_loop_running_(false),
+          next_transaction_id_(1) {}
       v1_connection(tls_socket&& sock)
-        : socket_(new tls_socket(std::move(sock))), send_loop_running_(false), next_transaction_id_(1) {}
+        : socket_(new tls_socket(std::move(sock))),
+          send_loop_running_(false),
+          next_transaction_id_(1) {}
       virtual ~v1_connection() {}
 
       void run();
+      void close(std::uint32_t ec) {}
 
-      void on_data(const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
-      void on_headers(const std::function<void(v1_message_head&& headers)>& fn);
-      void on_trailers(const std::function<void(v1_header_block&& trailers)>& fn);
-      void on_close(const std::function<void(std::uint32_t error_code)>& fn);
-      void on_end(const std::function<void()>& fn);
-      void on_drain(const std::function<void()>& fn);
+
+      void on_close(const std::function<void(std::uint32_t error_code)>& fn) {}
+      void on_new_stream(const std::function<void(std::uint32_t transaction_id)>& fn) {}
+
+      void on_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&& headers)>& fn);
+      void on_informational_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&& headers)>& fn);
+      void on_trailers(std::uint32_t transaction_id, const std::function<void(header_block&& headers)>& fn);
+      void on_push_promise(std::uint32_t transaction_id, const std::function<void(SendMsg&& headers, std::uint32_t promised_transaction_id)>& fn) {}
+      void on_data(std::uint32_t transaction_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
+      void on_close(std::uint32_t transaction_id, const std::function<void(std::uint32_t error_code)>& fn);
+      void on_end(std::uint32_t transaction_id, const std::function<void()>& fn);
+      void on_drain(std::uint32_t transaction_id, const std::function<void()>& fn);
+
+
+      std::uint32_t create_stream(std::uint32_t dependency_transaction_id, std::uint32_t transaction_id) { return 0; }
+      bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream) { return false; }
+      bool send_headers(std::uint32_t stream_id, const SendMsg& head, bool end_headers, bool end_stream) { return false; }
+      bool send_trailers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream) { return false; }
+      //bool send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream);
+      //bool send_priority(std::uint32_t stream_id, priority_options options);
+      bool send_reset_stream(std::uint32_t stream_id, http::errc error_code)  { this->close((int)error_code); }
+      std::uint32_t send_push_promise(std::uint32_t stream_id, const RecvMsg& head) { return 0; }
+      void send_goaway(http::errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0) { this->close((int)error_code); }
 
       std::uint64_t start_message();
       void send_message_head(std::uint64_t transaction_id, const v1_message_head& head);

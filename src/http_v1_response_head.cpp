@@ -22,6 +22,13 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    v1_response_head::v1_response_head(const v1_message_head& hb)
+      : v1_message_head(hb)
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     v1_response_head::v1_response_head(unsigned short status, std::list<std::pair<std::string,std::string>>&& headers)
     {
       this->start_line_ = "http/1.1 200 Ok";
@@ -48,8 +55,8 @@ namespace manifold
     //----------------------------------------------------------------//
     unsigned short v1_response_head::status_code() const
     {
-      std::stringstream tmp(this->start_line_.substr(9,3));
       unsigned short ret = 0;
+      std::stringstream tmp(this->start_line_.substr(9,3));
       tmp >> ret;
       return ret;
     }

@@ -25,49 +25,49 @@ namespace manifold
     {
     private:
       //================================================================//
-      class connection : public http::v2_connection<response_head, request_head>
+      class v2_connection : public http::v2_connection<response_head, request_head>
       {
       public:
-        connection(non_tls_socket&& sock)
-          : http::v2_connection<response_head, request_head>(std::move(sock)), next_stream_id_(2)
+        v2_connection(non_tls_socket&& sock)
+          : http::v2_connection<response_head, request_head>(std::move(sock))
         {
           this->local_settings_[setting_code::enable_push] = 0;
         }
-        connection(tls_socket&& sock)
-          : http::v2_connection<response_head, request_head>(std::move(sock)), next_stream_id_(2)
+        v2_connection(tls_socket&& sock)
+          : http::v2_connection<response_head, request_head>(std::move(sock))
         {
           this->local_settings_[setting_code::enable_push] = 0;
         }
-        ~connection() {}
+        ~v2_connection() {}
       private:
-        class stream : public http::v2_connection<response_head, request_head>::stream
-        {
-        public:
-          stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size) : http::v2_connection<response_head, request_head>::stream(stream_id, initial_window_size, initial_peer_window_size)
-          {
-
-          }
-          ~stream() {}
-
-        private:
-
-        };
-
-        std::uint32_t next_stream_id_;
-
-        stream* create_stream_object(std::uint32_t stream_id = 0)
-        {
-          if (stream_id == 0 && this->next_stream_id_ <= connection::max_stream_id)
-          {
-            stream_id = this->next_stream_id_;
-            this->next_stream_id_ += 2;
-          }
-
-          if (stream_id)
-            return new stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size));
-          else
-            return nullptr;
-        }
+//        class stream : public http::v2_connection<response_head, request_head>::stream
+//        {
+//        public:
+//          stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size) : http::v2_connection<response_head, request_head>::stream(stream_id, initial_window_size, initial_peer_window_size)
+//          {
+//
+//          }
+//          ~stream() {}
+//
+//        private:
+//
+//        };
+//
+//        std::uint32_t next_stream_id_;
+//
+//        stream* create_stream_object(std::uint32_t stream_id = 0)
+//        {
+//          if (stream_id == 0 && this->next_stream_id_ <= v2_connection::max_stream_id)
+//          {
+//            stream_id = this->next_stream_id_;
+//            this->next_stream_id_ += 2;
+//          }
+//
+//          if (stream_id)
+//            return new stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size));
+//          else
+//            return nullptr;
+//        }
 
       };
       //================================================================//
@@ -95,6 +95,7 @@ namespace manifold
       };
       //================================================================//
 
+      class push_promise;
       //================================================================//
       class response : public outgoing_message<response_head, request_head>
       {
@@ -115,9 +116,22 @@ namespace manifold
         //----------------------------------------------------------------//
         response_head& head();
         bool send_headers(bool end_stream = false);
-        response make_push_response(request_head&& push_promise_headers);
-        response make_push_response(const request_head& push_promise_headers);
+        push_promise send_push_promise(request_head&& push_promise_headers);
+        push_promise send_push_promise(const request_head& push_promise_headers);
         //----------------------------------------------------------------//
+      };
+      //================================================================//
+
+      //================================================================//
+      class push_promise
+      {
+      public:
+        push_promise(request&& req, response&& res);
+        void fulfill(const std::function<void(request&& req, response&& res)>& handler);
+      private:
+        request req_;
+        response res_;
+        bool fulfilled_;
       };
       //================================================================//
 

@@ -7,7 +7,8 @@
 #include <algorithm>
 #include <system_error>
 
-#include "http_message_head.hpp"
+#include "http_v1_message_head.hpp"
+#include "http_v2_message_head.hpp"
 
 namespace manifold
 {
@@ -15,6 +16,31 @@ namespace manifold
   {
     //----------------------------------------------------------------//
     header_block::header_block()
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    header_block::header_block(const v1_header_block& v1_headers)
+    {
+      this->headers_ = v1_headers.raw_headers();
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    header_block::header_block(const v2_header_block& v2_headers)
+    {
+      for (auto it = v2_headers.raw_headers().begin(); it != v2_headers.raw_headers().end(); ++it)
+      {
+        if (it->name.front() != ':')
+          this->headers_.emplace_back(it->name, it->value);
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    header_block::header_block(std::list<std::pair<std::string, std::string>>&& headers)
+      : headers_(std::move(headers))
     {
 
     }

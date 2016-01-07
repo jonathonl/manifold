@@ -11,9 +11,10 @@
 #include <map>
 #include <iostream>
 
+#include "http_v1_connection.hpp"
 #include "http_v2_connection.hpp"
-#include "http_v2_request_head.hpp"
-#include "http_v2_response_head.hpp"
+#include "http_request_head.hpp"
+#include "http_response_head.hpp"
 #include "http_outgoing_message.hpp"
 #include "http_incoming_message.hpp"
 
@@ -64,12 +65,12 @@ namespace manifold
       {
       public:
         v2_connection(non_tls_socket&& sock)
-          : http::v2_connection<request_head, response_head>(std::move(sock)), next_stream_id_(1)
+          : http::v2_connection<request_head, response_head>(std::move(sock))
         {
           this->local_settings_[setting_code::enable_push] = 1;
         }
         v2_connection(tls_socket&& sock)
-          : http::v2_connection<request_head, response_head>(std::move(sock)), next_stream_id_(1)
+          : http::v2_connection<request_head, response_head>(std::move(sock))
         {
           this->local_settings_[setting_code::enable_push] = 1;
         }
@@ -80,63 +81,63 @@ namespace manifold
         //void on_trailers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn);
         //void on_push_promise(std::uint32_t stream_id, const std::function<void(http::client::request && resp)>& fn);
       private:
-        class stream : public http::v2_connection<request_head, response_head>::stream
-        {
-        public:
-          stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size)
-            : http::v2_connection<request_head, response_head>::stream(stream_id, initial_window_size, initial_peer_window_size)
-          {
-            //http::v2_connection::stream::on_headers(std::bind(&stream::on_headers_handler, this, std::placeholders::_1));
-            //http::connection::stream::on_push_promise(std::bind(&stream::on_push_promise_handler, this, std::placeholders::_1, std::placeholders::_2));
-          }
-          ~stream() {}
-
-          //void on_informational_headers(const std::function<void(v2_response_head&& headers)>& fn) { this->on_informational_headers_ = fn; }
-          //void on_response_headers(const std::function<void(v2_response_head&& headers)>& fn) { this->on_response_headers_ = fn; }
-          //void on_trailers(const std::function<void(v2_header_block&& headers)>& fn) { this->on_trailers_ = fn; }
-          //void on_push_promise_headers(const std::function<void(v2_request_head&& headers, std::uint32_t)>& fn) { this->on_push_promise_repsonse_head_ = fn; }
-        private:
-          //std::function<void(v2_response_head&& headers)> on_informational_headers_;
-          //std::function<void(v2_response_head&& headers)> on_response_headers_;
-          //std::function<void(v2_header_block&& headers)> on_trailers_;
-          //std::function<void(v2_request_head&& req_head, std::uint32_t)> on_push_promise_repsonse_head_;
-
-//          void on_headers_handler(v2_header_block&& headers)
+//        class stream : public http::v2_connection<request_head, response_head>::stream
+//        {
+//        public:
+//          stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size)
+//            : http::v2_connection<request_head, response_head>::stream(stream_id, initial_window_size, initial_peer_window_size)
 //          {
-//            // TODO: need to make sure response is only received once and that all of thes happen in the correct order.
-//            int status_code = atoi(headers.header(":status").c_str());
-//            if (status_code == 0)
-//            {
-//              this->on_trailers_ ? this->on_trailers_(std::move(headers)) : void();
-//            }
-//            else if (status_code < 200)
-//            {
-//              this->on_informational_headers_ ? this->on_informational_headers_(std::move(headers)) : void();
-//            }
-//            else
-//            {
-//              this->on_response_headers_ ? this->on_response_headers_(std::move(headers)) : void();
-//            }
+//            //http::v2_connection::stream::on_headers(std::bind(&stream::on_headers_handler, this, std::placeholders::_1));
+//            //http::connection::stream::on_push_promise(std::bind(&stream::on_push_promise_handler, this, std::placeholders::_1, std::placeholders::_2));
 //          }
-        };
-
-
-        std::uint32_t next_stream_id_;
-
-        stream* create_stream_object(std::uint32_t stream_id = 0)
-        {
-          if (stream_id == 0 && this->next_stream_id_ <= v2_connection::max_stream_id)
-          {
-            stream_id = this->next_stream_id_;
-            this->next_stream_id_ += 2;
-          }
-
-          if (stream_id)
-            return new stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size));
-          else
-            return nullptr;
-        }
-
+//          ~stream() {}
+//
+//          //void on_informational_headers(const std::function<void(v2_response_head&& headers)>& fn) { this->on_informational_headers_ = fn; }
+//          //void on_response_headers(const std::function<void(v2_response_head&& headers)>& fn) { this->on_response_headers_ = fn; }
+//          //void on_trailers(const std::function<void(v2_header_block&& headers)>& fn) { this->on_trailers_ = fn; }
+//          //void on_push_promise_headers(const std::function<void(v2_request_head&& headers, std::uint32_t)>& fn) { this->on_push_promise_repsonse_head_ = fn; }
+//        private:
+//          //std::function<void(v2_response_head&& headers)> on_informational_headers_;
+//          //std::function<void(v2_response_head&& headers)> on_response_headers_;
+//          //std::function<void(v2_header_block&& headers)> on_trailers_;
+//          //std::function<void(v2_request_head&& req_head, std::uint32_t)> on_push_promise_repsonse_head_;
+//
+////          void on_headers_handler(v2_header_block&& headers)
+////          {
+////            // TODO: need to make sure response is only received once and that all of thes happen in the correct order.
+////            int status_code = atoi(headers.header(":status").c_str());
+////            if (status_code == 0)
+////            {
+////              this->on_trailers_ ? this->on_trailers_(std::move(headers)) : void();
+////            }
+////            else if (status_code < 200)
+////            {
+////              this->on_informational_headers_ ? this->on_informational_headers_(std::move(headers)) : void();
+////            }
+////            else
+////            {
+////              this->on_response_headers_ ? this->on_response_headers_(std::move(headers)) : void();
+////            }
+////          }
+//        };
+//
+//
+////        std::uint32_t next_stream_id_;
+////
+////        stream* create_stream_object(std::uint32_t stream_id = 0)
+////        {
+////          if (stream_id == 0 && this->next_stream_id_ <= v2_connection::max_stream_id)
+////          {
+////            stream_id = this->next_stream_id_;
+////            this->next_stream_id_ += 2;
+////          }
+////
+////          if (stream_id)
+////            return new stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size));
+////          else
+////            return nullptr;
+////        }
+//
       };
       //================================================================//
 

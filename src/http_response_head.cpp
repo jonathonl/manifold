@@ -1,5 +1,7 @@
 
 #include "http_response_head.hpp"
+#include "http_v1_response_head.hpp"
+#include "http_v2_response_head.hpp"
 
 namespace manifold
 {
@@ -141,8 +143,38 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    response_head::response_head() : status_code_(200)
+    response_head::response_head(std::uint16_t status, std::list<std::pair<std::string, std::string>>&& headers) : header_block(std::move(headers)), status_code_(status)
     {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    response_head::response_head(v1_message_head&& v1_headers)
+      : response_head(v1_response_head(std::move(v1_headers)))
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    response_head::response_head(v2_header_block&& v2_headers)
+      : response_head(v2_response_head(std::move(v2_headers)))
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    response_head::response_head(const v1_response_head& v1_headers)
+      : header_block(v1_headers)
+    {
+      this->status_code(v1_headers.status_code());
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    response_head::response_head(const v2_response_head& v2_headers)
+      : header_block(v2_headers)
+    {
+      this->status_code(v2_headers.status_code());
     }
     //----------------------------------------------------------------//
 
@@ -174,7 +206,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool response_head::is_informational_status() const
+    bool response_head::has_informational_status() const
     {
       std::uint16_t status = this->status_code();
       return (status >= 100 && status < 200);
@@ -182,7 +214,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool response_head::is_successful_status() const
+    bool response_head::has_successful_status() const
     {
       std::uint16_t status = this->status_code();
       return (status >= 200 && status < 300);
@@ -190,7 +222,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool response_head::is_redirection_status() const
+    bool response_head::has_redirection_status() const
     {
       std::uint16_t status = this->status_code();
       return (status >= 300 && status < 400);
@@ -198,7 +230,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool response_head::is_client_error_status() const
+    bool response_head::has_client_error_status() const
     {
       std::uint16_t status = this->status_code();
       return (status >= 400 && status < 500);
@@ -206,7 +238,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool response_head::is_server_error_status() const
+    bool response_head::has_server_error_status() const
     {
       std::uint16_t status = this->status_code();
       return (status >= 500 && status < 600);

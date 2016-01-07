@@ -72,16 +72,20 @@ namespace manifold
     {
     public:
       //----------------------------------------------------------------//
-      response_head();
+      response_head(std::uint16_t status = 200, std::list<std::pair<std::string, std::string>>&& headers = {});
+      response_head(class v1_message_head&& v1_headers);
+      response_head(class v2_header_block&& v2_headers);
+      response_head(const class v1_response_head& v1_headers);
+      response_head(const class v2_response_head& v2_headers);
       ~response_head();
       std::uint16_t status_code() const;
       void status_code(std::uint16_t value);
       void status_code(http::status_code value);
-      bool is_informational_status() const;
-      bool is_successful_status() const;
-      bool is_redirection_status() const;
-      bool is_client_error_status() const;
-      bool is_server_error_status() const;
+      bool has_informational_status() const;
+      bool has_successful_status() const;
+      bool has_redirection_status() const;
+      bool has_client_error_status() const;
+      bool has_server_error_status() const;
       //----------------------------------------------------------------//
     private:
       //----------------------------------------------------------------//

@@ -91,19 +91,21 @@ namespace manifold
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     const std::array<char,24> v2_connection<SendMsg, RecvMsg>::preface{{0x50, 0x52, 0x49, 0x20, 0x2a, 0x20, 0x48, 0x54, 0x54, 0x50, 0x2f, 0x32, 0x2e, 0x30, 0x0d, 0x0a, 0x0d, 0x0a, 0x53, 0x4d, 0x0d, 0x0a, 0x0d, 0x0a}};
+    template<> const std::uint32_t v2_connection<request_head, response_head>::initial_stream_id = 1;
+    template<> const std::uint32_t v2_connection<response_head, request_head>::initial_stream_id = 2;
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     v2_connection<SendMsg, RecvMsg>::v2_connection(non_tls_socket&& sock)
       : socket_(new non_tls_socket(std::move(sock))),
-      hpack_encoder_(4096),
-      hpack_decoder_(4096),
-      last_newly_accepted_stream_id_(0),
-      last_newly_created_stream_id_(0),
-      outgoing_window_size_(default_initial_window_size),
-      incoming_window_size_(default_initial_window_size),
-      stream_dependency_tree_()
+        hpack_encoder_(4096),
+        hpack_decoder_(4096),
+        last_newly_accepted_stream_id_(0),
+        next_stream_id_(initial_stream_id),
+        outgoing_window_size_(default_initial_window_size),
+        incoming_window_size_(default_initial_window_size),
+        stream_dependency_tree_()
     {
       std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
       this->rg_.seed(seed);
@@ -135,13 +137,13 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     v2_connection<SendMsg, RecvMsg>::v2_connection(tls_socket&& sock)
       : socket_(new tls_socket(std::move(sock))),
-      hpack_encoder_(4096),
-      hpack_decoder_(4096),
-      last_newly_accepted_stream_id_(0),
-      last_newly_created_stream_id_(0),
-      outgoing_window_size_(default_initial_window_size),
-      incoming_window_size_(default_initial_window_size),
-      stream_dependency_tree_()
+        hpack_encoder_(4096),
+        hpack_decoder_(4096),
+        last_newly_accepted_stream_id_(0),
+        next_stream_id_(initial_stream_id),
+        outgoing_window_size_(default_initial_window_size),
+        incoming_window_size_(default_initial_window_size),
+        stream_dependency_tree_()
     {
       std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
       this->rg_.seed(seed);
@@ -288,9 +290,9 @@ namespace manifold
     {
       for (auto it = this->streams_.begin(); it != this->streams_.end(); )
       {
-        if (it->second->state() == stream_state::closed)
+        if (it->second.state() == stream_state::closed)
         {
-          this->stream_dependency_tree_.remove(*it->second);
+          this->stream_dependency_tree_.remove(it->second);
           it = this->streams_.erase(it);
         }
         else
@@ -298,6 +300,34 @@ namespace manifold
           ++it;
         }
       }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template<> bool v2_connection<request_head, response_head>::receiving_push_promise_is_allowed()
+    {
+      bool ret = true;
+      auto it = this->local_settings_.find(setting_code::enable_push);
+      if (it != this->local_settings_.end() && it->second == 0)
+      {
+        ret = false;
+      }
+      return ret;
+    }
+    template<> bool v2_connection<response_head, request_head>::receiving_push_promise_is_allowed() { return false; }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template<> bool v2_connection<request_head, response_head>::sending_push_promise_is_allowed() { return false; }
+    template<> bool v2_connection<response_head, request_head>::sending_push_promise_is_allowed()
+    {
+      bool ret = true;
+      auto it = this->peer_settings_.find(setting_code::enable_push);
+      if (it != this->peer_settings_.end() && it->second == 0)
+      {
+        ret = false;
+      }
+      return ret;
     }
     //----------------------------------------------------------------//
 
@@ -379,7 +409,7 @@ namespace manifold
                       self->incoming_header_block_fragments_.pop();
                     }
 
-                    current_stream_it->second->handle_incoming_frame(h_frame, cont_frames, self->hpack_decoder_);
+                    current_stream_it->second.handle_incoming_frame(h_frame, cont_frames, self->hpack_decoder_);
                   }
                   else
                   {
@@ -394,36 +424,43 @@ namespace manifold
                       self->incoming_header_block_fragments_.pop();
                     }
 
-                    if (!self->create_stream(current_stream_it->second->id(), pp_frame.promised_stream_id()))
+                    if (!self->create_stream(current_stream_it->second.id(), pp_frame.promised_stream_id()))
                     {
                       // TODO: Handle error.
                     }
                     else
                     {
                       auto promised_stream_it = self->streams_.find(pp_frame.promised_stream_id());
-                      current_stream_it->second->handle_incoming_frame(pp_frame, cont_frames, self->hpack_decoder_, *(promised_stream_it->second));
+                      current_stream_it->second.handle_incoming_frame(pp_frame, cont_frames, self->hpack_decoder_, promised_stream_it->second);
                     }
                   }
                 }
               }
               else if (incoming_frame_type == frame_type::headers || incoming_frame_type == frame_type::push_promise)
               {
-                bool has_end_headers_flag = (incoming_frame_type == frame_type::headers ? self->incoming_frame_.headers_frame().has_end_headers_flag() : self->incoming_frame_.push_promise_frame().has_end_headers_flag());
-
-                if (!has_end_headers_flag)
-                  self->incoming_header_block_fragments_.push(std::move(self->incoming_frame_));
-                else if (incoming_frame_type == frame_type::headers)
-                  current_stream_it->second->handle_incoming_frame(self->incoming_frame_.headers_frame(), {}, self->hpack_decoder_);
+                if (!(self->receiving_push_promise_is_allowed()) && incoming_frame_type == frame_type::push_promise)
+                {
+                  // TODO: Connection error.
+                }
                 else
                 {
-                  if (!self->create_stream(current_stream_it->second->id(), self->incoming_frame_.push_promise_frame().promised_stream_id()))
-                  {
-                    // TODO: Handle error.
-                  }
+                  bool has_end_headers_flag = (incoming_frame_type == frame_type::headers ? self->incoming_frame_.headers_frame().has_end_headers_flag() : self->incoming_frame_.push_promise_frame().has_end_headers_flag());
+
+                  if (!has_end_headers_flag)
+                    self->incoming_header_block_fragments_.push(std::move(self->incoming_frame_));
+                  else if (incoming_frame_type == frame_type::headers)
+                    current_stream_it->second.handle_incoming_frame(self->incoming_frame_.headers_frame(), {}, self->hpack_decoder_);
                   else
                   {
-                    auto promised_stream_it = self->streams_.find(self->incoming_frame_.push_promise_frame().promised_stream_id());
-                    current_stream_it->second->handle_incoming_frame(self->incoming_frame_.push_promise_frame(), {}, self->hpack_decoder_, *(promised_stream_it->second));
+                    if (!self->create_stream(current_stream_it->second.id(), self->incoming_frame_.push_promise_frame().promised_stream_id()))
+                    {
+                      // TODO: Handle error.
+                    }
+                    else
+                    {
+                      auto promised_stream_it = self->streams_.find(self->incoming_frame_.push_promise_frame().promised_stream_id());
+                      current_stream_it->second.handle_incoming_frame(self->incoming_frame_.push_promise_frame(), {}, self->hpack_decoder_, promised_stream_it->second);
+                    }
                   }
                 }
               }
@@ -432,16 +469,16 @@ namespace manifold
                 switch (incoming_frame_type)
                 {
                   case frame_type::data:
-                    current_stream_it->second->handle_incoming_frame(self->incoming_frame_.data_frame());
+                    current_stream_it->second.handle_incoming_frame(self->incoming_frame_.data_frame());
                     break;
                   case frame_type::priority:
-                    current_stream_it->second->handle_incoming_frame(self->incoming_frame_.priority_frame());
+                    current_stream_it->second.handle_incoming_frame(self->incoming_frame_.priority_frame());
                     break;
                   case frame_type::rst_stream:
-                    current_stream_it->second->handle_incoming_frame(self->incoming_frame_.rst_stream_frame());
+                    current_stream_it->second.handle_incoming_frame(self->incoming_frame_.rst_stream_frame());
                     break;
                   case frame_type::window_update:
-                    current_stream_it->second->handle_incoming_frame(self->incoming_frame_.window_update_frame());
+                    current_stream_it->second.handle_incoming_frame(self->incoming_frame_.window_update_frame());
                     break;
                   default:
                   {
@@ -484,6 +521,11 @@ namespace manifold
         }
       });
     }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template<> bool v2_connection<request_head, response_head>::stream::header_is_informational(const response_head& head) { return head.has_informational_status(); }
+    template<> bool v2_connection<response_head, request_head>::stream::header_is_informational(const request_head& head) { return false; }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
@@ -598,7 +640,17 @@ namespace manifold
             if (incoming_headers_frame.has_end_stream_flag())
               this->state_ = (this->state_ == stream_state::half_closed_local ? stream_state::closed : stream_state::half_closed_remote);
           }
-          this->on_headers_ ? this->on_headers_(RecvMsg(headers)) : void();
+
+          RecvMsg generic_head(std::move(headers));
+          if (header_is_informational(generic_head))
+            this->on_informational_headers_ ? this->on_informational_headers_(std::move(generic_head)) : void();
+          else if (!this->on_headers_called_)
+          {
+            this->on_headers_called_ = true;
+            this->on_headers_ ? this->on_headers_(std::move(generic_head)) : void();
+          }
+          else
+            this->on_trailers_ ? this->on_trailers_(std::move(generic_head)) : void();
 
           if (this->state_ == stream_state::closed)
           {
@@ -708,7 +760,7 @@ namespace manifold
           }
 
           idle_promised_stream.state_ = stream_state::reserved_remote;
-          this->on_push_promise_ ? this->on_push_promise_(std::move(headers), incoming_push_promise_frame.promised_stream_id()) : void();
+          this->on_push_promise_ ? this->on_push_promise_(SendMsg(std::move(headers)), incoming_push_promise_frame.promised_stream_id()) : void();
           break;
         }
         case stream_state::closed:
@@ -717,10 +769,10 @@ namespace manifold
           {
             if (true) //incoming_push_promise_frame.promised_stream_id() <= this->parent_connection_.last_newly_accepted_stream_id_)
             {
-//              this->parent_connection_.last_newly_accepted_stream_id_ = incoming_push_promise_frame.promised_stream_id();
-//              assert(this->parent_connection_.create_stream(this->parent_connection_.last_newly_accepted_stream_id_));
-//              auto it = this->parent_connection_.streams_.find(this->parent_connection_.last_newly_accepted_stream_id_);
-//              assert(it != this->parent_connection_.streams_.end());
+              //              this->parent_connection_.last_newly_accepted_stream_id_ = incoming_push_promise_frame.promised_stream_id();
+              //              assert(this->parent_connection_.create_stream(this->parent_connection_.last_newly_accepted_stream_id_));
+              //              auto it = this->parent_connection_.streams_.find(this->parent_connection_.last_newly_accepted_stream_id_);
+              //              assert(it != this->parent_connection_.streams_.end());
               idle_promised_stream.state_ = stream_state::reserved_remote;
               idle_promised_stream.outgoing_non_data_frames.push(http::frame(http::rst_stream_frame(errc::refused_stream), idle_promised_stream.id_));
               //this->parent_connection_.send_reset_stream(this->parent_connection_.last_newly_accepted_stream_id_, errc::refused_stream);
@@ -861,7 +913,7 @@ namespace manifold
           if (prioritized_stream_ptr)
           {
             this->outgoing_frame_ = std::move(prioritized_stream_ptr->pop_next_outgoing_frame(this->outgoing_window_size_));
-            if (this->outgoing_frame_.is<data_frame>())
+            if (this->outgoing_frame_.type() == frame_type::data)
               this->outgoing_window_size_ -= this->outgoing_frame_.data_frame().data_length();
             outgoing_frame_set = true;
           }
@@ -912,7 +964,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::on_new_stream(const std::function<void(std::int32_t stream_id)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::on_new_stream(const std::function<void(std::uint32_t stream_id)>& fn)
     {
       this->on_new_stream_ = fn;
     }
@@ -937,13 +989,14 @@ namespace manifold
       }
       else
       {
-        it->second->on_data(fn);
+        it->second.on_data(fn);
       }
     }
     //----------------------------------------------------------------//
 
+    //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::on_headers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::on_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&& headers)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -952,10 +1005,44 @@ namespace manifold
       }
       else
       {
-        it->second->on_headers(fn);
+        it->second.on_headers(fn);
       }
     }
+    //----------------------------------------------------------------//
 
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    void v2_connection<SendMsg, RecvMsg>::on_informational_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&& headers)>& fn)
+    {
+      auto it = this->streams_.find(stream_id);
+      if (it == this->streams_.end())
+      {
+        // TODO: Handle error
+      }
+      else
+      {
+        it->second.on_informational_headers(fn);
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    void v2_connection<SendMsg, RecvMsg>::on_trailers(std::uint32_t stream_id, const std::function<void(header_block&& headers)>& fn)
+    {
+      auto it = this->streams_.find(stream_id);
+      if (it == this->streams_.end())
+      {
+        // TODO: Handle error
+      }
+      else
+      {
+        it->second.on_trailers(fn);
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::on_close(std::uint32_t stream_id, const std::function<void(std::uint32_t error_code)>& fn)
     {
@@ -966,12 +1053,14 @@ namespace manifold
       }
       else
       {
-        it->second->on_close(fn);
+        it->second.on_close(fn);
       }
     }
+    //----------------------------------------------------------------//
 
+    //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::on_push_promise(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers, std::uint32_t promised_stream_id)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::on_push_promise(std::uint32_t stream_id, const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -980,9 +1069,10 @@ namespace manifold
       }
       else
       {
-        it->second->on_push_promise(fn);
+        it->second.on_push_promise(fn);
       }
     }
+    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
@@ -995,7 +1085,7 @@ namespace manifold
       }
       else
       {
-        it->second->on_end(fn);
+        it->second.on_end(fn);
       }
     }
     //----------------------------------------------------------------//
@@ -1011,7 +1101,7 @@ namespace manifold
       }
       else
       {
-        it->second->on_drain(fn);
+        it->second.on_drain(fn);
       }
     }
     //----------------------------------------------------------------//
@@ -1022,13 +1112,16 @@ namespace manifold
     {
       std::uint32_t ret = 0;
 
-      std::unique_ptr<v2_connection<SendMsg, RecvMsg>::stream> s(this->create_stream_object(stream_id));
-      if (s)
+      //std::unique_ptr<v2_connection<SendMsg, RecvMsg>::stream> s(this->create_stream_object(stream_id));
+
+      if (stream_id == 0)
+        stream_id = this->get_next_stream_id();
+      if (stream_id)
       {
-        auto insert_res = this->streams_.emplace(s->id(), std::move(s));
+        auto insert_res = this->streams_.emplace(stream_id, stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size)));
         if (insert_res.second)
         {
-          this->stream_dependency_tree_.insert_child(stream_dependency_tree_child_node((insert_res.first->second.get())));
+          this->stream_dependency_tree_.insert_child(stream_dependency_tree_child_node(&(insert_res.first->second)));
 
           ret = insert_res.first->first;
         }
@@ -1040,15 +1133,29 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::send_headers(std::uint32_t stream_id, const request_head& head, bool end_headers, bool end_stream)
+    std::uint32_t v2_connection<SendMsg, RecvMsg>::get_next_stream_id()
+    {
+      std::uint32_t ret = 0;
+      if (this->next_stream_id_ <= max_stream_id)
+      {
+        ret = this->next_stream_id_;
+        this->next_stream_id_ += 2;
+      }
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <>
+    bool v2_connection<request_head, response_head>::send_headers(std::uint32_t stream_id, const request_head& head, bool end_headers, bool end_stream)
     {
       return this->send_headers(stream_id, v2_request_head(head), end_headers, end_stream);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::send_headers(std::uint32_t stream_id, const response_head& head, bool end_headers, bool end_stream)
+    template <>
+    bool v2_connection<response_head, request_head>::send_headers(std::uint32_t stream_id, const response_head& head, bool end_headers, bool end_stream)
     {
       return this->send_headers(stream_id, v2_response_head(head), end_headers, end_stream);
     }
@@ -1056,7 +1163,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::send_headers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream)
+    bool v2_connection<SendMsg, RecvMsg>::send_trailers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream)
     {
       return this->send_headers(stream_id, v2_header_block(head), end_headers, end_stream);
     }
@@ -1085,13 +1192,13 @@ namespace manifold
         else
         {
           // TODO: check for errors below
-          bool state_change_result = it->second->handle_outgoing_headers_state_change();
+          bool state_change_result = it->second.handle_outgoing_headers_state_change();
           if (end_stream && state_change_result)
-            state_change_result = it->second->handle_outgoing_end_stream_state_change();
+            state_change_result = it->second.handle_outgoing_end_stream_state_change();
 
           if (state_change_result)
           {
-            it->second->outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream), stream_id));
+            it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream), stream_id));
             this->run_send_loop();
             ret = true;
           }
@@ -1130,13 +1237,13 @@ namespace manifold
         else
         {
           // TODO: check for errors below
-          auto state_change_result = it->second->handle_outgoing_headers_state_change();
+          auto state_change_result = it->second.handle_outgoing_headers_state_change();
           if (end_stream && state_change_result)
-            state_change_result = it->second->handle_outgoing_end_stream_state_change();
+            state_change_result = it->second.handle_outgoing_end_stream_state_change();
 
           if (state_change_result)
           {
-            it->second->outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream, priority), stream_id));
+            it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream, priority), stream_id));
             this->run_send_loop();
             ret = true;
           }
@@ -1160,7 +1267,7 @@ namespace manifold
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
       {
-        it->second->outgoing_non_data_frames.push(http::frame(http::priority_frame(options), stream_id));
+        it->second.outgoing_non_data_frames.push(http::frame(http::priority_frame(options), stream_id));
       }
 
       return ret;
@@ -1176,9 +1283,9 @@ namespace manifold
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
       {
-        if (it->second->handle_outgoing_rst_stream_state_change())
+        if (it->second.handle_outgoing_rst_stream_state_change())
         {
-          it->second->outgoing_non_data_frames.push(http::frame(http::rst_stream_frame(error_code), stream_id));
+          it->second.outgoing_non_data_frames.push(http::frame(http::rst_stream_frame(error_code), stream_id));
           this->run_send_loop();
           ret = true;
         }
@@ -1223,7 +1330,7 @@ namespace manifold
         }
         else
         {
-          it->second->outgoing_non_data_frames.push(http::frame(http::continuation_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers), stream_id));
+          it->second.outgoing_non_data_frames.push(http::frame(http::continuation_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers), stream_id));
           this->run_send_loop();
           ret = true;
         }
@@ -1245,11 +1352,11 @@ namespace manifold
       {
         bool state_change_result = true;
         if (end_stream)
-          state_change_result = it->second->handle_outgoing_end_stream_state_change();
+          state_change_result = it->second.handle_outgoing_end_stream_state_change();
 
         if (state_change_result)
         {
-          it->second->outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), stream_id));
+          it->second.outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), stream_id));
           this->run_send_loop();
           ret = true;
         }
@@ -1265,34 +1372,45 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::send_push_promise(std::uint32_t stream_id, const v2_header_block& head, std::uint32_t promised_stream_id, bool end_headers)
+    std::uint32_t v2_connection<SendMsg, RecvMsg>::send_push_promise(std::uint32_t stream_id, const RecvMsg& head)
     {
-      bool ret = false;
+      std::uint32_t promised_stream_id = 0;
 
-      auto it = this->streams_.find(stream_id);
+      if (this->sending_push_promise_is_allowed())
+      {
+        auto it = this->streams_.find(stream_id);
 
-      if (it == this->streams_.end())
-      {
-        // TODO: Handle error
-      }
-      else
-      {
-        std::string header_data;
-        v2_header_block::serialize(this->hpack_encoder_, head, header_data);
-        const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
-        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
+        if (it == this->streams_.end())
         {
           // TODO: Handle error
         }
         else
         {
-          it->second->outgoing_non_data_frames.push(http::frame(http::push_promise_frame(header_data.data(), (std::uint32_t)header_data.size(), promised_stream_id, end_headers), stream_id));
-          this->run_send_loop();
-          ret = true;
+          std::string header_data;
+          v2_header_block::serialize(this->hpack_encoder_, head, header_data);
+          const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
+          if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
+          {
+            // TODO: Handle error
+          }
+          else
+          {
+            promised_stream_id = this->create_stream(stream_id, 0);
+
+            if (!promised_stream_id)
+            {
+              // TODO: stream_id's exhausted.
+            }
+            else
+            {
+              it->second.outgoing_non_data_frames.push(http::frame(http::push_promise_frame(header_data.data(), (std::uint32_t) header_data.size(), promised_stream_id, true), stream_id));
+              this->run_send_loop();
+            }
+          }
         }
       }
 
-      return ret;
+      return promised_stream_id;
     }
     //----------------------------------------------------------------//
 
@@ -1329,7 +1447,7 @@ namespace manifold
       auto it = this->streams_.find(stream_id);
       if (it != this->streams_.end())
       {
-        it->second->outgoing_non_data_frames.push(http::frame(http::window_update_frame(amount), stream_id));
+        it->second.outgoing_non_data_frames.push(http::frame(http::window_update_frame(amount), stream_id));
         this->run_send_loop();
         ret = true;
       }
@@ -1346,6 +1464,9 @@ namespace manifold
       this->run_send_loop();
     }
     //----------------------------------------------------------------//
+
+    template class v2_connection<request_head, response_head>;
+    template class v2_connection<response_head, request_head>;
 
 //    //----------------------------------------------------------------//
 //    void connection::send(char* buf, std::size_t buf_size, const std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>& handler)
