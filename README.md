@@ -26,7 +26,6 @@ app.register_handler(std::regex("^/(.*)$"), [&app](http::server::request&& req, 
     res_ptr->end("Received: " + req_entity->str());
 
     push_promise.fulfill(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
-
   });
 });
 

@@ -14,7 +14,7 @@
 #include "http_v2_response_head.hpp"
 #include "http_outgoing_message.hpp"
 #include "http_incoming_message.hpp"
-#include "http_v2_connection.hpp"
+#include "http_connection.hpp"
 
 namespace manifold
 {
@@ -159,7 +159,7 @@ namespace manifold
       std::unique_ptr<asio::ssl::context> ssl_context_;
       unsigned short port_;
       std::string host_;
-      std::set<std::shared_ptr<http::v2_connection<response_head, request_head>>> connections_;
+      std::set<std::shared_ptr<http::connection<response_head, request_head>>> connections_;
       std::function<void(server::request&& req, server::response&& res)> request_handler_;
       std::string default_server_header_ = "Manifold";
       //std::list<std::pair<std::regex,std::function<void(server::request&& req, server::response&& res)>>> stream_handlers_;
@@ -168,7 +168,7 @@ namespace manifold
       //----------------------------------------------------------------//
       void accept();
       void accept(asio::ssl::context& ctx);
-      void manage_connection(const std::shared_ptr<http::v2_connection<response_head, request_head>>& conn);
+      void manage_connection(const std::shared_ptr<http::connection<response_head, request_head>>& conn);
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//

@@ -29,6 +29,14 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    v1_response_head::v1_response_head(const response_head& generic_head)
+    {
+      this->start_line_ = "http/1.1 " + std::to_string(generic_head.status_code()) + " " + status_code_to_reason_phrase(generic_head.status_code());
+      this->headers_ = generic_head.raw_headers();
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     v1_response_head::v1_response_head(unsigned short status, std::list<std::pair<std::string,std::string>>&& headers)
     {
       this->start_line_ = "http/1.1 200 Ok";

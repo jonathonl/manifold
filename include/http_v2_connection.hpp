@@ -150,15 +150,15 @@ namespace manifold
         //const std::function<void()>& on_drain() const { return this->on_drain_; }
         //const std::function<void(std::uint32_t error_code)>& on_close() const { return this->on_close_; }
 
-        void on_data(const std::function<void(const char* const buf, std::size_t buf_size)>& fn) { this->on_data_ = fn; }
-        void on_headers(const std::function<void(RecvMsg&& headers)>& fn) { this->on_headers_ = fn; }
-        void on_informational_headers(const std::function<void(RecvMsg&& headers)>& fn) { this->on_informational_headers_ = fn; }
-        void on_trailers(const std::function<void(header_block&& headers)>& fn) { this->on_trailers_ = fn; }
-        void on_rst_stream(const std::function<void(std::uint32_t error_code)>& fn) { this->on_rst_stream_ = fn; }
-        void on_push_promise(const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn)  { this->on_push_promise_ = fn; }
-        void on_end(const std::function<void()>& fn) { this->on_end_ = fn; }
-        void on_drain(const std::function<void()>& fn)  { this->on_drain_ = fn; }
-        void on_close(const std::function<void(std::uint32_t error_code)>& fn) { this->on_close_ = fn; }
+        void on_data(const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
+        void on_headers(const std::function<void(RecvMsg&& headers)>& fn);
+        void on_informational_headers(const std::function<void(RecvMsg&& headers)>& fn);
+        void on_trailers(const std::function<void(header_block&& headers)>& fn);
+        void on_rst_stream(const std::function<void(std::uint32_t error_code)>& fn);
+        void on_push_promise(const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn);
+        void on_end(const std::function<void()>& fn);
+        void on_drain(const std::function<void()>& fn);
+        void on_close(const std::function<void(std::uint32_t error_code)>& fn);
 
         stream_state state() const { return this->state_; }
         std::uint32_t id() const { return this->id_; }
@@ -216,7 +216,8 @@ namespace manifold
         //----------------------------------------------------------------//
         bool handle_outgoing_headers_state_change();
         bool handle_outgoing_end_stream_state_change();
-        bool handle_outgoing_rst_stream_state_change();
+        bool handle_outgoing_push_promise_state_change();
+        bool handle_outgoing_rst_stream_state_change(std::uint32_t ec);
         //----------------------------------------------------------------//
       };
       //================================================================//

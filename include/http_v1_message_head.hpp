@@ -9,6 +9,8 @@
 #include <list>
 #include <iostream>
 
+#include "http_message_head.hpp"
+
 namespace manifold
 {
   namespace http
@@ -19,6 +21,7 @@ namespace manifold
     public:
       //----------------------------------------------------------------//
       v1_header_block();
+      v1_header_block(const header_block& generic_head);
       virtual ~v1_header_block();
       //----------------------------------------------------------------//
 

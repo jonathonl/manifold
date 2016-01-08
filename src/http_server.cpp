@@ -7,6 +7,7 @@
 #include "tcp.hpp"
 #include "http_server.hpp"
 #include "http_v2_connection.hpp"
+#include "http_v1_connection.hpp"
 
 namespace manifold
 {
@@ -249,31 +250,12 @@ namespace manifold
 
         if (!ec)
         {
-          auto* preface_buf = new std::array<char, v2_connection::preface.size()>();
-          sock->recv(preface_buf->data(), v2_connection::preface.size(), [this, sock, preface_buf](const std::error_code& ec, std::size_t bytes_read)
+          auto it = this->connections_.emplace(std::make_shared<v1_connection<response_head, request_head>>(std::move(*sock)));
+          if (it.second)
           {
-            if (ec)
-            {
-              std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
-            }
-            else
-            {
-              if (*preface_buf != v2_connection::preface)
-              {
-                std::cout << "Invalid Connection Preface" << ":" __FILE__ << "/" << __LINE__ << std::endl;
-              }
-              else
-              {
-                auto it = this->connections_.emplace(std::make_shared<v2_connection>(std::move(*sock)));
-                if (it.second)
-                {
-                  this->manage_connection(*it.first);
-                  (*it.first)->run();
-                }
-              }
-            }
-            delete preface_buf;
-          });
+            this->manage_connection(*it.first);
+            (*it.first)->run();
+          }
         }
         else
         {
@@ -316,7 +298,7 @@ namespace manifold
             {
               std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
             }
-            else
+            else if (std::string((char*)selected_alpn, selected_alpn_sz) == "h2")
             {
               auto* preface_buf = new std::array<char,v2_connection::preface.size()>();
               sock->recv(preface_buf->data(), v2_connection::preface.size(), [this, sock, preface_buf](const std::error_code& ec, std::size_t bytes_read)
@@ -354,6 +336,15 @@ namespace manifold
                 delete preface_buf;
               });
             }
+            else
+            {
+              auto it = this->connections_.emplace(std::make_shared<v1_connection<response_head, request_head>>(std::move(*sock)));
+              if (it.second)
+              {
+                this->manage_connection(*it.first);
+                (*it.first)->run();
+              }
+            }
           });
         }
 
@@ -364,7 +355,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void server::manage_connection(const std::shared_ptr<http::v2_connection<response_head, request_head>>& conn)
+    void server::manage_connection(const std::shared_ptr<http::connection<response_head, request_head>>& conn)
     {
       conn->on_new_stream([this, conn](std::int32_t stream_id)
       {

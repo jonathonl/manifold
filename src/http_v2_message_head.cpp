@@ -149,13 +149,19 @@ namespace manifold
     //----------------------------------------------------------------//
     std::string v2_header_block::header(const std::string& name) const
     {
+      return this->header(std::string(name));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    std::string v2_header_block::header(std::string&& name) const
+    {
       std::string ret;
-      std::string nameToLower(name);
-      std::for_each(nameToLower.begin(), nameToLower.end(), ::tolower);
+      std::for_each(name.begin(), name.end(), ::tolower);
 
       for (auto it = this->headers_.rbegin(); ret.empty() && it != this->headers_.rend(); ++it)
       {
-        if (it->name == nameToLower)
+        if (it->name == name)
           ret = it->value;
       }
 
@@ -166,13 +172,19 @@ namespace manifold
     //----------------------------------------------------------------//
     std::list<std::string> v2_header_block::multi_header(const std::string& name) const
     {
+      return this->multi_header(std::string(name));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    std::list<std::string> v2_header_block::multi_header(std::string&& name) const
+    {
       std::list<std::string> ret;
-      std::string nameToLower(name);
-      std::for_each(nameToLower.begin(), nameToLower.end(), ::tolower);
+      std::for_each(name.begin(), name.end(), ::tolower);
 
       for (auto it = this->headers_.begin(); it != this->headers_.end(); ++it)
       {
-        if (it->name == nameToLower)
+        if (it->name == name)
           ret.push_back(it->value);
       }
 

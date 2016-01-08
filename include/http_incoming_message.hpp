@@ -15,6 +15,7 @@ namespace manifold
     class incoming_message : public message<SendMsg, RecvMsg>
     {
     private:
+      header_block trailers_;
       //----------------------------------------------------------------//
       std::uint64_t bytesReceived_;
       //----------------------------------------------------------------//
@@ -36,6 +37,7 @@ namespace manifold
       //incoming_message(const header_block& head, Socket&& sock);
       incoming_message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::int32_t stream_id);
       virtual ~incoming_message();
+      const header_block& trailers() const { return this->trailers_; }
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//

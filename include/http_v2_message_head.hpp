@@ -44,7 +44,9 @@ namespace manifold
       void multi_header(const std::string& name, const std::list<std::string>& values);
       void multi_header(std::string&& name, std::list<std::string>&& values);
       std::string header(const std::string& name) const;
+      std::string header(std::string&& name) const;
       std::list<std::string> multi_header(const std::string& name) const;
+      std::list<std::string> multi_header(std::string&& name) const;
       const std::list<hpack::header_field>& raw_headers() const;
       //----------------------------------------------------------------//
 

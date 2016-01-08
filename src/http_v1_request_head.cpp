@@ -16,6 +16,14 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    v1_request_head::v1_request_head(const request_head& generic_head)
+    {
+      this->start_line_ = generic_head.method() + " " + generic_head.path() + " http/1.1";
+      this->headers_ = generic_head.raw_headers();
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     v1_request_head::v1_request_head(const std::string& path, const std::string& method, std::list<std::pair<std::string,std::string>>&& headers)
     {
       this->start_line_ = "GET / http/1.1";
