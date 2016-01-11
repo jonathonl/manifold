@@ -161,6 +161,11 @@ int main()
 
     });
 
+    req.on_close([](http::errc e)
+    {
+      std::cout << "on_close called on server" << std::endl;
+    });
+
   });
 
 
@@ -197,7 +202,7 @@ int main()
       ops.dhparam.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
   }
 
-  http::server srv(ioservice, ops, 8080, "0.0.0.0");
+  http::server srv(ioservice, 8080, "0.0.0.0");
   srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
 
   //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
@@ -209,7 +214,7 @@ int main()
     //----------------------------------------------------------------//
     // Client to Local Server Test
     //
-    http::client c1(ioservice, "127.0.0.1", http::client::ssl_options(), 8080);
+    http::client c1(ioservice, "127.0.0.1", 8080);
     c1.on_connect([&c1]()
     {
       http::client::request req = c1.make_request();
@@ -244,7 +249,10 @@ int main()
 
       req.on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req.stream_id()));
 
-      req.on_close([&c1](http::errc) { /*c1.close();*/ });
+      req.on_close([](http::errc e)
+      {
+        std::cout << "on_close called on client" << std::endl;
+      });
 
 
       req.end(std::string("name=value&name2=value2"));

@@ -26,6 +26,34 @@ namespace manifold
   }
   //----------------------------------------------------------------//
 
+//  //----------------------------------------------------------------//
+//  void non_tls_socket::recv(asio::streambuf& b, std::size_t bytes_to_recv, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+//  {
+//    asio::async_read(*this->s_, b, asio::transfer_exactly(bytes_to_recv) , std::move(cb));
+//  }
+//  //----------------------------------------------------------------//
+//
+//  //----------------------------------------------------------------//
+//  void non_tls_socket::recv(asio::streambuf& b, std::size_t bytes_to_recv, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+//  {
+//    this->recv(b, bytes_to_recv, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb));
+//  }
+//  //----------------------------------------------------------------//
+//
+//  //----------------------------------------------------------------//
+//  void non_tls_socket::recv_until(asio::streambuf& b, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+//  {
+//    asio::async_read_until(*this->s_, b, delim, std::move(cb));
+//  }
+//  //----------------------------------------------------------------//
+//
+//  //----------------------------------------------------------------//
+//  void non_tls_socket::recv_until(asio::streambuf& b, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+//  {
+//    this->recv_until(b, delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb));
+//  }
+//  //----------------------------------------------------------------//
+
   //----------------------------------------------------------------//
   void non_tls_socket::recvline(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb, const std::string& delim)
   {
@@ -131,6 +159,34 @@ namespace manifold
     this->recv(data, data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb));
   }
   //----------------------------------------------------------------//
+
+//  //----------------------------------------------------------------//
+//  void tls_socket::recv(asio::streambuf& b, std::size_t bytes_to_recv, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+//  {
+//    asio::async_read(*this->s_, b, asio::transfer_exactly(bytes_to_recv) , std::move(cb));
+//  }
+//  //----------------------------------------------------------------//
+//
+//  //----------------------------------------------------------------//
+//  void tls_socket::recv(asio::streambuf& b, std::size_t bytes_to_recv, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+//  {
+//    this->recv(b, bytes_to_recv, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb));
+//  }
+//  //----------------------------------------------------------------//
+//
+//  //----------------------------------------------------------------//
+//  void tls_socket::recv_until(asio::streambuf& b, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
+//  {
+//    asio::async_read_until(*this->s_, b, delim, std::move(cb));
+//  }
+//  //----------------------------------------------------------------//
+//
+//  //----------------------------------------------------------------//
+//  void tls_socket::recv_until(asio::streambuf& b, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb)
+//  {
+//    this->recv_until(b, delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>(cb));
+//  }
+//  //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
   void tls_socket::recvline(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb, const std::string& delim)

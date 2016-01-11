@@ -186,29 +186,33 @@ namespace manifold
         }
         else if (!self->is_closed())
         {
-          std::stringstream is(std::string(self->recv_buffer_.data(), bytes_read));
-          v1_header_block header_block;
-          v1_header_block::deserialize(is, header_block);
-
-          if (header_block.size())
+          if (bytes_read > 2)
           {
-            self->recv_queue_.front().on_trailers ? self->recv_queue_.front().on_trailers(std::move(header_block)) : void();
+            std::stringstream is(std::string(self->recv_buffer_.data(), bytes_read));
+            v1_header_block::deserialize(is, self->recv_queue_.front().trailers);
           }
-
-          self->recv_queue_.front().on_end ? self->recv_queue_.front().on_end() : void();
-          auto front_transaction_id = self->recv_queue_.front().id;
-          if (std::find_if(self->send_queue_.begin(), self->send_queue_.end(), [front_transaction_id](const queued_send_message& m) { return (m.id == front_transaction_id); }) == self->send_queue_.end())
+          else
           {
-            assert(self->transaction_close_queue_.front().id == front_transaction_id);
-            ++(self->transaction_close_queue_.front().call_count);
-            self->transaction_close_queue_.front().on_close ? self->transaction_close_queue_.front().on_close(errc::no_error) : void();
-            self->transaction_close_queue_.pop_front();
-          }
-          self->recv_queue_.pop_front();
+            if (self->recv_queue_.front().trailers.size())
+            {
+              self->recv_queue_.front().on_trailers ? self->recv_queue_.front().on_trailers(std::move(self->recv_queue_.front().trailers)) : void();
+            }
 
-          self->run_recv_loop();
+            self->recv_queue_.front().on_end ? self->recv_queue_.front().on_end() : void();
+            auto front_transaction_id = self->recv_queue_.front().id;
+            if (std::find_if(self->send_queue_.begin(), self->send_queue_.end(), [front_transaction_id](const queued_send_message& m) { return (m.id == front_transaction_id); }) == self->send_queue_.end())
+            {
+              assert(self->transaction_close_queue_.front().id == front_transaction_id);
+              ++(self->transaction_close_queue_.front().call_count);
+              self->transaction_close_queue_.front().on_close ? self->transaction_close_queue_.front().on_close(errc::no_error) : void();
+              self->transaction_close_queue_.pop_front();
+            }
+            self->recv_queue_.pop_front();
+
+            self->run_recv_loop();
+          }
         }
-      }, "\r\n\r\n");
+      });
     }
 
     template <typename SendMsg, typename RecvMsg>
@@ -232,7 +236,7 @@ namespace manifold
 
           char* not_converted = nullptr;
           unsigned long chunk_size = strtoul(chunk_size_str.c_str(), &not_converted, 16);
-          if (not_converted != nullptr)
+          if (*not_converted != '\0')
           {
             // TODO: handle error.
           }
@@ -244,6 +248,7 @@ namespace manifold
             }
             else
             {
+              // TODO: make sure chunk_size isn't bigger than buffer size;
               self->socket_->recv(self->recv_buffer_.data(), chunk_size, [self, chunk_size](const std::error_code& ec, std::size_t bytes_read)
               {
                 if (ec)
@@ -252,8 +257,7 @@ namespace manifold
                 }
                 else if (!self->is_closed())
                 {
-                  assert(chunk_size == bytes_read);
-                  self->recv_queue_.front().on_data ? self->recv_queue_.front().on_data(self->recv_buffer_.data(), bytes_read) : void();
+                  self->recv_queue_.front().on_data ? self->recv_queue_.front().on_data(self->recv_buffer_.data(), chunk_size) : void();
 
                   self->socket_->recv(self->recv_buffer_.data(), 2, [self, chunk_size](const std::error_code& ec, std::size_t bytes_read)
                   {
@@ -263,7 +267,6 @@ namespace manifold
                     }
                     else if (!self->is_closed())
                     {
-                      assert(bytes_read == 2);
                       self->recv_chunk_encoded_body();
                     }
                   });
@@ -300,7 +303,7 @@ namespace manifold
           bytes_to_read = content_length;
 
         auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
-        this->socket_->recv(this->recv_buffer_.data(), bytes_to_read, [self, content_length](const std::error_code& ec, std::size_t bytes_read)
+        this->socket_->recv(this->recv_buffer_.data(), bytes_to_read, [self, content_length, bytes_to_read](const std::error_code& ec, std::size_t bytes_read)
         {
           if (ec)
           {
@@ -308,8 +311,8 @@ namespace manifold
           }
           else if (!self->is_closed())
           {
-            self->recv_queue_.front().on_data ? self->recv_queue_.front().on_data(self->recv_buffer_.data(), self->recv_buffer_.size()) : void();
-            self->recv_known_length_body(content_length - bytes_read);
+            self->recv_queue_.front().on_data ? self->recv_queue_.front().on_data(self->recv_buffer_.data(), bytes_to_read) : void();
+            self->recv_known_length_body(content_length - bytes_to_read);
           }
         });
       }
@@ -438,6 +441,7 @@ namespace manifold
     {
       this->send_queue_.emplace_back(queued_send_message(this->next_transaction_id_));
       this->recv_queue_.emplace_back(queued_recv_message(this->next_transaction_id_));
+      this->transaction_close_queue_.emplace_back(queued_close_callback(this->next_transaction_id_));
       return this->next_transaction_id_++;
     }
 
@@ -471,6 +475,13 @@ namespace manifold
       bool ret = false;
 
       v1_request_head v1_head(head);
+      std::string method = v1_head.method();
+      std::for_each(method.begin(), method.end(), ::toupper);
+      if (method != "GET" && method != "HEAD")
+        v1_head.header("transfer-encoding", "chunked");
+      else
+        end_stream = true;
+
       if (this->send_message_head(stream_id, v1_head))
       {
         if (end_stream)
@@ -488,6 +499,8 @@ namespace manifold
       bool ret = false;
 
       v1_response_head v1_head(head);
+      v1_head.header("transfer-encoding", "chunked");
+
       if (this->send_message_head(stream_id, v1_head))
       {
         if (end_stream)
@@ -511,7 +524,7 @@ namespace manifold
       bool ret = false;
 
       auto it = std::find_if(this->send_queue_.begin(), this->send_queue_.end(), [transaction_id](const queued_send_message& m) { return m.id == transaction_id; });
-      if (it != this->send_queue_.end() && !it->ended && data_sz)
+      if (it != this->send_queue_.end() && !it->ended)
       {
         if (data_sz)
         {

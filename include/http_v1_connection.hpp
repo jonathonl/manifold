@@ -22,11 +22,13 @@ namespace manifold
       v1_connection(non_tls_socket&& sock)
         : socket_(new non_tls_socket(std::move(sock))),
           closed_(false),
+          //recv_buffer_(8192),
           send_loop_running_(false),
           next_transaction_id_(1) {}
       v1_connection(tls_socket&& sock)
         : socket_(new tls_socket(std::move(sock))),
           closed_(false),
+          //recv_buffer_(8192),
           send_loop_running_(false),
           next_transaction_id_(1) {}
       virtual ~v1_connection() {}
@@ -86,6 +88,7 @@ namespace manifold
         std::function<void(RecvMsg&& headers)> on_headers;
         std::function<void(RecvMsg&& headers)> on_informational_headers;
         std::function<void(header_block&& headers)> on_trailers;
+        v1_header_block trailers;
         std::function<void(const char* const buf, std::size_t buf_size)> on_data;
         std::function<void()> on_end;
         std::function<void()> on_drain;
@@ -100,11 +103,16 @@ namespace manifold
         const std::uint32_t id;
         std::uint8_t call_count = 0;
         std::function<void(errc error_code)> on_close;
+        queued_close_callback(std::uint32_t transaction_id)
+          : id(transaction_id)
+        {
+        }
       };
 
       socket* socket_;
       bool closed_;
       std::array<char, 8192> recv_buffer_;
+      //asio::streambuf recv_buffer_;
       std::deque<queued_send_message> send_queue_;
       std::deque<queued_recv_message> recv_queue_;
       std::deque<queued_close_callback> transaction_close_queue_;

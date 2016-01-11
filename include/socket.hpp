@@ -27,6 +27,10 @@ namespace manifold
     virtual asio::io_service& io_service() = 0;
     virtual void recv(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
     virtual void recv(char* buf, std::size_t buf_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
+    //virtual void recv(asio::streambuf& b, std::size_t bytes_to_recv, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
+    //virtual void recv(asio::streambuf& b, std::size_t bytes_to_recv, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
+    //virtual void recv_until(asio::streambuf& b, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
+    //virtual void recv_until(asio::streambuf& b, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
     virtual void recvline(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb, const std::string& delim = "\r\n") = 0;
     virtual void recvline(char* buf, std::size_t buf_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb, const std::string& delim = "\r\n") = 0;
     virtual void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
@@ -59,6 +63,10 @@ namespace manifold
     asio::io_service& io_service() { return this->s_->get_io_service(); }
     void recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     void recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+    //void recv(asio::streambuf& b, std::size_t bytes_to_recv, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
+    //void recv(asio::streambuf& b, std::size_t bytes_to_recv, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+    //void recv_until(asio::streambuf& b, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
+    //void recv_until(asio::streambuf& b, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
     void recvline(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb, const std::string& delim = "\r\n");
     void recvline(char* buf, std::size_t buf_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb, const std::string& delim = "\r\n");
     void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
@@ -100,6 +108,10 @@ namespace manifold
     asio::io_service& io_service() { return this->s_->get_io_service(); }
     void recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     void recv(char* data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+    //void recv(asio::streambuf& b, std::size_t bytes_to_recv, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
+    //void recv(asio::streambuf& b, std::size_t bytes_to_recv, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
+    //void recv_until(asio::streambuf& b, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
+    //void recv_until(asio::streambuf& b, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
     void recvline(char* buf, std::size_t buf_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb, const std::string& delim = "\r\n");
     void recvline(char* buf, std::size_t buf_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb, const std::string& delim = "\r\n");
     void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
