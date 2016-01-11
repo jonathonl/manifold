@@ -244,13 +244,13 @@ int main()
 
       req.on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req.stream_id()));
 
-      req.on_close([&c1](std::uint32_t) { /*c1.close();*/ });
+      req.on_close([&c1](http::errc) { /*c1.close();*/ });
 
 
       req.end(std::string("name=value&name2=value2"));
     });
 
-    c1.on_close([&ioservice](std::uint32_t ec)
+    c1.on_close([&ioservice](http::errc ec)
     {
       std::cout << ec << std::endl;
       //ioservice.stop();
@@ -289,7 +289,7 @@ int main()
           });
         });
 
-        request->on_close([&c2](std::uint32_t error_code)
+        request->on_close([&c2](http::errc error_code)
         {
           c2.close();
         });
@@ -339,7 +339,7 @@ int main()
         });
 
         //
-        req_ptr->on_close([ofs](std::uint32_t ec)
+        req_ptr->on_close([ofs](http::errc ec)
         {
           ofs->close();
           std::remove("./response_file.txt.tmp");
@@ -351,7 +351,7 @@ int main()
       }
     });
 
-    c2.on_close([](std::uint32_t ec) { std::cerr << ec << std::endl; });
+    c2.on_close([](http::errc ec) { std::cerr << ec << std::endl; });
   }
   //----------------------------------------------------------------//
 

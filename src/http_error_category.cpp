@@ -27,7 +27,7 @@ namespace manifold
         case (std::uint32_t)errc::enhance_your_calm:   return errc::enhance_your_calm;
         case (std::uint32_t)errc::inadequate_security: return errc::inadequate_security;
         case (std::uint32_t)errc::http_1_1_required:   return errc::http_1_1_required;
-        default: return errc::internal_error;
+        default: return errc::protocol_error;
       }
     }
     //----------------------------------------------------------------------//

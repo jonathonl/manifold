@@ -370,7 +370,7 @@ namespace manifold
         });
       });
 
-      conn->on_close([conn, this](std::uint32_t ec)
+      conn->on_close([conn, this](errc ec)
       {
         this->connections_.erase(conn);
       });

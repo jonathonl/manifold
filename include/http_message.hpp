@@ -38,7 +38,7 @@ namespace manifold
       //----------------------------------------------------------------//
       std::uint32_t stream_id() const;
       void close(http::errc error_code = http::errc::no_error);
-      void on_close(const std::function<void(std::uint32_t ec)>& cb);
+      void on_close(const std::function<void(errc ec)>& cb);
       //----------------------------------------------------------------//
     private:
       //message(const message&) = delete;

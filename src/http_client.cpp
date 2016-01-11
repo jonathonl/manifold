@@ -231,7 +231,7 @@ namespace manifold
       {
         if (ec)
         {
-          this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
+          this->ec_ = errc::internal_error;
           this->on_close_ ? this->on_close_(this->ec_) : void();
         }
         else
@@ -243,25 +243,14 @@ namespace manifold
           {
             if (ec)
             {
-              this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
+              this->ec_ = errc::internal_error;
               this->on_close_ ? this->on_close_(this->ec_) : void();
             }
             else
             {
-              sock->send(v2_connection::preface.data(), v2_connection::preface.size(), [this, sock](const std::error_code& ec, std::size_t bytes_transfered)
-              {
-                if (ec)
-                {
-                  this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
-                  this->on_close_ ? this->on_close_(this->ec_) : void();
-                }
-                else
-                {
-                  this->connection_ = std::make_shared<v1_connection<request_head, response_head>>(std::move(*sock));
-                  this->connection_->run();
-                  this->on_connect_ ? this->on_connect_() : void();
-                }
-              });
+              this->connection_ = std::make_shared<v1_connection<request_head, response_head>>(std::move(*sock));
+              this->connection_->run();
+              this->on_connect_ ? this->on_connect_() : void();
             }
           });
         }
@@ -280,7 +269,7 @@ namespace manifold
       std::copy_n(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL, ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL), proto_list.begin());
       //SSL_CTX_set_alpn_select_cb(this->ssl_context_->impl(), client_alpn_select_proto_cb, nullptr);
       const unsigned char* test = this->ssl_context_->impl()->alpn_client_proto_list;
-      auto r = SSL_CTX_set_alpn_protos(this->ssl_context_->impl(), proto_list.data(), proto_list.size());
+      //auto r = SSL_CTX_set_alpn_protos(this->ssl_context_->impl(), proto_list.data(), proto_list.size());
       const unsigned char* test2 = this->ssl_context_->impl()->alpn_client_proto_list;
       auto sock = std::make_shared<manifold::tls_socket>(ioservice, *this->ssl_context_);
       std::error_code e;
@@ -293,7 +282,7 @@ namespace manifold
       {
         if (ec)
         {
-          this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
+          this->ec_ = errc::internal_error;
           this->on_close_ ? this->on_close_(this->ec_) : void();
         }
         else
@@ -305,7 +294,7 @@ namespace manifold
             if (ec)
             {
               std::cout << "ERROR: " << ec.message() << std::endl;
-              this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
+              this->ec_ = errc::internal_error;
               this->on_close_ ? this->on_close_(this->ec_) : void();
             }
             else
@@ -319,26 +308,33 @@ namespace manifold
                 if (ec)
                 {
                   std::cout << "ERROR: " << ec.message() << std::endl;
-                  this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
+                  this->ec_ = errc::internal_error;
                   this->on_close_ ? this->on_close_(this->ec_) : void();
                 }
-                else
+                else if (std::string((char*)selected_alpn, selected_alpn_sz) == "h2")
                 {
                   sock->send(v2_connection::preface.data(), v2_connection::preface.size(), [this, sock](const std::error_code& ec, std::size_t bytes_transfered)
                   {
                     if (ec)
                     {
-                      this->ec_ = static_cast<std::uint32_t>(errc::internal_error);
+                      this->ec_ = errc::internal_error;
                       this->on_close_ ? this->on_close_(this->ec_) : void();
                     }
                     else
                     {
                       this->connection_ = std::make_shared<v2_connection>(std::move(*sock));
-                      this->connection_->on_close([this](std::uint32_t ec) { this->on_close_ ? this->on_close_(ec) : void(); });
+                      this->connection_->on_close([this](errc ec) { this->on_close_ ? this->on_close_(ec) : void(); });
                       this->connection_->run();
                       this->on_connect_ ? this->on_connect_() : void();
                     }
                   });
+                }
+                else
+                {
+                  this->connection_ = std::make_shared<v1_connection<request_head, response_head>>(std::move(*sock));
+                  this->connection_->on_close([this](errc ec) { this->on_close_ ? this->on_close_(ec) : void(); });
+                  this->connection_->run();
+                  this->on_connect_ ? this->on_connect_() : void();
                 }
               });
             }
@@ -365,12 +361,12 @@ namespace manifold
 
         if (this->connection_)
         {
-          this->connection_->close((std::uint32_t)http::errc::cancel);
+          this->connection_->close(http::errc::cancel);
           this->connection_ = nullptr;
         }
         else if (this->on_close_)
         {
-          this->on_close_((std::uint32_t)http::errc::cancel);
+          this->on_close_(http::errc::cancel);
         }
 
         this->on_close_ = nullptr;
@@ -407,7 +403,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void client::on_close(const std::function<void(std::uint32_t ec)>& fn)
+    void client::on_close(const std::function<void(errc ec)>& fn)
     {
       //bool had_previous_handler = (bool)this->on_close_;
       this->on_close_ = fn;

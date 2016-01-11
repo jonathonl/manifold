@@ -80,7 +80,10 @@ namespace manifold
   {
   public:
     tls_socket(asio::io_service &ioservice, asio::ssl::context& ctx)
-      : s_(new asio::ssl::stream<asio::ip::tcp::socket>(ioservice, ctx)) { }
+      : s_(new asio::ssl::stream<asio::ip::tcp::socket>(ioservice, ctx))
+    {
+      SSL_CTX_set_mode(ctx.native_handle(), SSL_MODE_AUTO_RETRY);
+    }
 
     tls_socket(tls_socket&& source)
       : s_(source.s_)

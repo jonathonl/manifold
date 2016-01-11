@@ -32,10 +32,11 @@ namespace manifold
       virtual ~v1_connection() {}
 
       void run();
-      void close(std::uint32_t ec);
+      void close(errc ec);
+      bool is_closed() const;
 
 
-      void on_close(const std::function<void(std::uint32_t error_code)>& fn);
+      void on_close(const std::function<void(errc error_code)>& fn);
       void on_new_stream(const std::function<void(std::uint32_t transaction_id)>& fn);
 
       void on_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&& headers)>& fn);
@@ -43,7 +44,7 @@ namespace manifold
       void on_trailers(std::uint32_t transaction_id, const std::function<void(header_block&& headers)>& fn);
       void on_push_promise(std::uint32_t transaction_id, const std::function<void(SendMsg&& headers, std::uint32_t promised_transaction_id)>& fn) {}
       void on_data(std::uint32_t transaction_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
-      void on_close(std::uint32_t transaction_id, const std::function<void(std::uint32_t error_code)>& fn);
+      void on_close(std::uint32_t transaction_id, const std::function<void(errc error_code)>& fn);
       void on_end(std::uint32_t transaction_id, const std::function<void()>& fn);
       void on_drain(std::uint32_t transaction_id, const std::function<void()>& fn);
 
@@ -54,9 +55,9 @@ namespace manifold
       bool send_trailers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream);
       //bool send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream);
       //bool send_priority(std::uint32_t stream_id, priority_options options);
-      bool send_reset_stream(std::uint32_t stream_id, http::errc error_code)  { this->close((int)error_code); }
+      bool send_reset_stream(std::uint32_t stream_id, http::errc error_code)  { this->close(error_code); }
       std::uint32_t send_push_promise(std::uint32_t stream_id, const RecvMsg& head) { return 0; }
-      void send_goaway(http::errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0) { this->close((int)error_code); }
+      void send_goaway(http::errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0) { this->close(error_code); }
 
       bool send_message_head(std::uint64_t transaction_id, const v1_message_head& head);
       //bool send_message_body(std::uint64_t transaction_id, const char*const data, std::size_t data_sz);
@@ -97,7 +98,8 @@ namespace manifold
       struct queued_close_callback
       {
         const std::uint32_t id;
-        std::function<void(std::uint32_t error_code)> on_close;
+        std::uint8_t call_count = 0;
+        std::function<void(errc error_code)> on_close;
       };
 
       socket* socket_;
@@ -110,10 +112,11 @@ namespace manifold
       bool send_loop_running_;
 
 
-      std::function<void(std::uint32_t error_code)> on_close_;
+      std::function<void(errc error_code)> on_close_;
       std::function<void(std::uint32_t transaction_id)> on_new_stream_;
 
       void run_recv_loop();
+      void recv_headers();
       void recv_chunk_encoded_body();
       void recv_trailers();
       void recv_known_length_body(std::uint64_t content_length);

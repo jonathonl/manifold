@@ -38,7 +38,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void message<SendMsg,RecvMsg>::on_close(const std::function<void(std::uint32_t ec)>& cb)
+    void message<SendMsg,RecvMsg>::on_close(const std::function<void(errc ec)>& cb)
     {
       this->connection_->on_close(this->stream_id_, cb);
     }

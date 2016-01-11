@@ -209,8 +209,8 @@ namespace manifold
 
       std::function<void(http::client::request && req)> on_push_promise_;
       std::function<void()> on_connect_;
-      std::function<void(std::uint32_t ec)> on_close_;
-      std::uint32_t ec_;
+      std::function<void(errc ec)> on_close_;
+      errc ec_;
 
       void send_connection_preface(std::function<void(const std::error_code& ec)>& fn);
     public:
@@ -219,7 +219,7 @@ namespace manifold
       ~client();
 
       void on_connect(const std::function<void()>& fn);
-      void on_close(const std::function<void(std::uint32_t ec)>& fn);
+      void on_close(const std::function<void(errc ec)>& fn);
       client::request make_request();
       void close();
       void set_default_user_agent(const std::string user_agent);

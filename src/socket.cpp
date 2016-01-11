@@ -8,6 +8,7 @@
 
 #include <assert.h>
 
+#include <thread>
 //################################################################//
 namespace manifold
 {
@@ -151,7 +152,7 @@ namespace manifold
   //----------------------------------------------------------------//
   void tls_socket::recvline(char* buf, std::size_t buf_size, std::size_t put_position, char* buf_end, std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>&& cb, const std::string& delim)
   {
-    asio::async_read(*this->s_, asio::null_buffers(), [this, buf, buf_size, put_position, buf_end, delim, cb](const std::error_code& ec, std::size_t bytes_transferred) mutable
+    this->s_->next_layer().async_read_some(asio::null_buffers(), [this, buf, buf_size, put_position, buf_end, delim, cb](const std::error_code& ec, std::size_t bytes_transferred) mutable
     {
       if (ec)
       {
@@ -167,9 +168,9 @@ namespace manifold
 
         //const std::size_t bytes_actually_read = sock.receive(asio::buffer(buf + put_position, bytes_to_read), asio::ip::tcp::socket::message_peek, err);
         int bytes_actually_read = SSL_peek(this->s_->native_handle(), buf + put_position, bytes_to_read);
-        if (SSL_get_error(this->s_->native_handle(), bytes_actually_read))
+        if (auto res = SSL_get_error(this->s_->native_handle(), bytes_actually_read))
         {
-          cb ? cb(asio::error::make_error_code(asio::error::ssl_errors()), 0) : void();
+          cb ? cb(std::error_code(res, asio::error::get_ssl_category()), 0) : void();
         }
         else
         {

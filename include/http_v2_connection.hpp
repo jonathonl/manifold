@@ -138,7 +138,7 @@ namespace manifold
         std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)> on_push_promise_;
         std::function<void()> on_end_;
         std::function<void()> on_drain_;
-        std::function<void(std::uint32_t error_code)> on_close_;
+        std::function<void(errc error_code)> on_close_;
 
         static bool header_is_informational(const RecvMsg& head);
       public:
@@ -158,7 +158,7 @@ namespace manifold
         void on_push_promise(const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn);
         void on_end(const std::function<void()>& fn);
         void on_drain(const std::function<void()>& fn);
-        void on_close(const std::function<void(std::uint32_t error_code)>& fn);
+        void on_close(const std::function<void(errc error_code)>& fn);
 
         stream_state state() const { return this->state_; }
         std::uint32_t id() const { return this->id_; }
@@ -217,7 +217,7 @@ namespace manifold
         bool handle_outgoing_headers_state_change();
         bool handle_outgoing_end_stream_state_change();
         bool handle_outgoing_push_promise_state_change();
-        bool handle_outgoing_rst_stream_state_change(std::uint32_t ec);
+        bool handle_outgoing_rst_stream_state_change(errc ec);
         //----------------------------------------------------------------//
       };
       //================================================================//
@@ -300,7 +300,7 @@ namespace manifold
       //----------------------------------------------------------------//
       // Connection level callbacks:
       std::function<void(std::uint32_t stream_id)> on_new_stream_;
-      std::function<void(std::uint32_t error_code)> on_close_;
+      std::function<void(errc error_code)> on_close_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -361,14 +361,14 @@ namespace manifold
 
       //----------------------------------------------------------------//
       void run();
-      void close(std::uint32_t ec);
+      void close(errc ec);
       bool is_closed() const;
       void cancelAllStreams();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       void on_new_stream(const std::function<void(std::uint32_t stream_id)>& fn);
-      void on_close(const std::function<void(std::uint32_t error_code)>& fn);
+      void on_close(const std::function<void(errc error_code)>& fn);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -379,7 +379,7 @@ namespace manifold
       void on_trailers(std::uint32_t stream_id, const std::function<void(header_block&& headers)>& fn);
       void on_data(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
       //void on_headers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn);
-      void on_close(std::uint32_t stream_id, const std::function<void(std::uint32_t error_code)>& fn);
+      void on_close(std::uint32_t stream_id, const std::function<void(errc error_code)>& fn);
       void on_push_promise(std::uint32_t stream_id, const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn);
 
 

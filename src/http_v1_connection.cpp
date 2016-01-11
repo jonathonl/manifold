@@ -10,7 +10,7 @@ namespace manifold
   namespace http
   {
     template <typename SendMsg, typename RecvMsg>
-    void v1_connection<SendMsg, RecvMsg>::on_close(const std::function<void(std::uint32_t error_code)>& fn)
+    void v1_connection<SendMsg, RecvMsg>::on_close(const std::function<void(errc error_code)>& fn)
     {
       this->on_close_ = fn;
     }
@@ -62,7 +62,7 @@ namespace manifold
     }
 
     template <typename SendMsg, typename RecvMsg>
-    void v1_connection<SendMsg, RecvMsg>::on_close(std::uint32_t transaction_id, const std::function<void(std::uint32_t)>& fn)
+    void v1_connection<SendMsg, RecvMsg>::on_close(std::uint32_t transaction_id, const std::function<void(errc)>& fn)
     {
       auto it = std::find_if(this->transaction_close_queue_.begin(), this->transaction_close_queue_.end(), [transaction_id](const queued_close_callback& m) { return m.id == transaction_id; });
       if (it != this->transaction_close_queue_.end())
@@ -98,49 +98,58 @@ namespace manifold
     }
 
     template <typename SendMsg, typename RecvMsg>
-    void v1_connection<SendMsg, RecvMsg>::close(std::uint32_t ec)
+    void v1_connection<SendMsg, RecvMsg>::close(errc ec)
     {
       if (!this->closed_)
       {
         this->closed_ = true;
 
         this->socket_->close();
-        auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
-        this->socket_->io_service().post([self, ec]()
+        for (auto it = this->transaction_close_queue_.begin(); it != this->transaction_close_queue_.end(); ++it)
         {
-          self->send_queue_.clear();
-          self->recv_queue_.clear();
-
-          while (self->transaction_close_queue_.size())
+          if (it->call_count == 0)
           {
-            self->transaction_close_queue_.front().on_close ? self->transaction_close_queue_.front().on_close(ec) : void();
-            self->transaction_close_queue_.pop_front();
+            ++(it->call_count);
+            it->on_close ? it->on_close(ec) : void();
           }
+        }
 
-          self->on_close_ ? self->on_close_(ec) : void();
-          self->on_new_stream_ = nullptr;
-          self->on_close_ = nullptr;
-        });
+        this->on_close_ ? this->on_close_(ec) : void();
       }
     }
 
     template <typename SendMsg, typename RecvMsg>
-    void v1_connection<SendMsg, RecvMsg>::run_recv_loop()
+    bool v1_connection<SendMsg, RecvMsg>::is_closed() const
+    {
+      return this->closed_;
+    }
+
+    template <>
+    void v1_connection<request_head, response_head>::run_recv_loop()
+    {
+      this->recv_headers();
+    }
+
+    template <>
+    void v1_connection<response_head, request_head>::run_recv_loop()
+    {
+      std::uint32_t transaction_id = this->create_stream(0, 0);
+      this->on_new_stream_ ? this->on_new_stream_(transaction_id) : void();
+
+      this->recv_headers();
+    }
+
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::recv_headers()
     {
       auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
-      if (this->recv_queue_.empty())
-      {
-        std::uint32_t transaction_id = this->create_stream(0, 0);
-        this->on_new_stream_ ? this->on_new_stream_(transaction_id) : void();
-      }
-
       this->socket_->recvline(this->recv_buffer_.data(), this->recv_buffer_.size(), [self](const std::error_code& ec, std::size_t bytes_read)
       {
         if (ec)
         {
           // TODO: handle error.
         }
-        else
+        else if (!self->is_closed())
         {
           std::stringstream is(std::string(self->recv_buffer_.data(), bytes_read));
           v1_message_head headers;
@@ -175,7 +184,7 @@ namespace manifold
         {
           // TODO: handle error.
         }
-        else
+        else if (!self->is_closed())
         {
           std::stringstream is(std::string(self->recv_buffer_.data(), bytes_read));
           v1_header_block header_block;
@@ -191,7 +200,8 @@ namespace manifold
           if (std::find_if(self->send_queue_.begin(), self->send_queue_.end(), [front_transaction_id](const queued_send_message& m) { return (m.id == front_transaction_id); }) == self->send_queue_.end())
           {
             assert(self->transaction_close_queue_.front().id == front_transaction_id);
-            self->transaction_close_queue_.front().on_close ? self->transaction_close_queue_.front().on_close(0) : void();
+            ++(self->transaction_close_queue_.front().call_count);
+            self->transaction_close_queue_.front().on_close ? self->transaction_close_queue_.front().on_close(errc::no_error) : void();
             self->transaction_close_queue_.pop_front();
           }
           self->recv_queue_.pop_front();
@@ -211,7 +221,7 @@ namespace manifold
         {
           // TODO: handle error.
         }
-        else
+        else if (!self->is_closed())
         {
           // parse chunk size.
           std::string size_line(self->recv_buffer_.data(), bytes_read);
@@ -240,7 +250,7 @@ namespace manifold
                 {
                   // TODO: handle error.
                 }
-                else
+                else if (!self->is_closed())
                 {
                   assert(chunk_size == bytes_read);
                   self->recv_queue_.front().on_data ? self->recv_queue_.front().on_data(self->recv_buffer_.data(), bytes_read) : void();
@@ -251,7 +261,7 @@ namespace manifold
                     {
                       // TODO: handle error.
                     }
-                    else
+                    else if (!self->is_closed())
                     {
                       assert(bytes_read == 2);
                       self->recv_chunk_encoded_body();
@@ -275,7 +285,8 @@ namespace manifold
         if (std::find_if(this->send_queue_.begin(), this->send_queue_.end(), [front_transaction_id](const queued_send_message& m) { return (m.id == front_transaction_id); }) == this->send_queue_.end())
         {
           assert(this->transaction_close_queue_.front().id == front_transaction_id);
-          this->transaction_close_queue_.front().on_close ? this->transaction_close_queue_.front().on_close(0) : void();
+          ++(this->transaction_close_queue_.front().call_count);
+          this->transaction_close_queue_.front().on_close ? this->transaction_close_queue_.front().on_close(errc::no_error) : void();
           this->transaction_close_queue_.pop_front();
         }
         this->recv_queue_.pop_front();
@@ -295,7 +306,7 @@ namespace manifold
           {
             // TODO: handle error.
           }
-          else
+          else if (!self->is_closed())
           {
             self->recv_queue_.front().on_data ? self->recv_queue_.front().on_data(self->recv_buffer_.data(), self->recv_buffer_.size()) : void();
             self->recv_known_length_body(content_length - bytes_read);
@@ -327,7 +338,7 @@ namespace manifold
                 {
                   // TODO: handle error.
                 }
-                else
+                else if (!self->is_closed())
                 {
                   self->send_loop_running_ = false;
                   self->run_send_loop();
@@ -354,7 +365,7 @@ namespace manifold
                 {
                   // TODO: handle error.
                 }
-                else
+                else if (!self->is_closed())
                 {
                   assert(current_message.body.front().size() == bytes_sent);
                   current_message.body.pop();
@@ -376,14 +387,15 @@ namespace manifold
                 {
                   // TODO: handle error.
                 }
-                else
+                else if (!self->is_closed())
                 {
                   assert(current_message.trailer_data.size() == bytes_sent);
                   auto front_transaction_id = self->send_queue_.front().id;
                   if (std::find_if(self->recv_queue_.begin(), self->recv_queue_.end(), [front_transaction_id](const queued_recv_message& m) { return (m.id == front_transaction_id); }) == self->recv_queue_.end())
                   {
                     assert(self->transaction_close_queue_.front().id == front_transaction_id);
-                    self->transaction_close_queue_.front().on_close ? self->transaction_close_queue_.front().on_close(0) : void();
+                    ++(self->transaction_close_queue_.front().call_count);
+                    self->transaction_close_queue_.front().on_close ? self->transaction_close_queue_.front().on_close(errc::no_error) : void();
                     self->transaction_close_queue_.pop_front();
                   }
                   self->send_queue_.pop_front();
@@ -402,7 +414,8 @@ namespace manifold
                 if (std::find_if(self->recv_queue_.begin(), self->recv_queue_.end(), [front_transaction_id](const queued_recv_message& m) { return (m.id == front_transaction_id); }) == self->recv_queue_.end())
                 {
                   assert(self->transaction_close_queue_.front().id == front_transaction_id);
-                  self->transaction_close_queue_.front().on_close ? self->transaction_close_queue_.front().on_close(0) : void();
+                  ++(self->transaction_close_queue_.front().call_count);
+                  self->transaction_close_queue_.front().on_close ? self->transaction_close_queue_.front().on_close(errc::no_error) : void();
                   self->transaction_close_queue_.pop_front();
                 }
                 self->send_queue_.pop_front();

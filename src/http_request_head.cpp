@@ -44,7 +44,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     request_head::request_head(v1_message_head&& v1_headers)
-      : request_head(v2_request_head(std::move(v1_headers)))
+      : request_head(v1_request_head(std::move(v1_headers)))
     {
     }
     //----------------------------------------------------------------//

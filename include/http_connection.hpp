@@ -21,12 +21,12 @@ namespace manifold
     public:
       //----------------------------------------------------------------//
       virtual void run() = 0;
-      virtual void close(std::uint32_t ec) = 0;
+      virtual void close(errc ec) = 0;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       virtual void on_new_stream(const std::function<void(std::uint32_t stream_id)>& fn) = 0;
-      virtual void on_close(const std::function<void(std::uint32_t error_code)>& fn) = 0;
+      virtual void on_close(const std::function<void(errc error_code)>& fn) = 0;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -34,7 +34,7 @@ namespace manifold
       virtual void on_informational_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&& headers)>& fn) = 0;
       virtual void on_trailers(std::uint32_t stream_id, const std::function<void(header_block&& headers)>& fn) = 0;
       virtual void on_data(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn) = 0;
-      virtual void on_close(std::uint32_t stream_id, const std::function<void(std::uint32_t error_code)>& fn) = 0;
+      virtual void on_close(std::uint32_t stream_id, const std::function<void(errc error_code)>& fn) = 0;
       virtual void on_push_promise(std::uint32_t stream_id, const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn) = 0;
 
 
