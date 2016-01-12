@@ -161,7 +161,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool client::request::send_headers(bool end_stream)
     {
-      if (this->head_.method() == "get" || this->head_.method() == "head")
+      if (this->head_.method() == "GET" || this->head_.method() == "HEAD")
         end_stream = true;
       return outgoing_message::send_headers(end_stream);
     }

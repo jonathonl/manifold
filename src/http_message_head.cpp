@@ -53,6 +53,27 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    bool header_block::header_exists(const std::string& name) const
+    {
+      return this->header_exists(std::string(name));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool header_block::header_exists(std::string&& name) const
+    {
+      bool ret = false;
+      std::for_each(name.begin(), name.end(), ::tolower);
+      for (auto it = this->headers_.begin(); !ret && it != this->headers_.end(); ++it)
+      {
+        if (it->first == name)
+          ret = true;
+      }
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     void header_block::header(const std::string& name, const std::string& value)
     {
       std::string n(name);

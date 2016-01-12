@@ -102,6 +102,7 @@ namespace manifold
       private:
         //----------------------------------------------------------------//
         response_head head_;
+        std::string request_method_;
         //----------------------------------------------------------------//
       protected:
         //----------------------------------------------------------------//
@@ -109,7 +110,7 @@ namespace manifold
         //----------------------------------------------------------------//
       public:
         //----------------------------------------------------------------//
-        response(response_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id);
+        response(response_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id, const std::string& request_method);
         ~response();
         //----------------------------------------------------------------//
 

@@ -39,6 +39,8 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
+      bool header_exists(const std::string& name) const;
+      bool header_exists(std::string&& name) const;
       void header(const std::string& name, const std::string& value);
       void header(std::string&& name, std::string&& value);
       void multi_header(const std::string& name, const std::list<std::string>& values);

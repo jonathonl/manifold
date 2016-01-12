@@ -234,7 +234,7 @@ int main()
         }
         else
         {
-          auto response_data = std::make_shared<std::stringstream>();
+          auto response_data = std::make_shared<std::stringstream>("");
           resp.on_data([response_data](const char *const data, std::size_t datasz)
           {
             response_data->write(data, datasz);
@@ -242,7 +242,8 @@ int main()
 
           resp.on_end([response_data]()
           {
-            std::cout << response_data->rdbuf() << std::endl;
+            if (response_data->rdbuf()->in_avail())
+              std::cout << response_data->rdbuf() << std::endl;
           });
         }
       });

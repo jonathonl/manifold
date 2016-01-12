@@ -533,8 +533,8 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template<> bool v2_connection<request_head, response_head>::stream::header_is_informational(const response_head& head) { return head.has_informational_status(); }
-    template<> bool v2_connection<response_head, request_head>::stream::header_is_informational(const request_head& head) { return false; }
+    template<> bool v2_connection<request_head, response_head>::stream::incoming_header_is_informational(const response_head& head) { return head.has_informational_status(); }
+    template<> bool v2_connection<response_head, request_head>::stream::incoming_header_is_informational(const request_head& head) { return false; }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
@@ -731,7 +731,7 @@ namespace manifold
           }
 
           RecvMsg generic_head(std::move(headers));
-          if (header_is_informational(generic_head))
+          if (incoming_header_is_informational(generic_head))
             this->on_informational_headers_ ? this->on_informational_headers_(std::move(generic_head)) : void();
           else if (!this->on_headers_called_)
           {
@@ -851,7 +851,7 @@ namespace manifold
           }
 
           idle_promised_stream.state_ = stream_state::reserved_remote;
-          this->on_push_promise_ ? this->on_push_promise_(SendMsg(std::move(headers)), incoming_push_promise_frame.promised_stream_id()) : void();
+          this->on_push_promise_ ? this->on_push_promise_(std::move(headers), incoming_push_promise_frame.promised_stream_id()) : void();
           break;
         }
         case stream_state::closed:

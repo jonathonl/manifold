@@ -79,6 +79,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     request_head::request_head(const std::string& path, http::method meth, std::list<std::pair<std::string, std::string>>&& headers)
+      : header_block(std::move(headers))
     {
       this->method(meth);
       this->path(path);
@@ -101,6 +102,19 @@ namespace manifold
     //----------------------------------------------------------------//
     void request_head::method(const std::string& value)
     {
+      this->method(std::string(value));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void request_head::method(std::string&& value)
+    {
+      const std::string whitespace(" \t\f\v\r\n");
+      value.erase(0, value.find_first_not_of(whitespace));
+      value.erase(value.find_last_not_of(whitespace) + 1);
+
+      std::for_each(value.begin(), value.end(), ::toupper);
+
       if (value.size())
         this->method_ = value;
     }

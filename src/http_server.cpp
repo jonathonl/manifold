@@ -61,7 +61,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::response::response(response_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id)
+    server::response::response(response_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id, const std::string& request_method)
       : outgoing_message<response_head, request_head>(conn, stream_id)
     {
       this->head_ = std::move(head);
@@ -87,6 +87,8 @@ namespace manifold
     {
       if (this->head().header("date").empty())
         this->head().header("date", server::date_string());
+      if (this->request_method_ == "HEAD")
+        end_stream = true;
       return outgoing_message::send_headers(end_stream);
     }
     //----------------------------------------------------------------//
@@ -94,9 +96,9 @@ namespace manifold
     //----------------------------------------------------------------//
     server::push_promise server::response::send_push_promise(request_head&& push_promise_headers)
     {
+      std::string method = push_promise_headers.method();
       std::uint32_t promised_stream_id = this->connection_->send_push_promise(this->stream_id_, push_promise_headers);
-
-      push_promise ret(server::request(std::move(push_promise_headers), this->connection_, promised_stream_id), server::response(response_head(200, {{"server", this->head().header("server")}}), this->connection_, promised_stream_id));
+      push_promise ret(server::request(std::move(push_promise_headers), this->connection_, promised_stream_id), server::response(response_head(200, {{"server", this->head().header("server")}}), this->connection_, promised_stream_id, method));
       return ret;
     }
     //----------------------------------------------------------------//
@@ -361,7 +363,8 @@ namespace manifold
       {
         conn->on_headers(stream_id, [conn, stream_id, this](request_head&& headers)
         {
-          this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(response_head(200, {{"server", this->default_server_header_}}), conn, stream_id)) : void();
+          std::string method = headers.method();
+          this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(response_head(), conn, stream_id, method)) : void();
         });
 
         conn->on_push_promise(stream_id, [stream_id, conn](response_head&& head, std::uint32_t promised_stream_id)

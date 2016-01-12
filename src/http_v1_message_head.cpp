@@ -61,7 +61,8 @@ namespace manifold
         else
           ++it;
       }
-      this->headers_.push_back(std::pair<std::string,std::string>(std::move(name), std::move(value)));
+      if (name.size())
+        this->headers_.push_back(std::pair<std::string,std::string>(std::move(name), std::move(value)));
     }
     //----------------------------------------------------------------//
 
@@ -93,14 +94,63 @@ namespace manifold
           ++it;
       }
 
-      std::for_each(values.begin(), values.end(), [this, &whitespace, &name](std::string& value)
+      if (name.size())
       {
-        value.erase(0, value.find_first_not_of(whitespace));
-        value.erase(value.find_last_not_of(whitespace)+1);
+        std::for_each(values.begin(), values.end(), [this, &whitespace, &name](std::string &value)
+        {
+          value.erase(0, value.find_first_not_of(whitespace));
+          value.erase(value.find_last_not_of(whitespace) + 1);
+          this->headers_.push_back(std::pair<std::string, std::string>(std::move(name), std::move(value)));
+        });
+      }
 
-        this->headers_.push_back(std::pair<std::string,std::string>(std::move(name), std::move(value)));
-      });
+    }
+    //----------------------------------------------------------------//
 
+    //----------------------------------------------------------------//
+    bool v1_header_block::header_exists(const std::string& name) const
+    {
+      return this->header_exists(std::string(name));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool v1_header_block::header_exists(std::string&& name) const
+    {
+      bool ret = false;
+      std::for_each(name.begin(), name.end(), ::tolower);
+      for (auto it = this->headers_.begin(); !ret && it != this->headers_.end(); ++it)
+      {
+        if (it->first == name)
+          ret = true;
+      }
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void v1_header_block::remove_header(const std::string& name)
+    {
+      this->remove_header(std::string(name));
+    }
+
+    //----------------------------------------------------------------//
+    void v1_header_block::remove_header(std::string&& name)
+    {
+      const std::string whitespace(" \t\f\v\r\n");
+      name.erase(0, name.find_first_not_of(":" + whitespace));
+      name.erase(name.find_last_not_of(whitespace)+1);
+
+      // make name lowercase
+      std::for_each(name.begin(), name.end(), ::tolower);
+
+      for (auto it = this->headers_.begin(); it != this->headers_.end();)
+      {
+        if (it->first == name)
+          it = this->headers_.erase(it);
+        else
+          ++it;
+      }
     }
     //----------------------------------------------------------------//
 

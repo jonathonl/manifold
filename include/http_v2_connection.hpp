@@ -140,7 +140,7 @@ namespace manifold
         std::function<void()> on_drain_;
         std::function<void(errc error_code)> on_close_;
 
-        static bool header_is_informational(const RecvMsg& head);
+        static bool incoming_header_is_informational(const RecvMsg &head);
       public:
         //const std::function<void(const char* const buf, std::size_t buf_size)>& on_data() const { return this->on_data_; }
         //const std::function<void(http::header_block&& headers)>& on_headers() const { return this->on_headers_; }

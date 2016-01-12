@@ -28,6 +28,7 @@ namespace manifold
       ~request_head();
       std::string method() const;
       void method(const std::string& value);
+      void method(std::string&& value);
       void method(http::method value);
       bool method_is(http::method methodToCheck) const;
       std::string path() const;

@@ -76,30 +76,22 @@ namespace manifold
 
       struct transaction
       {
-        struct
-        {
-          std::string head_data;
-          bool head_sent = false;
-          bool chunked_encoding;
-          std::uint64_t content_length;
-          std::queue<std::vector<char>> body;
-          std::string trailer_data;
-          bool ended = false;
-        } outgoing;
+        std::string outgoing_head_data;
+        bool head_sent = false;
+        std::queue<std::vector<char>> outgoing_body;
+        std::string outgoing_trailer_data;
+        bool outgoing_ended = false;
 
-        struct
-        {
-          std::function<void(RecvMsg&& headers)> on_headers;
-          std::function<void(RecvMsg&& headers)> on_informational_headers;
-          std::function<void(header_block&& headers)> on_trailers;
-          v1_header_block trailers;
-          std::function<void(const char* const buf, std::size_t buf_size)> on_data;
-          std::function<void()> on_end;
-          std::function<void()> on_drain;
-        } incoming;
+        std::function<void(RecvMsg&& headers)> on_headers;
+        std::function<void(RecvMsg&& headers)> on_informational_headers;
+        std::function<void(header_block&& headers)> on_trailers;
+        bool ignore_incoming_body = false;
+        v1_header_block incoming_trailers;
+        std::function<void(const char* const buf, std::size_t buf_size)> on_data;
+        std::function<void()> on_end;
+        std::function<void()> on_drain;
 
         const std::uint32_t id;
-
         transaction_state state = transaction_state::open;
         std::function<void(errc error_code)> on_close;
         transaction(std::uint32_t transaction_id)
@@ -120,9 +112,13 @@ namespace manifold
       std::function<void(errc error_code)> on_close_;
       std::function<void(std::uint32_t transaction_id)> on_new_stream_;
 
+      static bool incoming_head_is_head_request(const RecvMsg& head);
+      transaction* current_send_transaction();
+      transaction* current_recv_transaction();
       void run_recv_loop();
       void recv_headers();
       void recv_chunk_encoded_body();
+      void recv_chunk_data(std::size_t chunk_size);
       void recv_trailers();
       void recv_known_length_body(std::uint64_t content_length);
       void run_send_loop();
