@@ -66,44 +66,43 @@ namespace manifold
       bool end_message(std::uint32_t transaction_id, const v1_header_block& trailers = v1_header_block());
     private:
 
-      struct queued_send_message
+      enum class transaction_state
       {
-        const std::uint32_t id;
-        std::string head_data;
-        bool head_sent;
-        bool chunked_encoding;
-        std::uint64_t content_length;
-        std::queue<std::vector<char>> body;
-        std::string trailer_data;
-        bool ended;
-        queued_send_message(std::uint32_t transaction_id)
-          : id(transaction_id), head_sent(false), chunked_encoding(false), content_length(0), ended(false)
-        {
-        }
+        open = 1,
+        half_closed_local,
+        half_closed_remote,
+        closed
       };
 
-      struct queued_recv_message
+      struct transaction
       {
-        const std::uint32_t id;
-        std::function<void(RecvMsg&& headers)> on_headers;
-        std::function<void(RecvMsg&& headers)> on_informational_headers;
-        std::function<void(header_block&& headers)> on_trailers;
-        v1_header_block trailers;
-        std::function<void(const char* const buf, std::size_t buf_size)> on_data;
-        std::function<void()> on_end;
-        std::function<void()> on_drain;
-        queued_recv_message(std::uint32_t transaction_id)
-          : id(transaction_id)
+        struct
         {
-        }
-      };
+          std::string head_data;
+          bool head_sent = false;
+          bool chunked_encoding;
+          std::uint64_t content_length;
+          std::queue<std::vector<char>> body;
+          std::string trailer_data;
+          bool ended = false;
+        } outgoing;
 
-      struct queued_close_callback
-      {
+        struct
+        {
+          std::function<void(RecvMsg&& headers)> on_headers;
+          std::function<void(RecvMsg&& headers)> on_informational_headers;
+          std::function<void(header_block&& headers)> on_trailers;
+          v1_header_block trailers;
+          std::function<void(const char* const buf, std::size_t buf_size)> on_data;
+          std::function<void()> on_end;
+          std::function<void()> on_drain;
+        } incoming;
+
         const std::uint32_t id;
-        std::uint8_t call_count = 0;
+
+        transaction_state state = transaction_state::open;
         std::function<void(errc error_code)> on_close;
-        queued_close_callback(std::uint32_t transaction_id)
+        transaction(std::uint32_t transaction_id)
           : id(transaction_id)
         {
         }
@@ -113,9 +112,7 @@ namespace manifold
       bool closed_;
       std::array<char, 8192> recv_buffer_;
       //asio::streambuf recv_buffer_;
-      std::deque<queued_send_message> send_queue_;
-      std::deque<queued_recv_message> recv_queue_;
-      std::deque<queued_close_callback> transaction_close_queue_;
+      std::deque<transaction> transaction_queue_;
       std::uint32_t next_transaction_id_;
       bool send_loop_running_;
 

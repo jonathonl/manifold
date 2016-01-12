@@ -24,68 +24,74 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::on_data(std::uint32_t transaction_id, const std::function<void(const char* const, std::size_t)>& fn)
     {
-      auto it = std::find_if(this->recv_queue_.begin(), this->recv_queue_.end(), [transaction_id](const queued_recv_message& m) { return m.id == transaction_id; });
-      if (it != this->recv_queue_.end())
+      auto it = std::find_if(this->transaction_queue_.begin(), this->transaction_queue_.end(), [transaction_id](const transaction& t) { return (t.id == transaction_id); });
+      if (it != this->transaction_queue_.end())
       {
-        it->on_data = fn;
+        it->incoming.on_data = fn;
       }
     }
 
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::on_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&&)>& fn)
     {
-      auto it = std::find_if(this->recv_queue_.begin(), this->recv_queue_.end(), [transaction_id](const queued_recv_message& m) { return m.id == transaction_id; });
-      if (it != this->recv_queue_.end())
+      auto it = std::find_if(this->transaction_queue_.begin(), this->transaction_queue_.end(), [transaction_id](const transaction& t) { return t.id == transaction_id; });
+      if (it != this->transaction_queue_.end())
       {
-        it->on_headers = fn;
+        it->incoming.on_headers = fn;
       }
     }
 
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::on_informational_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&& headers)>& fn)
     {
-      auto it = std::find_if(this->recv_queue_.begin(), this->recv_queue_.end(), [transaction_id](const queued_recv_message& m) { return m.id == transaction_id; });
-      if (it != this->recv_queue_.end())
+      auto it = std::find_if(this->transaction_queue_.begin(), this->transaction_queue_.end(), [transaction_id](const transaction& t) { return t.id == transaction_id; });
+      if (it != this->transaction_queue_.end())
       {
-        it->on_informational_headers = fn;
+        it->incoming.on_informational_headers = fn;
       }
     }
 
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::on_trailers(std::uint32_t transaction_id, const std::function<void(header_block&&)>& fn)
     {
-      auto it = std::find_if(this->recv_queue_.begin(), this->recv_queue_.end(), [transaction_id](const queued_recv_message& m) { return m.id == transaction_id; });
-      if (it != this->recv_queue_.end())
+      auto it = std::find_if(this->transaction_queue_.begin(), this->transaction_queue_.end(), [transaction_id](const transaction& t) { return t.id == transaction_id; });
+      if (it != this->transaction_queue_.end())
       {
-        it->on_trailers = fn;
+        it->incoming.on_trailers = fn;
       }
     }
 
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::on_close(std::uint32_t transaction_id, const std::function<void(errc)>& fn)
     {
-      auto it = std::find_if(this->transaction_close_queue_.begin(), this->transaction_close_queue_.end(), [transaction_id](const queued_close_callback& m) { return m.id == transaction_id; });
-      if (it != this->transaction_close_queue_.end())
+      auto it = std::find_if(this->transaction_queue_.begin(), this->transaction_queue_.end(), [transaction_id](const transaction& t) { return t.id == transaction_id; });
+      if (it != this->transaction_queue_.end())
       {
-        it->on_close = fn;
+        if (it->state == transaction_state::closed)
+          fn ? fn(errc::no_error) : void();
+        else
+          it->on_close = fn;
       }
     }
 
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::on_end(std::uint32_t transaction_id, const std::function<void()>& fn)
     {
-      auto it = std::find_if(this->recv_queue_.begin(), this->recv_queue_.end(), [transaction_id](const queued_recv_message& m) { return m.id == transaction_id; });
-      if (it != this->recv_queue_.end())
+      auto it = std::find_if(this->transaction_queue_.begin(), this->transaction_queue_.end(), [transaction_id](const transaction& t) { return t.id == transaction_id; });
+      if (it != this->transaction_queue_.end())
       {
-        it->on_end = fn;
+        if (it->state == transaction_state::closed || it->state == transaction_state::half_closed_remote)
+          fn ? fn() : void();
+        else
+          it->on_end = fn;
       }
     }
 
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::on_drain(std::uint32_t transaction_id, const std::function<void()>& fn)
     {
-      auto it = std::find_if(this->recv_queue_.begin(), this->recv_queue_.end(), [transaction_id](const queued_recv_message& m) { return m.id == transaction_id; });
-      if (it != this->recv_queue_.end())
+      auto it = std::find_if(this->transaction_queue_.begin(), this->transaction_queue_.end(), [transaction_id](const transaction& t) { return t.id == transaction_id; });
+      if (it != this->transaction_queue_.end())
       {
         it->on_drain = fn;
       }
@@ -105,11 +111,11 @@ namespace manifold
         this->closed_ = true;
 
         this->socket_->close();
-        for (auto it = this->transaction_close_queue_.begin(); it != this->transaction_close_queue_.end(); ++it)
+        for (auto it = this->transaction_queue_.begin(); it != this->transaction_queue_.end(); ++it)
         {
-          if (it->call_count == 0)
+          if (it->state != transaction_state::closed)
           {
-            ++(it->call_count);
+            it->state = transaction_state::closed;
             it->on_close ? it->on_close(ec) : void();
           }
         }
@@ -160,15 +166,26 @@ namespace manifold
           std::stringstream content_length_ss(headers.header("content-length"));
           content_length_ss >> content_length;
 
-          self->recv_queue_.front().on_headers(std::move(headers));
-
-          if (transfer_encoding.empty() || transfer_encoding == "identity")
+          auto front_transaction = std::find_if(
+            self->transaction_queue_.begin(),
+            self->transaction_queue_.end(),
+            [](const transaction& t) { return (t.state != transaction_state::closed && t.state != transaction_state::half_closed_remote); });
+          if (front_transaction == self->transaction_queue_.end())
           {
-            self->recv_known_length_body(content_length);
+            // TODO: handle error (server sending a response without a request).
           }
           else
           {
-            self->recv_chunk_encoded_body();
+            front_transaction->incoming.on_headers ? front_transaction->incoming.on_headers(std::move(headers)) : void();
+
+            if (transfer_encoding.empty() || transfer_encoding == "identity")
+            {
+              self->recv_known_length_body(content_length);
+            }
+            else
+            {
+              self->recv_chunk_encoded_body();
+            }
           }
         }
       }, "\r\n\r\n");
@@ -186,28 +203,31 @@ namespace manifold
         }
         else if (!self->is_closed())
         {
+          auto front_transaction = std::find_if(
+            self->transaction_queue_.begin(),
+            self->transaction_queue_.end(),
+            [](const transaction& t) { return (t.state != transaction_state::closed && t.state != transaction_state::half_closed_remote); });
+
           if (bytes_read > 2)
           {
             std::stringstream is(std::string(self->recv_buffer_.data(), bytes_read));
-            v1_header_block::deserialize(is, self->recv_queue_.front().trailers);
+            v1_header_block::deserialize(is, front_transaction->incoming.trailers);
           }
           else
           {
-            if (self->recv_queue_.front().trailers.size())
+            if (front_transaction->incoming.trailers.size())
             {
-              self->recv_queue_.front().on_trailers ? self->recv_queue_.front().on_trailers(std::move(self->recv_queue_.front().trailers)) : void();
+              front_transaction->incoming.on_trailers ? front_transaction->incoming.on_trailers(std::move(front_transaction->incoming.trailers)) : void();
             }
 
-            self->recv_queue_.front().on_end ? self->recv_queue_.front().on_end() : void();
-            auto front_transaction_id = self->recv_queue_.front().id;
-            if (std::find_if(self->send_queue_.begin(), self->send_queue_.end(), [front_transaction_id](const queued_send_message& m) { return (m.id == front_transaction_id); }) == self->send_queue_.end())
+            front_transaction->state = (front_transaction->state == transaction_state::half_closed_local ? transaction_state::closed : transaction_state::half_closed_remote);
+            front_transaction->incoming.on_end ? front_transaction->incoming.on_end() : void();
+            if (front_transaction->state == transaction_state::closed)
             {
-              assert(self->transaction_close_queue_.front().id == front_transaction_id);
-              ++(self->transaction_close_queue_.front().call_count);
-              self->transaction_close_queue_.front().on_close ? self->transaction_close_queue_.front().on_close(errc::no_error) : void();
-              self->transaction_close_queue_.pop_front();
+              front_transaction->on_close ? front_transaction->on_close(errc::no_error) : void();
+              // TODO: garbage collect closed transactions.
             }
-            self->recv_queue_.pop_front();
+
 
             self->run_recv_loop();
           }
@@ -257,7 +277,12 @@ namespace manifold
                 }
                 else if (!self->is_closed())
                 {
-                  self->recv_queue_.front().on_data ? self->recv_queue_.front().on_data(self->recv_buffer_.data(), chunk_size) : void();
+                  auto front_transaction = std::find_if(
+                    self->transaction_queue_.begin(),
+                    self->transaction_queue_.end(),
+                    [](const transaction& t) { return (t.state != transaction_state::closed && t.state != transaction_state::half_closed_remote); });
+
+                  front_transaction->incoming.on_data ? front_transaction->incoming.on_data(self->recv_buffer_.data(), chunk_size) : void();
 
                   self->socket_->recv(self->recv_buffer_.data(), 2, [self, chunk_size](const std::error_code& ec, std::size_t bytes_read)
                   {
@@ -283,16 +308,18 @@ namespace manifold
     {
       if (content_length == 0)
       {
-        this->recv_queue_.front().on_end ? this->recv_queue_.front().on_end() : void();
-        auto front_transaction_id = this->recv_queue_.front().id;
-        if (std::find_if(this->send_queue_.begin(), this->send_queue_.end(), [front_transaction_id](const queued_send_message& m) { return (m.id == front_transaction_id); }) == this->send_queue_.end())
+        auto front_transaction = std::find_if(
+          this->transaction_queue_.begin(),
+          this->transaction_queue_.end(),
+          [](const transaction& t) { return (t.state != transaction_state::closed && t.state != transaction_state::half_closed_remote); });
+
+        front_transaction->state = (front_transaction->state == transaction_state::half_closed_local ? transaction_state::closed : transaction_state::half_closed_remote);
+        front_transaction->incoming.on_end ? front_transaction->incoming.on_end() : void();
+        if (front_transaction->state == transaction_state::closed)
         {
-          assert(this->transaction_close_queue_.front().id == front_transaction_id);
-          ++(this->transaction_close_queue_.front().call_count);
-          this->transaction_close_queue_.front().on_close ? this->transaction_close_queue_.front().on_close(errc::no_error) : void();
-          this->transaction_close_queue_.pop_front();
+          front_transaction->on_close ? front_transaction->on_close(errc::no_error) : void();
+          // TODO: post garbage collect to io_service
         }
-        this->recv_queue_.pop_front();
 
         this->run_recv_loop();
       }
@@ -311,7 +338,12 @@ namespace manifold
           }
           else if (!self->is_closed())
           {
-            self->recv_queue_.front().on_data ? self->recv_queue_.front().on_data(self->recv_buffer_.data(), bytes_to_read) : void();
+            auto front_transaction = std::find_if(
+              self->transaction_queue_.begin(),
+              self->transaction_queue_.end(),
+              [](const transaction& t) { return (t.state != transaction_state::closed && t.state != transaction_state::half_closed_remote); });
+
+            front_transaction->incoming.on_data ? front_transaction->incoming.on_data(self->recv_buffer_.data(), bytes_to_read) : void();
             self->recv_known_length_body(content_length - bytes_to_read);
           }
         });
@@ -323,19 +355,23 @@ namespace manifold
     {
       if (!this->send_loop_running_)
       {
-        this->send_loop_running_ = true;
+        auto front_transaction = std::find_if(
+          this->transaction_queue_.begin(),
+          this->transaction_queue_.end(),
+          [](const transaction& t) { return (t.state != transaction_state::closed && t.state != transaction_state::half_closed_local); });
 
-        if (this->send_queue_.size())
+        if (front_transaction != this->transaction_queue_.end())
         {
-          queued_send_message& current_message = this->send_queue_.front();
-          if (!current_message.head_sent)
+          this->send_loop_running_ = true;
+
+          if (!front_transaction->outgoing.head_sent)
           {
-            if (current_message.head_data.size())
+            if (front_transaction->outgoing.head_data.size())
             {
-              current_message.head_sent = true;
+              front_transaction->outgoing.head_sent = true;
 
               auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
-              this->socket_->send(current_message.head_data.data(), current_message.head_data.size(), [self](const std::error_code &ec, std::size_t bytes_sent)
+              this->socket_->send(front_transaction->outgoing.head_data.data(), front_transaction->outgoing.head_data.size(), [self](const std::error_code &ec, std::size_t bytes_sent)
               {
                 if (ec)
                 {
@@ -353,16 +389,16 @@ namespace manifold
               this->send_loop_running_ = false;
             }
           }
-          else if (current_message.body.size())
+          else if (front_transaction->outgoing.body.size())
           {
-            if (!current_message.chunked_encoding && current_message.body.front().size() > current_message.content_length)
+            if (!front_transaction->outgoing.chunked_encoding && front_transaction->outgoing.body.front().size() > front_transaction->outgoing.content_length)
             {
               // TODO: handle error.
             }
             else
             {
               auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
-              this->socket_->send(current_message.body.front().data(), current_message.body.front().size(), [self, &current_message](const std::error_code &ec, std::size_t bytes_sent)
+              this->socket_->send(front_transaction->outgoing.body.front().data(), front_transaction->outgoing.body.front().size(), [self, &front_transaction->outgoing](const std::error_code &ec, std::size_t bytes_sent)
               {
                 if (ec)
                 {
@@ -370,21 +406,21 @@ namespace manifold
                 }
                 else if (!self->is_closed())
                 {
-                  assert(current_message.body.front().size() == bytes_sent);
-                  current_message.body.pop();
-                  current_message.content_length -= bytes_sent;
+                  assert(front_transaction->outgoing.body.front().size() == bytes_sent);
+                  front_transaction->outgoing.body.pop();
+                  front_transaction->outgoing.content_length -= bytes_sent;
                   self->send_loop_running_ = false;
                   self->run_send_loop();
                 }
               });
             }
           }
-          else if (current_message.ended)
+          else if (front_transaction->outgoing.ended)
           {
-            if (current_message.trailer_data.size())
+            if (front_transaction->outgoing.trailer_data.size())
             {
               auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
-              this->socket_->send(current_message.trailer_data.data(), current_message.trailer_data.size(), [self, &current_message](const std::error_code &ec, std::size_t bytes_sent)
+              this->socket_->send(front_transaction->outgoing.trailer_data.data(), front_transaction->outgoing.trailer_data.size(), [self, &front_transaction](const std::error_code &ec, std::size_t bytes_sent)
               {
                 if (ec)
                 {
@@ -392,16 +428,13 @@ namespace manifold
                 }
                 else if (!self->is_closed())
                 {
-                  assert(current_message.trailer_data.size() == bytes_sent);
-                  auto front_transaction_id = self->send_queue_.front().id;
-                  if (std::find_if(self->recv_queue_.begin(), self->recv_queue_.end(), [front_transaction_id](const queued_recv_message& m) { return (m.id == front_transaction_id); }) == self->recv_queue_.end())
+                  front_transaction->state = (front_transaction->state == transaction_state::half_closed_remote ? transaction_state::closed : transaction_state::half_closed_local);
+                  if (front_transaction->state == transaction_state::closed)
                   {
-                    assert(self->transaction_close_queue_.front().id == front_transaction_id);
-                    ++(self->transaction_close_queue_.front().call_count);
-                    self->transaction_close_queue_.front().on_close ? self->transaction_close_queue_.front().on_close(errc::no_error) : void();
-                    self->transaction_close_queue_.pop_front();
+                    front_transaction->on_close ? front_transaction->on_close(errc::no_error) : void();
+                    // TODO: garbage collect
                   }
-                  self->send_queue_.pop_front();
+
                   self->send_loop_running_ = false;
                   self->run_send_loop();
                 }
@@ -409,11 +442,9 @@ namespace manifold
             }
             else
             {
-              assert(current_message.content_length == 0);
               auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
               this->socket_->io_service().post([self]()
               {
-                auto front_transaction_id = self->send_queue_.front().id;
                 if (std::find_if(self->recv_queue_.begin(), self->recv_queue_.end(), [front_transaction_id](const queued_recv_message& m) { return (m.id == front_transaction_id); }) == self->recv_queue_.end())
                 {
                   assert(self->transaction_close_queue_.front().id == front_transaction_id);
@@ -470,7 +501,7 @@ namespace manifold
     }
 
     template <>
-    bool v1_connection<request_head, response_head>::send_headers(std::uint32_t stream_id, const request_head& head, bool end_headers, bool end_stream)
+    bool v1_connection<request_head, response_head>::send_headers(std::uint32_t transaction_id, const request_head& head, bool end_headers, bool end_stream)
     {
       bool ret = false;
 
@@ -480,12 +511,23 @@ namespace manifold
       if (method != "GET" && method != "HEAD")
         v1_head.header("transfer-encoding", "chunked");
       else
-        end_stream = true;
+      {
+        auto it = std::find_if(this->send_queue_.begin(), this->send_queue_.end(), [transaction_id](const queued_send_message& m) { return m.id == transaction_id; });
+        if (it != this->send_queue_.end())
+          it->ignore_body = true;
 
-      if (this->send_message_head(stream_id, v1_head))
+        if (method == "HEAD")
+        {
+          auto it = std::find_if(this->recv_queue_.begin(), this->recv_queue_.end(), [transaction_id](const queued_recv_message& m) { return m.id == transaction_id; });
+          if (it != this->recv_queue_.end())
+            it->ignore_body = true;
+        }
+      }
+
+      if (this->send_message_head(transaction_id, v1_head))
       {
         if (end_stream)
-          ret = this->end_message(stream_id);
+          ret = this->end_message(transaction_id);
         else
           ret = true;
       }
@@ -494,17 +536,17 @@ namespace manifold
     }
 
     template <>
-    bool v1_connection<response_head, request_head>::send_headers(std::uint32_t stream_id, const response_head& head, bool end_headers, bool end_stream)
+    bool v1_connection<response_head, request_head>::send_headers(std::uint32_t transaction_id, const response_head& head, bool end_headers, bool end_stream)
     {
       bool ret = false;
 
       v1_response_head v1_head(head);
       v1_head.header("transfer-encoding", "chunked");
 
-      if (this->send_message_head(stream_id, v1_head))
+      if (this->send_message_head(transaction_id, v1_head))
       {
         if (end_stream)
-          ret = this->end_message(stream_id);
+          ret = this->end_message(transaction_id);
         else
           ret = true;
       }
