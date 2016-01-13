@@ -123,8 +123,9 @@ namespace manifold
     operator asio::ssl::stream<asio::ip::tcp::socket>& () { return *this->s_; }
   private:
     asio::ssl::stream<asio::ip::tcp::socket>* s_;
+    asio::streambuf recvline_buffer_;
 
-    void recvline(char* buf, std::size_t bufSize, std::size_t putPosition, char* bufEnd, std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>&& cb, const std::string& delim);
+    //void recvline(char* buf, std::size_t bufSize, std::size_t putPosition, char* bufEnd, std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>&& cb, const std::string& delim);
   };
   //================================================================//
 
