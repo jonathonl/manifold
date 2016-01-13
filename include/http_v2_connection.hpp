@@ -205,12 +205,12 @@ namespace manifold
         ~stream() {}
 
         //----------------------------------------------------------------//
-        void handle_incoming_frame(const data_frame& incoming_data_frame);
-        void handle_incoming_frame(const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec);
-        void handle_incoming_frame(const priority_frame& incoming_priority_frame);
-        void handle_incoming_frame(const rst_stream_frame& incoming_rst_stream_frame);
-        void handle_incoming_frame(const push_promise_frame& incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, stream& idle_promised_stream);
-        void handle_incoming_frame(const window_update_frame& incoming_window_update_frame);
+        void handle_incoming_frame(const data_frame& incoming_data_frame, errc& connection_error);
+        void handle_incoming_frame(const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, errc& connection_error);
+        void handle_incoming_frame(const priority_frame& incoming_priority_frame, errc& connection_error);
+        void handle_incoming_frame(const rst_stream_frame& incoming_rst_stream_frame, errc& connection_error);
+        void handle_incoming_frame(const push_promise_frame& incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, stream& idle_promised_stream, errc& connection_error);
+        void handle_incoming_frame(const window_update_frame& incoming_window_update_frame, errc& connection_error);
         //----------------------------------------------------------------//
 
         //----------------------------------------------------------------//
