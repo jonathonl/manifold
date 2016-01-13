@@ -28,9 +28,9 @@ namespace manifold
         end = begin + this->buf_size_;
         auto find = std::search(begin, end, delim_.begin(), delim_.end());
         if (find == end)
-          return std::make_pair(find, true);
+          return std::make_pair(end, true);
         else
-          return std::make_pair(++find, true);
+          return std::make_pair(find + delim_.size(), true);
       }
       else
       {
@@ -38,7 +38,7 @@ namespace manifold
         if (find == end)
           return std::make_pair(begin, false);
         else
-          return std::make_pair(++find, true);
+          return std::make_pair(find + delim_.size(), true);
       }
     }
   private:
@@ -192,7 +192,26 @@ namespace manifold
   //----------------------------------------------------------------//
   void tls_socket::recv(char* data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb)
   {
-    asio::async_read(*this->s_, asio::buffer(data, data_sz), std::move(cb));
+    std::size_t streambuf_sz = this->recvline_buffer_.size();
+    if (streambuf_sz == 0)
+      asio::async_read(*this->s_, asio::buffer(data, data_sz), std::move(cb));
+    else
+    {
+      std::istream is(&this->recvline_buffer_);
+      std::size_t bytes_to_read_from_socket = 0;
+      if (data_sz <= streambuf_sz)
+        is.read(data, data_sz);
+      else
+      {
+        bytes_to_read_from_socket = data_sz - streambuf_sz;
+        is.read(data, streambuf_sz);
+      }
+
+      asio::async_read(*this->s_, asio::buffer(data + (data_sz - bytes_to_read_from_socket), bytes_to_read_from_socket), [cb, data_sz, bytes_to_read_from_socket](const std::error_code& ec, std::size_t bytes_read)
+      {
+        cb(ec, (data_sz - bytes_to_read_from_socket) + bytes_read);
+      });
+    }
   }
   //----------------------------------------------------------------//
 
@@ -238,8 +257,11 @@ namespace manifold
       cb ? cb(make_error_code(std::errc::value_too_large), 0) : void();
     else
     {
-      asio::async_read_until(*this->s_, this->recvline_buffer_, recvline_match_condition(delim, buf_sz), [cb, delim, buf, buf_sz](const std::error_code& ec, std::size_t bytes_read)
+      asio::async_read_until(*this->s_, this->recvline_buffer_, recvline_match_condition(delim, buf_sz), [cb, delim, buf, buf_sz, this](const std::error_code& ec, std::size_t bytes_read)
       {
+        std::istream is(&this->recvline_buffer_);
+        is.read(buf, bytes_read);
+
         if (!ec && bytes_read == buf_sz)
         {
           char* buf_end = (buf + buf_sz);

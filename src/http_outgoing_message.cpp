@@ -47,7 +47,7 @@ namespace manifold
     {
       bool ret = true;
       if (!this->headers_sent_)
-        ret =this->send_headers();
+        ret = this->send_headers();
 
       if (ret)
       {

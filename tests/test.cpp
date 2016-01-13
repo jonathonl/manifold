@@ -202,7 +202,7 @@ int main()
       ops.dhparam.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
   }
 
-  http::server srv(ioservice, 8080, "0.0.0.0");
+  http::server srv(ioservice, ops, 8080, "0.0.0.0");
   srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
 
   //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
@@ -214,7 +214,7 @@ int main()
     //----------------------------------------------------------------//
     // Client to Local Server Test
     //
-    http::client c1(ioservice, "127.0.0.1", 8080);
+    http::client c1(ioservice, "127.0.0.1", http::client::ssl_options(), 8080);
     c1.on_connect([&c1]()
     {
       http::client::request req = c1.make_request();
@@ -255,8 +255,10 @@ int main()
         std::cout << "on_close called on client" << std::endl;
       });
 
-
-      req.end(std::string("name=value&name2=value2"));
+      req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
+      req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
+      req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
+      req.end(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
     });
 
     c1.on_close([&ioservice](http::errc ec)
