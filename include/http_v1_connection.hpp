@@ -16,22 +16,31 @@ namespace manifold
   namespace http
   {
     template <typename SendMsg, typename RecvMsg>
-    class v1_connection : public std::enable_shared_from_this<v1_connection<SendMsg, RecvMsg>>, public connection<SendMsg, RecvMsg>
+    class v1_connection : public connection<SendMsg, RecvMsg>
     {
     public:
       v1_connection(non_tls_socket&& sock)
         : socket_(new non_tls_socket(std::move(sock))),
           closed_(false),
           //recv_buffer_(8192),
-          send_loop_running_(false),
-          next_transaction_id_(1) {}
+          next_transaction_id_(1),
+          send_loop_running_(false)
+
+      {}
       v1_connection(tls_socket&& sock)
         : socket_(new tls_socket(std::move(sock))),
           closed_(false),
           //recv_buffer_(8192),
-          send_loop_running_(false),
-          next_transaction_id_(1) {}
-      virtual ~v1_connection() {}
+          next_transaction_id_(1),
+          send_loop_running_(false)
+      {}
+      virtual ~v1_connection()
+      {
+        std::cout << "~v1_connection()" << std::endl;
+        this->close(errc::cancel);
+        if (this->socket_)
+          delete this->socket_;
+      }
 
       void run();
       void close(errc ec);
@@ -57,7 +66,7 @@ namespace manifold
       bool send_trailers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream);
       //bool send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream);
       //bool send_priority(std::uint32_t stream_id, priority_options options);
-      bool send_reset_stream(std::uint32_t stream_id, http::errc error_code)  { this->close(error_code); }
+      bool send_reset_stream(std::uint32_t stream_id, http::errc error_code)  { this->close(error_code); return true; }
       std::uint32_t send_push_promise(std::uint32_t stream_id, const RecvMsg& head) { return 0; }
       void send_goaway(http::errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0) { this->close(error_code); }
 
@@ -65,6 +74,10 @@ namespace manifold
       //bool send_message_body(std::uint64_t transaction_id, const char*const data, std::size_t data_sz);
       bool end_message(std::uint32_t transaction_id, const v1_header_block& trailers = v1_header_block());
     private:
+      std::shared_ptr<v1_connection> casted_shared_from_this()
+      {
+        return std::dynamic_pointer_cast<v1_connection<SendMsg, RecvMsg>>(connection<SendMsg, RecvMsg>::shared_from_this());
+      }
 
       enum class transaction_state
       {
@@ -113,6 +126,7 @@ namespace manifold
       std::function<void(std::uint32_t transaction_id)> on_new_stream_;
 
       static bool incoming_head_is_head_request(const RecvMsg& head);
+      void garbage_collect_transactions();
       transaction* current_send_transaction();
       transaction* current_recv_transaction();
       void run_recv_loop();

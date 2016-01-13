@@ -228,31 +228,33 @@ int main()
         for (auto it : resp.head().raw_headers())
           std::cout << it.first << ": " << it.second << std::endl;
 
-        if (!(resp.head().status_code() == 200))
+        if (!resp.head().has_successful_status())
         {
           resp.close();
         }
         else
         {
           auto response_data = std::make_shared<std::stringstream>("");
-          resp.on_data([response_data](const char *const data, std::size_t datasz)
+          resp.on_data([response_data, &c1](const char *const data, std::size_t datasz)
           {
             response_data->write(data, datasz);
           });
 
-          resp.on_end([response_data]()
+          resp.on_end([response_data, &c1]()
           {
             if (response_data->rdbuf()->in_avail())
               std::cout << response_data->rdbuf() << std::endl;
+            c1.close();
           });
         }
       });
 
       req.on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req.stream_id()));
 
-      req.on_close([](http::errc e)
+      req.on_close([&c1](http::errc e)
       {
         std::cout << "on_close called on client" << std::endl;
+        c1.close();
       });
 
       req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));

@@ -121,6 +121,13 @@ namespace manifold
         }
 
         this->on_close_ ? this->on_close_(ec) : void();
+        auto self = casted_shared_from_this();
+        this->socket_->io_service().post([self]()
+        {
+          self->garbage_collect_transactions();
+          self->on_close_ = nullptr;
+          self->on_new_stream_ = nullptr;
+        });
       }
     }
 
@@ -128,6 +135,18 @@ namespace manifold
     bool v1_connection<SendMsg, RecvMsg>::is_closed() const
     {
       return this->closed_;
+    }
+
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::garbage_collect_transactions()
+    {
+      while (this->transaction_queue_.size())
+      {
+        if (this->transaction_queue_.front().state == transaction_state::closed)
+          this->transaction_queue_.pop_front();
+        else
+          break;
+      }
     }
 
     template<> bool v1_connection<request_head, response_head>::incoming_head_is_head_request(const response_head& head) { return false; }
@@ -183,59 +202,64 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::recv_headers()
     {
-      auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
+      auto self = casted_shared_from_this();
       this->socket_->recvline(this->recv_buffer_.data(), this->recv_buffer_.size(), [self](const std::error_code& ec, std::size_t bytes_read)
       {
         if (ec)
         {
-          // TODO: handle error.
+          self->close(errc::internal_error);
         }
         else if (!self->is_closed())
         {
           std::stringstream is(std::string(self->recv_buffer_.data(), bytes_read));
 
           v1_message_head headers;
-          v1_message_head::deserialize(is, headers);
-
-          std::string transfer_encoding = headers.header("transfer-encoding");
-          std::uint64_t content_length = 0;
-          std::stringstream content_length_ss(headers.header("content-length"));
-          content_length_ss >> content_length;
-
-          transaction* current = self->current_recv_transaction();
-          if (!current)
+          if (!v1_message_head::deserialize(is, headers))
           {
-            self->close(errc::protocol_error); //(server sending a response without a request).
+            self->close(errc::protocol_error);
           }
           else
           {
-            RecvMsg generic_headers(std::move(headers));
+            std::string transfer_encoding = headers.header("transfer-encoding");
+            std::uint64_t content_length = 0;
+            std::stringstream content_length_ss(headers.header("content-length"));
+            content_length_ss >> content_length;
 
-            if (incoming_head_is_head_request(generic_headers))
-              current->outgoing_ended = true;
-
-            current->on_headers ? current->on_headers(std::move(generic_headers)) : void();
-
-            if (current->ignore_incoming_body) // TODO: || incoming_header_is_get_or_head_request(headers)
+            transaction* current = self->current_recv_transaction();
+            if (!current)
             {
-              current->state = (current->state == transaction_state::half_closed_local ? transaction_state::closed : transaction_state::half_closed_remote);
-              current->on_end ? current->on_end() : void();
-              if (current->state == transaction_state::closed)
-              {
-                if (current->on_close)
-                  current->on_close(errc::no_error); // : void();
-                // TODO: post garbage collect to io_service
-              }
-
-              self->run_recv_loop();
-            }
-            else if (transfer_encoding.empty() || transfer_encoding == "identity")
-            {
-              self->recv_known_length_body(content_length);
+              self->close(errc::protocol_error); //(server sending a response without a request).
             }
             else
             {
-              self->recv_chunk_encoded_body();
+              RecvMsg generic_headers(std::move(headers));
+
+              if (incoming_head_is_head_request(generic_headers))
+                current->outgoing_ended = true;
+
+              current->on_headers ? current->on_headers(std::move(generic_headers)) : void();
+
+              if (current->ignore_incoming_body) // TODO: || incoming_header_is_get_or_head_request(headers)
+              {
+                current->state = (current->state == transaction_state::half_closed_local ? transaction_state::closed : transaction_state::half_closed_remote);
+                current->on_end ? current->on_end() : void();
+                if (current->state == transaction_state::closed)
+                {
+                  if (current->on_close)
+                    current->on_close(errc::no_error); // : void();
+                  self->garbage_collect_transactions();
+                }
+
+                self->run_recv_loop();
+              }
+              else if (transfer_encoding.empty() || transfer_encoding == "identity")
+              {
+                self->recv_known_length_body(content_length);
+              }
+              else
+              {
+                self->recv_chunk_encoded_body();
+              }
             }
           }
         }
@@ -245,12 +269,12 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::recv_trailers()
     {
-      auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
+      auto self = casted_shared_from_this();
       this->socket_->recvline(this->recv_buffer_.data(), this->recv_buffer_.size(), [self](const std::error_code& ec, std::size_t bytes_read)
       {
         if (ec)
         {
-          // TODO: handle error.
+          self->close(errc::internal_error);
         }
         else if (!self->is_closed())
         {
@@ -280,7 +304,7 @@ namespace manifold
               if (current->state == transaction_state::closed)
               {
                 current->on_close ? current->on_close(errc::no_error) : void();
-                // TODO: garbage collect closed transactions.
+                self->garbage_collect_transactions();
               }
 
 
@@ -294,12 +318,12 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::recv_chunk_encoded_body()
     {
-      auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
+      auto self = casted_shared_from_this();
       this->socket_->recvline(this->recv_buffer_.data(), this->recv_buffer_.size(), [self](const std::error_code& ec, std::size_t bytes_read)
       {
         if (ec)
         {
-          // TODO: handle error.
+          self->close(errc::internal_error);
         }
         else if (!self->is_closed())
         {
@@ -314,7 +338,7 @@ namespace manifold
           unsigned long chunk_size = strtoul(chunk_size_str.c_str(), &not_converted, 16);
           if (*not_converted != '\0')
           {
-            // TODO: handle error.
+            self->close(errc::internal_error);
           }
           else
           {
@@ -334,12 +358,12 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::recv_chunk_data(std::size_t chunk_size)
     {
-      auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
+      auto self = casted_shared_from_this();
       this->socket_->recv(self->recv_buffer_.data(), (chunk_size > this->recv_buffer_.size() ? this->recv_buffer_.size() : chunk_size), [self, chunk_size](const std::error_code& ec, std::size_t bytes_read)
       {
         if (ec)
         {
-          // TODO: handle error.
+          self->close(errc::internal_error);
         }
         else if (!self->is_closed())
         {
@@ -362,7 +386,7 @@ namespace manifold
               {
                 if (ec)
                 {
-                  // TODO: handle error.
+                  self->close(errc::internal_error);
                 }
                 else if (!self->is_closed())
                 {
@@ -397,7 +421,7 @@ namespace manifold
           if (current->state == transaction_state::closed)
           {
             current->on_close ? current->on_close(errc::no_error) : void();
-            // TODO: post garbage collect to io_service
+            this->garbage_collect_transactions();
           }
 
           this->run_recv_loop();
@@ -409,12 +433,12 @@ namespace manifold
         if (bytes_to_read > content_length)
           bytes_to_read = content_length;
 
-        auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
+        auto self = casted_shared_from_this();
         this->socket_->recv(this->recv_buffer_.data(), bytes_to_read, [self, content_length, bytes_to_read](const std::error_code& ec, std::size_t bytes_read)
         {
           if (ec)
           {
-            // TODO: handle error.
+            self->close(errc::internal_error);
           }
           else if (!self->is_closed())
           {
@@ -451,12 +475,12 @@ namespace manifold
             {
               current->head_sent = true;
 
-              auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
+              auto self = casted_shared_from_this();
               this->socket_->send(current->outgoing_head_data.data(), current->outgoing_head_data.size(), [self](const std::error_code &ec, std::size_t bytes_sent)
               {
                 if (ec)
                 {
-                  // TODO: handle error.
+                  self->close(errc::internal_error);
                 }
                 else if (!self->is_closed())
                 {
@@ -472,12 +496,12 @@ namespace manifold
           }
           else if (current->outgoing_body.size())
           {
-            auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
+            auto self = casted_shared_from_this();
             this->socket_->send(current->outgoing_body.front().data(), current->outgoing_body.front().size(), [self, current](const std::error_code &ec, std::size_t bytes_sent)
             {
               if (ec)
               {
-                // TODO: handle error.
+                self->close(errc::internal_error);
               }
               else if (!self->is_closed())
               {
@@ -492,12 +516,12 @@ namespace manifold
           {
             if (current->outgoing_trailer_data.size())
             {
-              auto self = v1_connection<SendMsg, RecvMsg>::shared_from_this();
+              auto self = casted_shared_from_this();
               this->socket_->send(current->outgoing_trailer_data.data(), current->outgoing_trailer_data.size(), [self, current](const std::error_code &ec, std::size_t bytes_sent)
               {
                 if (ec)
                 {
-                  // TODO: handle error.
+                  self->close(errc::internal_error);
                 }
                 else if (!self->is_closed())
                 {
@@ -505,7 +529,7 @@ namespace manifold
                   if (current->state == transaction_state::closed)
                   {
                     current->on_close ? current->on_close(errc::no_error) : void();
-                    // TODO: garbage collect
+                    self->garbage_collect_transactions();
                   }
 
                   self->send_loop_running_ = false;
@@ -519,7 +543,11 @@ namespace manifold
               if (current->state == transaction_state::closed)
               {
                 current->on_close ? current->on_close(errc::no_error) : void();
-                // TODO: garbage collect
+                auto self = casted_shared_from_this();
+                this->socket_->io_service().post([self]()
+                {
+                  self->garbage_collect_transactions();
+                });
               }
 
               this->send_loop_running_ = false;

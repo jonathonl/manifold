@@ -269,7 +269,7 @@ namespace manifold
       std::copy_n(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL, ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL), proto_list.begin());
       //SSL_CTX_set_alpn_select_cb(this->ssl_context_->impl(), client_alpn_select_proto_cb, nullptr);
       const unsigned char* test = this->ssl_context_->impl()->alpn_client_proto_list;
-      //auto r = SSL_CTX_set_alpn_protos(this->ssl_context_->impl(), proto_list.data(), proto_list.size());
+      auto r = SSL_CTX_set_alpn_protos(this->ssl_context_->impl(), proto_list.data(), proto_list.size());
       const unsigned char* test2 = this->ssl_context_->impl()->alpn_client_proto_list;
       auto sock = std::make_shared<manifold::tls_socket>(ioservice, *this->ssl_context_);
       std::error_code e;

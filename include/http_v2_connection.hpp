@@ -18,7 +18,7 @@
 #include "http_request_head.hpp"
 #include "http_connection.hpp"
 
-#define MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL "\x2h2"
+#define MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL "\x2h2\x08http/1.1"
 
 namespace manifold
 {
@@ -92,7 +92,7 @@ namespace manifold
 
     //================================================================//
     template <typename SendMsg, typename RecvMsg>
-    class v2_connection : public std::enable_shared_from_this<v2_connection<SendMsg, RecvMsg>>, public connection<SendMsg, RecvMsg>
+    class v2_connection : public connection<SendMsg, RecvMsg>
     {
     protected:
       //================================================================//
@@ -322,10 +322,6 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
       void send_connection_level_window_update(std::uint32_t amount);
       void send_ping_acknowledgement(std::uint64_t opaque_data);
       //----------------------------------------------------------------//
@@ -340,6 +336,13 @@ namespace manifold
       void handle_incoming_frame(const ping_frame& incoming_ping_frame);
       void handle_incoming_frame(const goaway_frame& incoming_goaway_frame);
       void handle_incoming_frame(const window_update_frame& incoming_window_update_frame);
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      std::shared_ptr<v2_connection> casted_shared_from_this()
+      {
+        return std::dynamic_pointer_cast<v2_connection<SendMsg, RecvMsg>>(connection<SendMsg, RecvMsg>::shared_from_this());
+      }
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//

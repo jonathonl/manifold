@@ -175,9 +175,9 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     v2_connection<SendMsg, RecvMsg>::~v2_connection()
     {
-      std::cout << "~connection()" << std::endl;
+      std::cout << "~v2_connection()" << std::endl;
 
-      this->close(errc::no_error);
+      this->close(errc::cancel);
 
       if (this->socket_)
         delete this->socket_;
@@ -343,16 +343,15 @@ namespace manifold
     {
       if (!this->closed_)
       {
-        std::shared_ptr<v2_connection> self = this->shared_from_this();
+        std::shared_ptr<v2_connection> self = casted_shared_from_this();
         this->incoming_frame_ = frame(); // reset incoming frame
         frame::recv_frame(*this->socket_, this->incoming_frame_, [self](const std::error_code& ec)
         {
           if (ec)
           {
-            // TODO: Handle error.
-            std::cout << ec.message() << std::endl;
+            self->close(errc::internal_error);
           }
-          else
+          else if (!self->is_closed())
           {
             const frame_type incoming_frame_type = self->incoming_frame_.type();
             std::uint32_t incoming_stream_id = self->incoming_frame_.stream_id();
@@ -367,7 +366,7 @@ namespace manifold
                   self->last_newly_accepted_stream_id_ = incoming_stream_id;
                   if (!self->create_stream(0, incoming_stream_id))
                   {
-                    // TODO: Handle Error
+                    this->close(errc::internal_error);
                   }
                   else
                   {
@@ -378,7 +377,7 @@ namespace manifold
                 }
                 else
                 {
-                  // TODO: Connection error for reusing old stream id_.
+                  this->close(errc::protocol_error);
                 }
               }
 
@@ -432,14 +431,22 @@ namespace manifold
                         self->incoming_header_block_fragments_.pop();
                       }
 
-                      if (!self->create_stream(current_stream_it->second.id(), pp_frame.promised_stream_id()))
+                      if (pp_frame.promised_stream_id() <= self->last_newly_accepted_stream_id_)
                       {
-                        // TODO: Handle error.
+                        self->close(errc::protocol_error);
                       }
                       else
                       {
-                        auto promised_stream_it = self->streams_.find(pp_frame.promised_stream_id());
-                        current_stream_it->second.handle_incoming_frame(pp_frame, cont_frames, self->hpack_decoder_, promised_stream_it->second);
+                        self->last_newly_accepted_stream_id_ = pp_frame.promised_stream_id()
+                        if (!self->create_stream(current_stream_it->second.id(), pp_frame.promised_stream_id()))
+                        {
+                          self->close(errc::internal_error);
+                        }
+                        else
+                        {
+                          auto promised_stream_it = self->streams_.find(pp_frame.promised_stream_id());
+                          current_stream_it->second.handle_incoming_frame(pp_frame, cont_frames, self->hpack_decoder_, promised_stream_it->second);
+                        }
                       }
                     }
                   }
@@ -519,13 +526,9 @@ namespace manifold
               }
             }
 
-            if (ec)
-              self->close(http::errc::internal_error); // TODO: make appropriate error
-            else
-            {
-              self->run_send_loop(); // One of the handle_incoming frames may have pushed an outgoing frame.
-              self->run_recv_loop();
-            }
+
+            self->run_send_loop(); // One of the handle_incoming frames may have pushed an outgoing frame.
+            self->run_recv_loop();
           }
         });
       }
@@ -702,18 +705,24 @@ namespace manifold
         case stream_state::half_closed_local:
         case stream_state::reserved_remote:
         {
-          v2_header_block headers;
 
-          {
-            std::string header_data(incoming_headers_frame.header_block_fragment(), incoming_headers_frame.header_block_fragment_length());
-            v2_header_block::deserialize(dec, header_data, headers);
-          }
+
+          std::string serialized_header_block;
+          std::size_t serialized_header_block_sz = incoming_headers_frame.header_block_fragment_length();
+          for (auto it = continuation_frames.begin(); it != continuation_frames.end(); ++it)
+            serialized_header_block_sz += it->header_block_fragment_length();
+
+          serialized_header_block.reserve(serialized_header_block_sz);
+
+          serialized_header_block.append(incoming_headers_frame.header_block_fragment(), incoming_headers_frame.header_block_fragment_length());
 
           for (auto it = continuation_frames.begin(); it != continuation_frames.end(); ++it)
           {
-            std::string header_data(it->header_block_fragment(), it->header_block_fragment_length());
-            v2_header_block::deserialize(dec, header_data, headers);
+            serialized_header_block.append(it->header_block_fragment(), it->header_block_fragment_length());
           }
+
+          v2_header_block headers;
+          v2_header_block::deserialize(dec, serialized_header_block, headers);
 
 
           if (this->state_ == stream_state::reserved_remote)
@@ -1006,7 +1015,7 @@ namespace manifold
       {
         this->send_loop_running_ = true;
 
-        auto self = v2_connection<SendMsg, RecvMsg>::shared_from_this();
+        auto self = casted_shared_from_this();
 
 
         bool outgoing_frame_set = false;
@@ -1024,6 +1033,8 @@ namespace manifold
                 self->socket_->close();
                 self->stream_dependency_tree_.clear_children();
                 self->streams_.clear();
+                self->on_new_stream_ = nullptr;
+                self->on_close_ = nullptr;
               });
             }
             this->outgoing_frames_.pop();
@@ -1058,7 +1069,7 @@ namespace manifold
               self->send_loop_running_ = false;
               if (ec)
               {
-                // TODO: Handle error.
+                self->close(errc::internal_error);
                 std::cout << "ERROR " << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
               }
               else
@@ -1555,6 +1566,7 @@ namespace manifold
     void v2_connection<SendMsg, RecvMsg>::send_ping(std::uint64_t opaque_data)
     {
       this->outgoing_frames_.push(http::frame(http::ping_frame(opaque_data), 0x0));
+      this->run_send_loop();
     }
     //----------------------------------------------------------------//
 
@@ -1563,6 +1575,7 @@ namespace manifold
     void v2_connection<SendMsg, RecvMsg>::send_ping_acknowledgement(std::uint64_t opaque_data)
     {
       this->outgoing_frames_.push(http::frame(http::ping_frame(opaque_data, true), 0x0));
+      this->run_send_loop();
     }
     //----------------------------------------------------------------//
 
@@ -1570,7 +1583,7 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::send_goaway(http::errc error_code, const char *const data, std::uint32_t data_sz)
     {
-      this->outgoing_frames_.push(http::frame(http::goaway_frame(this->streams_.size() ? this->streams_.rbegin()->first : 0, error_code, data, data_sz), 0x0));
+      this->outgoing_frames_.push(http::frame(http::goaway_frame(this->last_newly_accepted_stream_id_, error_code, data, data_sz), 0x0));
       this->run_send_loop();
     }
     //----------------------------------------------------------------//

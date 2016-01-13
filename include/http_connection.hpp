@@ -9,6 +9,8 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
+#include <iostream>
 
 namespace manifold
 {
@@ -16,9 +18,14 @@ namespace manifold
   {
     //================================================================//
     template <typename SendMsg, typename RecvMsg>
-    class connection
+    class connection : public std::enable_shared_from_this<connection<SendMsg, RecvMsg>>
     {
     public:
+      connection() {}
+      virtual ~connection()
+      {
+        std::cout << "~connection()" << std::endl;
+      }
       //----------------------------------------------------------------//
       virtual void run() = 0;
       virtual void close(errc ec) = 0;
