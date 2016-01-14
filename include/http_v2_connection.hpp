@@ -18,7 +18,7 @@
 #include "http_request_head.hpp"
 #include "http_connection.hpp"
 
-#define MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL "\x2h2\x08http/1.1"
+#ifndef MANIFOLD_DISABLE_HTTP2
 
 namespace manifold
 {
@@ -416,6 +416,6 @@ namespace manifold
   }
 }
 
-
+#endif //MANIFOLD_DISABLE_HTTP2
 
 #endif //MANIFOLD_HTTP_V2_CONNECTION_HPP

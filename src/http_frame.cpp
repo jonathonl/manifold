@@ -1,11 +1,12 @@
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 #include <new>
 #include <iostream>
 
 #include "asio/ssl.hpp"
 #include "http_frame.hpp"
 
-
+#ifndef MANIFOLD_DISABLE_HTTP2
 namespace manifold
 {
   namespace http
@@ -987,3 +988,5 @@ namespace manifold
     //****************************************************************//
   }
 }
+
+#endif //MANIFOLD_DISABLE_HTTP2

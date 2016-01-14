@@ -3,6 +3,7 @@
 #ifndef MANIFOLD_HTTP_FRAME_HPP
 #define MANIFOLD_HTTP_FRAME_HPP
 
+
 #include <vector>
 #include <list>
 #include <cstdint>
@@ -10,6 +11,8 @@
 #include "socket.hpp"
 #include "http_error_category.hpp"
 
+
+#ifndef MANIFOLD_DISABLE_HTTP2
 namespace manifold
 {
   namespace http
@@ -387,9 +390,9 @@ namespace manifold
       //----------------------------------------------------------------//
     };
     //================================================================//
-  };
+  }
 }
 
-
+#endif //MANIFOLD_DISABLE_HTTP2
 
 #endif //MANIFOLD_HTTP_FRAME_HPP

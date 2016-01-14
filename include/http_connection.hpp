@@ -12,6 +12,12 @@
 #include <memory>
 #include <iostream>
 
+#ifdef MANIFOLD_DISABLE_HTTP2
+#define MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS "\x08http/1.1"
+#else
+#define MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS "\x2h2\x08http/1.1"
+#endif
+
 namespace manifold
 {
   namespace http

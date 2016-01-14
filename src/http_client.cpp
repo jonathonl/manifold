@@ -26,26 +26,26 @@ namespace manifold
       return preverified;
     }
 
-    int client_alpn_select_proto_cb(SSL *ssl, const unsigned char **out,
-      unsigned char *out_len, const unsigned char *in,
-      unsigned int in_len, void *arg)
-    {
-      static const char*const h2_proto_string = "\x02h2";
-      std::size_t h2_proto_string_len = ::strlen(h2_proto_string);
-      const unsigned char* client_proto = in;
-      const unsigned char* client_proto_end = in + in_len;
-      for ( ; client_proto + h2_proto_string_len <= client_proto_end; client_proto += *client_proto + 1)
-      {
-        std::size_t client_proto_len = (*client_proto + 1);
-        if (::memcmp(h2_proto_string, client_proto, h2_proto_string_len <  client_proto_len ? h2_proto_string_len : client_proto_len) == 0)
-        {
-          *out = client_proto;
-          *out_len = (unsigned char)client_proto_len;
-          return SSL_TLSEXT_ERR_OK;
-        }
-      }
-      return SSL_TLSEXT_ERR_NOACK;
-    }
+//    int client_alpn_select_proto_cb(SSL *ssl, const unsigned char **out,
+//      unsigned char *out_len, const unsigned char *in,
+//      unsigned int in_len, void *arg)
+//    {
+//      static const char*const h2_proto_string = "\x02h2";
+//      std::size_t h2_proto_string_len = ::strlen(h2_proto_string);
+//      const unsigned char* client_proto = in;
+//      const unsigned char* client_proto_end = in + in_len;
+//      for ( ; client_proto + h2_proto_string_len <= client_proto_end; client_proto += *client_proto + 1)
+//      {
+//        std::size_t client_proto_len = (*client_proto + 1);
+//        if (::memcmp(h2_proto_string, client_proto, h2_proto_string_len <  client_proto_len ? h2_proto_string_len : client_proto_len) == 0)
+//        {
+//          *out = client_proto;
+//          *out_len = (unsigned char)client_proto_len;
+//          return SSL_TLSEXT_ERR_OK;
+//        }
+//      }
+//      return SSL_TLSEXT_ERR_NOACK;
+//    }
 
 //    //----------------------------------------------------------------//
 //    void client::v2_connection::on_informational_headers(std::uint32_t stream_id, const std::function<void(v2_response_head&& headers)>& fn)
@@ -265,8 +265,8 @@ namespace manifold
       this->closed_ = false;
       this->next_stream_id_ = 1;
 
-      std::vector<unsigned char> proto_list(::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL));
-      std::copy_n(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL, ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOL), proto_list.begin());
+      std::vector<unsigned char> proto_list(::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS));
+      std::copy_n(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS, ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS), proto_list.begin());
       //SSL_CTX_set_alpn_select_cb(this->ssl_context_->impl(), client_alpn_select_proto_cb, nullptr);
       const unsigned char* test = this->ssl_context_->impl()->alpn_client_proto_list;
       auto r = SSL_CTX_set_alpn_protos(this->ssl_context_->impl(), proto_list.data(), proto_list.size());
@@ -311,6 +311,7 @@ namespace manifold
                   this->ec_ = errc::internal_error;
                   this->on_close_ ? this->on_close_(this->ec_) : void();
                 }
+#ifndef MANIFOLD_DISABLE_HTTP2
                 else if (std::string((char*)selected_alpn, selected_alpn_sz) == "h2")
                 {
                   sock->send(v2_connection::preface.data(), v2_connection::preface.size(), [this, sock](const std::error_code& ec, std::size_t bytes_transfered)
@@ -329,6 +330,7 @@ namespace manifold
                     }
                   });
                 }
+#endif //MANIFOLD_DISABLE_HTTP2
                 else
                 {
                   this->connection_ = std::make_shared<v1_connection<request_head, response_head>>(std::move(*sock));

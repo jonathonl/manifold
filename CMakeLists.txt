@@ -12,9 +12,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-local-typedefs -DASIO_
 set(HEADER_FILES
     include/socket.hpp
     include/tcp.hpp
+    include/uniform_resource_identifier.hpp
     include/http_error_category.hpp
     include/http_frame.hpp
-        include/http_v2_connection.hpp
+    include/http_v2_connection.hpp
     include/http_v2_message_head.hpp
     include/http_request_head.hpp
     include/http_v2_response_head.hpp
@@ -31,14 +32,16 @@ set(HEADER_FILES
     include/http_v1_request_head.hpp
     include/http_v2_request_head.hpp
     include/http_message_head.hpp
-    include/http_v1_response_head.hpp)
+    include/http_v1_response_head.hpp
+    include/http_file_transfer.hpp)
 
 set(SOURCE_FILES
     src/socket.cpp
     src/tcp.cpp
+    src/uniform_resource_identifier.cpp
     src/http_error_category.cpp
     src/http_frame.cpp
-        src/http_v2_connection.cpp
+    src/http_v2_connection.cpp
     src/http_v2_message_head.cpp
     src/http_request_head.cpp
     src/http_v2_response_head.cpp
@@ -54,7 +57,8 @@ set(SOURCE_FILES
     src/http_v1_response_head.cpp
     src/http_response_head.cpp
     src/http_v2_request_head.cpp
-    src/http_v1_request_head.cpp src/http_message_head.cpp)
+    src/http_v1_request_head.cpp
+    src/http_message_head.cpp src/http_file_transfer.cpp)
 
 add_library(manifold SHARED ${SOURCE_FILES} ${HEADER_FILES})
 #target_link_libraries(manifold libssl.dylib)

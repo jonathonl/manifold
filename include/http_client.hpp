@@ -60,6 +60,7 @@ namespace manifold
     class client
     {
     public:
+#ifndef MANIFOLD_DISABLE_HTTP2
       //================================================================//
       class v2_connection : public http::v2_connection<request_head, response_head>
       {
@@ -140,7 +141,7 @@ namespace manifold
 //
       };
       //================================================================//
-
+#endif //MANIFOLD_DISABLE_HTTP2
       //================================================================//
       class response : public incoming_message<request_head, response_head>
       {

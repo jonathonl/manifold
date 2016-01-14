@@ -24,6 +24,7 @@ namespace manifold
     class server
     {
     private:
+#ifndef MANIFOLD_DISABLE_HTTP2
       //================================================================//
       class v2_connection : public http::v2_connection<response_head, request_head>
       {
@@ -71,6 +72,7 @@ namespace manifold
 
       };
       //================================================================//
+#endif //MANIFOLD_DISABLE_HTTP2
     public:
       //================================================================//
       class request : public incoming_message<response_head, request_head>

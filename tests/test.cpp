@@ -11,6 +11,7 @@
 #include "http_client.hpp"
 #include "http_router.hpp"
 #include "hpack.hpp"
+#include "http_file_transfer.hpp"
 
 
 
@@ -59,6 +60,7 @@ int main()
   std::tie(first, second, third) = return_move_only();
 
   asio::io_service ioservice;
+  http::file_download(ioservice, uri("/foo"), "foomanchu.txt");
 
 //  //----------------------------------------------------------------//
 //  std::uint32_t plus_sign_code = (0x7fb << (32 - 11));

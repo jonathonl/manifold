@@ -6,6 +6,13 @@
 #include <string>
 #include <system_error>
 
+#define _MSC_VER 1800
+#ifdef _MSC_VER
+#if (_MSC_VER < 1900)
+#define MANIFOLD_DISABLE_HTTP2
+#endif
+#endif
+
 namespace manifold
 {
   namespace http

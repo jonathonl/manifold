@@ -5,6 +5,8 @@
 
 #include "http_v2_connection.hpp"
 
+#ifndef MANIFOLD_DISABLE_HTTP2
+
 namespace manifold
 {
   namespace http
@@ -1696,3 +1698,5 @@ namespace manifold
 //    //----------------------------------------------------------------//
   }
 }
+
+#endif //MANIFOLD_DISABLE_HTTP2

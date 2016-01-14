@@ -17,10 +17,10 @@ namespace manifold
       unsigned char *out_len, const unsigned char *in,
       unsigned int in_len, void *arg)
     {
-      static const char*const h2_proto_string = "\x02h2\x08http/1.1";
-      std::size_t h2_proto_string_len = ::strlen(h2_proto_string);
+      //static const char*const h2_proto_string = "\x02h2\x08http/1.1";
+      std::size_t h2_proto_string_len = ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS);
 
-      int ret = SSL_select_next_proto((unsigned char **)out, out_len, (unsigned char*)h2_proto_string, h2_proto_string_len, in, in_len) == OPENSSL_NPN_NEGOTIATED ? SSL_TLSEXT_ERR_OK : SSL_TLSEXT_ERR_ALERT_FATAL;
+      int ret = SSL_select_next_proto((unsigned char **)out, out_len, (unsigned char*)MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS, h2_proto_string_len, in, in_len) == OPENSSL_NPN_NEGOTIATED ? SSL_TLSEXT_ERR_OK : SSL_TLSEXT_ERR_ALERT_FATAL;
       auto select_proto = *out;
       int e = SSL_get_error(ssl, ret);
       return  ret;
@@ -300,6 +300,7 @@ namespace manifold
             {
               std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
             }
+#ifndef MANIFOLD_DISABLE_HTTP2
             else if (std::string((char*)selected_alpn, selected_alpn_sz) == "h2")
             {
               auto* preface_buf = new std::array<char,v2_connection::preface.size()>();
@@ -338,6 +339,7 @@ namespace manifold
                 delete preface_buf;
               });
             }
+#endif //MANIFOLD_DISABLE_HTTP2
             else
             {
               auto it = this->connections_.emplace(std::make_shared<v1_connection<response_head, request_head>>(std::move(*sock)));
