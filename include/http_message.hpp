@@ -17,21 +17,8 @@ namespace manifold
     {
     public:
       //----------------------------------------------------------------//
-//      enum class error_code
-//      { NoError = 0, SocketError, HeadCorrupt, HeadTooLarge };
-      //----------------------------------------------------------------//
-    protected:
-      //----------------------------------------------------------------//
-      std::shared_ptr<http::connection<SendMsg, RecvMsg>> connection_;
-      std::uint32_t stream_id_;
-      bool ended_ = false;
-      //----------------------------------------------------------------//
-    public:
-      //----------------------------------------------------------------//
       message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::uint32_t stream_id);
-      //message(message&& source) {}
-      //message& operator=(message&& source) { return *this; }
-
+      message(message&& source);
       virtual ~message();
       //----------------------------------------------------------------//
 
@@ -41,8 +28,14 @@ namespace manifold
       void on_close(const std::function<void(errc ec)>& cb);
       //----------------------------------------------------------------//
     private:
-      //message(const message&) = delete;
-      //message& operator=(const message&) = delete;
+      message(const message&); //= delete;
+      message& operator=(const message&); //= delete;
+      message& operator=(message&&); //= delete;
+    protected:
+      //----------------------------------------------------------------//
+      std::shared_ptr<http::connection<SendMsg, RecvMsg>> connection_;
+      std::uint32_t stream_id_;
+      //----------------------------------------------------------------//
     };
     //================================================================//
   }

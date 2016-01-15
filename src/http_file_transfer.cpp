@@ -116,9 +116,9 @@ namespace manifold
               if (std::regex_match(content_disposition, sm, exp))
               {
                 if (sm[1].matched)
-                  filename = basename(std::string(sm[1]));
+                  filename = basename(sm[1].str());
                 else if (sm[2].matched)
-                  filename = basename(std::string(sm[2]));
+                  filename = basename(sm[2].str());
               }
               else
               {
@@ -150,7 +150,7 @@ namespace manifold
 
             this->file_.open(destination_file_path, std::ios::binary);
 
-            if (this->file_.good())
+            if (!this->file_.good())
             {
               this->err_ = file_transfer_error("Could Not Open File For Writing");
               res.close(http::errc::cancel);
@@ -163,49 +163,58 @@ namespace manifold
                 this->file_.write(data, data_sz);
               });
 
-              res.on_end([]()
-              {
-              });
+//              res.on_end([]()
+//              {
+//              });
             }
           }
         });
 
-        req.on_close([this](errc ec)
-        {
-          this->completed_ = true;
-
-          this->file_.close();
-
-          if (ec != errc::no_error)
-          {
-            if (this->result_.size())
-              std::remove(this->result_.c_str());
-
-            if (!err_)
-            {
-              this->err_ = file_transfer_error("Connection Closed Prematurely (" + std::to_string((unsigned)ec) + ")");
-            }
-          }
-
-          this->on_complete_ ? this->on_complete_(this->err_, this->result_) : void();
-        });
+        req.on_close(std::bind(&file_download::on_close_handler, this, std::placeholders::_1));
 
         req.head().path(this->url_.path_with_query());
         req.end();
       });
+
+      this->c_->on_close(std::bind(&file_download::on_close_handler, this, std::placeholders::_1));
     }
 
     file_download::~file_download()
     {
-      this->c_->close();
+      this->cancel();
       assert(!this->file_.is_open());
+    }
+
+    void file_download::on_close_handler(errc ec)
+    {
+      if (!this->completed_)
+      {
+        this->completed_ = true;
+
+        this->file_.close();
+
+        if (ec != errc::no_error)
+        {
+          if (this->result_.size())
+            std::remove(this->result_.c_str());
+
+          if (!err_)
+          {
+            this->err_ = file_transfer_error("Connection Closed Prematurely (" + std::to_string((unsigned) ec) + ")");
+          }
+        }
+
+        this->on_complete_ ? this->on_complete_(this->err_, this->result_) : void();
+        this->on_complete_ = nullptr;
+        this->c_->close();
+      }
     }
 
     void file_download::on_complete(std::function<void(const file_transfer_error& err, const std::string& local_file_path)>&& cb)
     {
       if (this->completed_)
         cb(err_, result_);
-      else if (!on_complete_)
+      else
         on_complete_ = std::move(cb);
     }
 
@@ -216,8 +225,7 @@ namespace manifold
 
     void file_download::on_progress(std::function<void(std::uint64_t transfered, std::uint64_t total)> &&cb)
     {
-      if (!on_progress_)
-        on_progress_ = std::move(cb);
+      on_progress_ = std::move(cb);
     }
 
     void file_download::on_progress(const std::function<void(std::uint64_t transfered, std::uint64_t total)> &cb)

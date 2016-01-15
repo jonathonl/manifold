@@ -507,6 +507,9 @@ namespace manifold
               {
                 assert(current->outgoing_body.front().size() == bytes_sent);
                 current->outgoing_body.pop();
+                if (current->outgoing_body.empty())
+                  current->on_drain ? current->on_drain() : void();
+
                 self->send_loop_running_ = false;
                 self->run_send_loop();
               }

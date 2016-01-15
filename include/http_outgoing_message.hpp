@@ -13,23 +13,10 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     class outgoing_message : public message<SendMsg, RecvMsg>
     {
-    private:
-      //----------------------------------------------------------------//
-      std::uint64_t bytes_sent_;
-      bool headers_sent_;
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-      //bool sendChunkedEntity(const char* data, std::size_t dataSize);
-      //bool sendKnownLengthEntity(const char* data, std::size_t dataSize);
-      //----------------------------------------------------------------//
-    protected:
-      //----------------------------------------------------------------//
-      virtual SendMsg& message_head() = 0;
-      //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
       outgoing_message(const std::shared_ptr<http::connection<SendMsg,RecvMsg>>& conn, std::int32_t stream_id);
+      outgoing_message(outgoing_message&& source);
       virtual ~outgoing_message();
       //----------------------------------------------------------------//
 
@@ -54,6 +41,15 @@ namespace manifold
         return this->end(dataBuffer.data(), dataBuffer.size(), trailers);
       }
       bool end(const header_block& trailers = {});
+      //----------------------------------------------------------------//
+    private:
+      //----------------------------------------------------------------//
+      bool headers_sent_;
+      bool ended_;
+      //----------------------------------------------------------------//
+    protected:
+      //----------------------------------------------------------------//
+      virtual SendMsg& message_head() = 0;
       //----------------------------------------------------------------//
     };
     //================================================================//

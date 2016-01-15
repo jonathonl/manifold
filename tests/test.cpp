@@ -60,7 +60,13 @@ int main()
   std::tie(first, second, third) = return_move_only();
 
   asio::io_service ioservice;
-  http::file_download(ioservice, uri("/foo"), "foomanchu.txt");
+  http::file_download dl(ioservice, uri("https://127.0.0.1:8080/foo"), "foomanchu.txt");
+  dl.on_complete([](const http::file_transfer_error& err, const std::string file_path)
+  {
+    std::cout << "DL: " << file_path << std::endl;
+  });
+
+  dl.cancel();
 
 //  //----------------------------------------------------------------//
 //  std::uint32_t plus_sign_code = (0x7fb << (32 - 11));
@@ -210,8 +216,9 @@ int main()
   //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
   //ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
   //----------------------------------------------------------------//
+  ioservice.run();
 
-  if (true)
+  if (false)
   {
     //----------------------------------------------------------------//
     // Client to Local Server Test

@@ -126,27 +126,17 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    client::request::request(request && source)
+    client::request::request(request&& source)
      : outgoing_message(std::move(source)), head_(std::move(source.head_))
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    client::request & client::request::operator=(request && source)
-    {
-      if (this != &source)
-      {
-        outgoing_message::operator=(std::move(source));
-        this->head_ = std::move(source.head_);
-      }
-      return *this;
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
     client::request::~request()
     {
+      if (this->connection_)
+        this->end();
       std::cout << "client::request::~request()" << std::endl;
     }
     //----------------------------------------------------------------//
@@ -203,6 +193,13 @@ namespace manifold
       : incoming_message(conn, stream_id)
     {
       this->head_ = std::move(head);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    client::response::response(response&& source)
+      : incoming_message(std::move(source)), head_(std::move(source.head_))
+    {
     }
     //----------------------------------------------------------------//
 

@@ -17,6 +17,16 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
+    message<SendMsg,RecvMsg>::message(message&& source)
+      : connection_(source.connection_),
+      stream_id_(source.stream_id_)
+    {
+      source.connection_ = nullptr;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
     message<SendMsg,RecvMsg>::~message()
     {
     }

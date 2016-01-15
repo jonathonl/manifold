@@ -12,7 +12,19 @@ namespace manifold
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     incoming_message<SendMsg, RecvMsg>::incoming_message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::int32_t stream_id)
-      : message<SendMsg, RecvMsg>(conn, stream_id), bytesReceived_(0), bytesRemainingInChunk_(0)
+      : message<SendMsg, RecvMsg>(conn, stream_id)
+    {
+      this->connection_->on_trailers(this->stream_id_, [this](header_block&& trailers)
+      {
+        this->trailers_ = std::move(trailers);
+      });
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    incoming_message<SendMsg, RecvMsg>::incoming_message(incoming_message&& source)
+      : message<SendMsg, RecvMsg>(std::move(source)), trailers_(std::move(source.trailers_))
     {
       this->connection_->on_trailers(this->stream_id_, [this](header_block&& trailers)
       {
@@ -25,7 +37,8 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     incoming_message<SendMsg, RecvMsg>::~incoming_message()
     {
-      this->connection_->on_trailers(this->stream_id_, nullptr);
+      if (this->connection_)
+        this->connection_->on_trailers(this->stream_id_, nullptr);
     }
     //----------------------------------------------------------------//
 

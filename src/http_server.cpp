@@ -48,6 +48,13 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    server::request::request(server::request&& source)
+      : incoming_message(std::move(source)), head_(std::move(source.head_))
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     server::request::~request()
     {
     }
@@ -69,9 +76,17 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    server::response::response(server::response&& source)
+      : outgoing_message(std::move(source)), head_(std::move(source.head_))
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     server::response::~response()
     {
-
+      if (this->connection_)
+        this->end();
     }
     //----------------------------------------------------------------//
 
@@ -96,9 +111,13 @@ namespace manifold
     //----------------------------------------------------------------//
     server::push_promise server::response::send_push_promise(request_head&& push_promise_headers)
     {
+      push_promise ret;
       std::string method = push_promise_headers.method();
       std::uint32_t promised_stream_id = this->connection_->send_push_promise(this->stream_id_, push_promise_headers);
-      push_promise ret(server::request(std::move(push_promise_headers), this->connection_, promised_stream_id), server::response(response_head(200, {{"server", this->head().header("server")}}), this->connection_, promised_stream_id, method));
+      if (promised_stream_id)
+      {
+        ret = push_promise(server::request(std::move(push_promise_headers), this->connection_, promised_stream_id), server::response(response_head(200, {{"server", this->head().header("server")}}), this->connection_, promised_stream_id, method));
+      }
       return ret;
     }
     //----------------------------------------------------------------//
@@ -111,19 +130,27 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::push_promise::push_promise(request&& req, response&& res)
-      : req_(std::move(req)), res_(std::move(res)), fulfilled_(false)
+    server::push_promise::push_promise()
+      : fulfilled_(false)
     {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    server::push_promise::push_promise(request&& req, response&& res)
+      : req_(new request(std::move(req))), res_(new response(std::move(res))), fulfilled_(false)
+    {
+
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void server::push_promise::fulfill(const std::function<void(server::request&& req, server::response&& res)>& handler)
     {
-      if (!this->fulfilled_)
+      if (!this->fulfilled_ && this->req_ && this->res_)
       {
         this->fulfilled_ = true;
-        handler(std::move(req_), std::move(res_));
+        handler(std::move(*req_), std::move(*res_));
       }
     }
     //----------------------------------------------------------------//

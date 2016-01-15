@@ -50,6 +50,7 @@ namespace manifold
       const std::string local_path_;
       const bool replace_existing_file_;
 
+      void on_close_handler(errc ec);
       std::function<void(std::uint64_t transfered, std::uint64_t total)> on_progress_;
       std::function<void(const file_transfer_error& err, const std::string& local_file_path)> on_complete_;
       bool completed_ = false;

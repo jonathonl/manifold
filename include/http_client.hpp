@@ -145,17 +145,18 @@ namespace manifold
       //================================================================//
       class response : public incoming_message<request_head, response_head>
       {
+      public:
+        response(response_head&& head, const std::shared_ptr<http::connection<request_head, response_head>>& conn, std::uint32_t stream_id);
+        response(response&& source);
+        ~response();
+
+        const response_head& head() const;
       private:
         response_head head_;
       protected:
         //----------------------------------------------------------------//
         response_head& message_head() { return this->head_; }
         //----------------------------------------------------------------//
-      public:
-        response(response_head&& head, const std::shared_ptr<http::connection<request_head, response_head>>& conn, std::uint32_t stream_id);
-        ~response();
-
-        const response_head& head() const;
       };
       //================================================================//
 
@@ -164,8 +165,7 @@ namespace manifold
       {
       public:
         request(request_head&& head, const std::shared_ptr<http::connection<request_head, response_head>>& conn, std::uint32_t stream_id);
-        request(request && source);
-        request & operator=(request && source);
+        request(request&& source);
         ~request();
 
         request_head& head();
@@ -177,9 +177,6 @@ namespace manifold
         void on_informational_headers(const std::function<void(response_head&& resp_head)>& cb);
       private:
         request_head head_;
-
-        request & operator=(const request &) = delete;
-        request(const request &) = delete;
       protected:
         //----------------------------------------------------------------//
         request_head& message_head() { return this->head_; }
@@ -198,6 +195,8 @@ namespace manifold
       };
       //================================================================//
     private:
+      class impl;
+
       asio::io_service& io_service_;
       asio::ip::tcp::resolver tcp_resolver_;
       std::uint32_t next_stream_id_;
@@ -213,7 +212,7 @@ namespace manifold
       std::function<void(errc ec)> on_close_;
       errc ec_;
 
-      void send_connection_preface(std::function<void(const std::error_code& ec)>& fn);
+      //void send_connection_preface(std::function<void(const std::error_code& ec)>& fn);
     public:
       client(asio::io_service& ioservice, const std::string& host, unsigned short port = 80);
       client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, unsigned short port = 443);

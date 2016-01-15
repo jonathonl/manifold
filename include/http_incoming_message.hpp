@@ -14,28 +14,10 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     class incoming_message : public message<SendMsg, RecvMsg>
     {
-    private:
-      header_block trailers_;
-      //----------------------------------------------------------------//
-      std::uint64_t bytesReceived_;
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-      std::uint64_t bytesRemainingInChunk_;
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-      //ssize_t recvChunkedEntity(char* buff, std::size_t buffSize);
-      //ssize_t recvKnownLengthEntity(char* buff, std::size_t buffSize);
-      //----------------------------------------------------------------//
-    protected:
-//      //----------------------------------------------------------------//
-//      virtual v2_header_block& message_head() = 0;
-//      //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      //incoming_message(const header_block& head, Socket&& sock);
       incoming_message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::int32_t stream_id);
+      incoming_message(incoming_message&& source);
       virtual ~incoming_message();
       const header_block& trailers() const { return this->trailers_; }
       //----------------------------------------------------------------//
@@ -44,6 +26,8 @@ namespace manifold
       void on_data(const std::function<void(const char*const buff, std::size_t buff_size)>& fn);
       void on_end(const std::function<void()>& fn);
       //----------------------------------------------------------------//
+    private:
+      header_block trailers_;
     };
     //================================================================//
   }

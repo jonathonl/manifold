@@ -11,8 +11,18 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     outgoing_message<SendMsg, RecvMsg>::outgoing_message(const std::shared_ptr<http::connection<SendMsg,RecvMsg>>& conn, std::int32_t stream_id)
       : message<SendMsg, RecvMsg>(conn, stream_id),
-        bytes_sent_(0),
-        headers_sent_(false)
+      headers_sent_(false),
+      ended_(false)
+    {
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    outgoing_message<SendMsg, RecvMsg>::outgoing_message(outgoing_message&& source)
+      : message<SendMsg, RecvMsg>(std::move(source)),
+      headers_sent_(source.headers_sent_),
+      ended_(source.ended_)
     {
     }
     //----------------------------------------------------------------//
@@ -49,7 +59,7 @@ namespace manifold
       if (!this->headers_sent_)
         ret = this->send_headers();
 
-      if (ret)
+      if (ret && !this->ended_)
       {
         ret = this->connection_->send_data(this->stream_id_, data, data_sz, false);
       }
@@ -71,19 +81,18 @@ namespace manifold
     bool outgoing_message<SendMsg, RecvMsg>::end(const char*const data, std::size_t data_sz, const header_block& trailers)
     {
       bool ret = true;
-      if (!this->ended_)
-      {
-        if (!this->headers_sent_)
-          ret = this->send_headers();
 
-        if (ret)
-        {
-          this->connection_->send_data(this->stream_id_, data, data_sz, trailers.size() == 0);
-          // TODO: Check content length against amount sent;
-          if (trailers.size())
-            this->connection_->send_trailers(this->stream_id_, trailers, true, true);
-          this->ended_ = true;
-        }
+      if (!this->headers_sent_)
+        ret = this->send_headers();
+
+
+      if (ret && !this->ended_)
+      {
+        this->connection_->send_data(this->stream_id_, data, data_sz, trailers.size() == 0);
+        // TODO: Check content length against amount sent;
+        if (trailers.size())
+          this->connection_->send_trailers(this->stream_id_, trailers, true, true);
+        this->ended_ = true;
       }
 
       return ret;

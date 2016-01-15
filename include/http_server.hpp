@@ -77,6 +77,16 @@ namespace manifold
       //================================================================//
       class request : public incoming_message<response_head, request_head>
       {
+      public:
+        //----------------------------------------------------------------//
+        request(request_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id);
+        request(request&& source);
+        ~request();
+        //----------------------------------------------------------------//
+
+        //----------------------------------------------------------------//
+        const request_head& head() const;
+        //----------------------------------------------------------------//
       private:
         //----------------------------------------------------------------//
         request_head head_;
@@ -85,15 +95,6 @@ namespace manifold
         //----------------------------------------------------------------//
         //header_block& message_head() { return this->head_; }
         //----------------------------------------------------------------//
-      public:
-        //----------------------------------------------------------------//
-        request(request_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id);
-        ~request();
-        //----------------------------------------------------------------//
-
-        //----------------------------------------------------------------//
-        const request_head& head() const;
-        //----------------------------------------------------------------//
       };
       //================================================================//
 
@@ -101,18 +102,10 @@ namespace manifold
       //================================================================//
       class response : public outgoing_message<response_head, request_head>
       {
-      private:
-        //----------------------------------------------------------------//
-        response_head head_;
-        std::string request_method_;
-        //----------------------------------------------------------------//
-      protected:
-        //----------------------------------------------------------------//
-        response_head& message_head() { return this->head_; }
-        //----------------------------------------------------------------//
       public:
         //----------------------------------------------------------------//
         response(response_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id, const std::string& request_method);
+        response(response&& source);
         ~response();
         //----------------------------------------------------------------//
 
@@ -122,6 +115,15 @@ namespace manifold
         push_promise send_push_promise(request_head&& push_promise_headers);
         push_promise send_push_promise(const request_head& push_promise_headers);
         //----------------------------------------------------------------//
+      private:
+        //----------------------------------------------------------------//
+        response_head head_;
+        std::string request_method_;
+        //----------------------------------------------------------------//
+      protected:
+        //----------------------------------------------------------------//
+        response_head& message_head() { return this->head_; }
+        //----------------------------------------------------------------//
       };
       //================================================================//
 
@@ -129,11 +131,12 @@ namespace manifold
       class push_promise
       {
       public:
+        push_promise();
         push_promise(request&& req, response&& res);
         void fulfill(const std::function<void(request&& req, response&& res)>& handler);
       private:
-        request req_;
-        response res_;
+        std::unique_ptr<request> req_;
+        std::unique_ptr<response> res_;
         bool fulfilled_;
       };
       //================================================================//

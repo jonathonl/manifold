@@ -1394,7 +1394,7 @@ namespace manifold
     {
       bool ret = false;
 
-     auto it = this->streams_.find(stream_id);
+      auto it = this->streams_.find(stream_id);
 
       if (it == this->streams_.end())
       {
