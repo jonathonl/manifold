@@ -66,8 +66,6 @@ int main()
     std::cout << "DL: " << file_path << std::endl;
   });
 
-  dl.cancel();
-
 //  //----------------------------------------------------------------//
 //  std::uint32_t plus_sign_code = (0x7fb << (32 - 11));
 //  auto res = hpack::huffman_code_tree.find(hpack::huffman_code(plus_sign_code, 32));

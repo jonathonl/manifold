@@ -56,6 +56,9 @@ namespace manifold
 {
   namespace http
   {
+
+    class client_impl;
+
     //================================================================//
     class client
     {
@@ -194,25 +197,6 @@ namespace manifold
         }
       };
       //================================================================//
-    private:
-      class impl;
-
-      asio::io_service& io_service_;
-      asio::ip::tcp::resolver tcp_resolver_;
-      std::uint32_t next_stream_id_;
-      std::string default_user_agent_ = "Manifold";
-      bool closed_;
-
-      std::unique_ptr<asio::ssl::context> ssl_context_;
-      std::shared_ptr<http::connection<request_head, response_head>> connection_;
-     // std::queue<std::pair<client::request, std::function<void(http::client::request && req)>>> pending_requests_;
-
-      std::function<void(http::client::request && req)> on_push_promise_;
-      std::function<void()> on_connect_;
-      std::function<void(errc ec)> on_close_;
-      errc ec_;
-
-      //void send_connection_preface(std::function<void(const std::error_code& ec)>& fn);
     public:
       client(asio::io_service& ioservice, const std::string& host, unsigned short port = 80);
       client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, unsigned short port = 443);
@@ -223,6 +207,8 @@ namespace manifold
       client::request make_request();
       void close();
       void set_default_user_agent(const std::string user_agent);
+    private:
+      std::shared_ptr<client_impl> impl_;
     };
     //================================================================//
   }
