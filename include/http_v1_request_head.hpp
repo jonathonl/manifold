@@ -13,10 +13,8 @@ namespace manifold
     //================================================================//
     class v1_request_head : public v1_message_head
     {
-    private:
     public:
       //----------------------------------------------------------------//
-      v1_request_head(v1_message_head&& hb);
       v1_request_head(const request_head& generic_head);
       v1_request_head(const std::string& url = "/", const std::string& method = "get", std::list<std::pair<std::string,std::string>>&& headers = {});
       v1_request_head(const std::string& url, http::method meth, std::list<std::pair<std::string,std::string>>&& headers = {});
@@ -24,16 +22,26 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      std::string method() const;
+      const std::string& method() const;
       void method(const std::string& value);
       void method(http::method value);
       bool method_is(http::method methodToCheck) const;
-      std::string path() const;
+      const std::string& path() const;
       void path(const std::string& value);
-      std::string scheme() const;
+      const std::string& scheme() const;
       void scheme(const std::string& value);
-      std::string authority() const;
+      const std::string& authority() const;
       void authority(const std::string& value);
+      //----------------------------------------------------------------//
+    private:
+      //----------------------------------------------------------------//
+      std::string method_;
+      std::string path_;
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      bool start_line(std::string&& value);
+      std::string start_line() const;
       //----------------------------------------------------------------//
     };
     //================================================================//

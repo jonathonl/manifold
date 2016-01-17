@@ -155,7 +155,7 @@ namespace manifold
       if (r[2].matched)
       {
         this->scheme_name_ = r[2].str();
-        std::for_each(this->scheme_name_.begin(), this->scheme_name_.end(), ::tolower);
+        std::transform(this->scheme_name_.begin(), this->scheme_name_.end(), this->scheme_name_.begin(), ::tolower);
       }
       if (r[4].matched)
       {
@@ -190,7 +190,7 @@ namespace manifold
     return ret;
   }
 
-  std::string uri::socket() const
+  std::string uri::socket_address() const
   {
     std::stringstream ss;
     ss << this->host_;

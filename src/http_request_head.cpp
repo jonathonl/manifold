@@ -93,7 +93,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string request_head::method() const
+    const std::string& request_head::method() const
     {
       return this->method_;
     }
@@ -113,7 +113,7 @@ namespace manifold
       value.erase(0, value.find_first_not_of(whitespace));
       value.erase(value.find_last_not_of(whitespace) + 1);
 
-      std::for_each(value.begin(), value.end(), ::toupper);
+      std::transform(value.begin(), value.end(), value.begin(), ::toupper);
 
       if (value.size())
         this->method_ = value;
@@ -128,7 +128,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string request_head::path() const
+    const std::string& request_head::path() const
     {
       return this->path_;
     }
@@ -142,7 +142,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string request_head::scheme() const
+    const std::string& request_head::scheme() const
     {
       return this->scheme_;
     }
@@ -156,7 +156,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string request_head::authority() const
+    const std::string& request_head::authority() const
     {
       return this->authority_;
     }

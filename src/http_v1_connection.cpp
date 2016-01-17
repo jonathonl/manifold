@@ -152,6 +152,24 @@ namespace manifold
     template<> bool v1_connection<request_head, response_head>::incoming_head_is_head_request(const response_head& head) { return false; }
     template<> bool v1_connection<response_head, request_head>::incoming_head_is_head_request(const request_head& head) { return (head.method() == "HEAD"); }
 
+    template<>
+    bool v1_connection<request_head, response_head>::deserialize_incoming_headers(std::istream& is, response_head& generic_headers)
+    {
+      v1_response_head v1_headers;
+      bool ret = v1_message_head::deserialize(is, v1_headers);
+      generic_headers = response_head(std::move(v1_headers));
+      return ret;
+    }
+
+    template<>
+    bool v1_connection<response_head, request_head>::deserialize_incoming_headers(std::istream& is, request_head& generic_headers)
+    {
+      v1_request_head v1_headers;
+      bool ret = v1_message_head::deserialize(is, v1_headers);
+      generic_headers = request_head(std::move(v1_headers));
+      return ret;
+    }
+
     template <typename SendMsg, typename RecvMsg>
     typename v1_connection<SendMsg, RecvMsg>::transaction* v1_connection<SendMsg, RecvMsg>::current_send_transaction()
     {
@@ -213,8 +231,8 @@ namespace manifold
         {
           std::stringstream is(std::string(self->recv_buffer_.data(), bytes_read));
 
-          v1_message_head headers;
-          if (!v1_message_head::deserialize(is, headers))
+          RecvMsg headers;
+          if (!v1_connection<SendMsg, RecvMsg>::deserialize_incoming_headers(is, headers))
           {
             self->close(errc::protocol_error);
           }
@@ -232,12 +250,12 @@ namespace manifold
             }
             else
             {
-              RecvMsg generic_headers(std::move(headers));
 
-              if (incoming_head_is_head_request(generic_headers))
+
+              if (incoming_head_is_head_request(headers))
                 current->outgoing_ended = true;
 
-              current->on_headers ? current->on_headers(std::move(generic_headers)) : void();
+              current->on_headers ? current->on_headers(std::move(headers)) : void();
 
               if (current->ignore_incoming_body) // TODO: || incoming_header_is_get_or_head_request(headers)
               {
@@ -507,7 +525,7 @@ namespace manifold
               {
                 assert(current->outgoing_body.front().size() == bytes_sent);
                 current->outgoing_body.pop();
-                if (current->outgoing_body.empty())
+                if (current->outgoing_body.empty()) // TODO: possibly check if ended.
                   current->on_drain ? current->on_drain() : void();
 
                 self->send_loop_running_ = false;
@@ -603,7 +621,7 @@ namespace manifold
         v1_head.header("user-agent", "Manifold"); // TODO: Allow overide of default for connection.
 
       std::string method = v1_head.method();
-      std::for_each(method.begin(), method.end(), ::toupper);
+      std::transform(method.begin(), method.end(), method.begin(), ::toupper);
       if (method != "GET" && method != "HEAD")
         v1_head.header("transfer-encoding", "chunked");
       else

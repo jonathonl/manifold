@@ -15,12 +15,9 @@ namespace manifold
     //================================================================//
     class v1_response_head : public v1_message_head
     {
-    private:
     public:
       //----------------------------------------------------------------//
       v1_response_head();
-      v1_response_head(v1_message_head&& hb);
-      v1_response_head(const v1_message_head& hb);
       v1_response_head(const response_head& generic_head);
       v1_response_head(unsigned short status, std::list<std::pair<std::string,std::string>>&& headers = {});
       v1_response_head(http::status_code status, std::list<std::pair<std::string,std::string>>&& headers = {});
@@ -31,6 +28,15 @@ namespace manifold
       unsigned short status_code() const;
       void status_code(unsigned short value);
       void status_code(http::status_code value);
+      //----------------------------------------------------------------//
+    private:
+      //----------------------------------------------------------------//
+      unsigned short status_code_ = 0;
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      bool start_line(std::string&& value);
+      std::string start_line() const;
       //----------------------------------------------------------------//
     };
     //================================================================//

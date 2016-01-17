@@ -5,13 +5,32 @@
 
 #include "uniform_resource_identifier.hpp"
 #include "http_client.hpp"
+#include "http_server.hpp"
 
+#include <regex>
 #include <fstream>
+#include <random>
 
 namespace manifold
 {
   namespace http
   {
+    class document_root
+    {
+    public:
+      document_root(const std::string& path, const std::map<std::string, std::string>& user_credentials = {});
+      ~document_root();
+      void operator()(server::request&& req, server::response&& res, const std::smatch& matches);
+    private:
+      std::string path_to_root_;
+      std::map<std::string, std::string> user_credentials_;
+      std::minstd_rand rng_;
+
+      void handle_head(server::response&& res, const std::string& file_path);
+      void handle_get(server::response&& res, const std::string& file_path);
+      void handle_put(server::request&& req, server::response&& res, const std::string& file_path);
+    };
+
     class file_transfer_error
     {
     public:

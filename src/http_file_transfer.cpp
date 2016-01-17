@@ -1,12 +1,13 @@
 
 #include "http_file_transfer.hpp"
 
-#include <regex>
+#include <chrono>
 
 namespace manifold
 {
   namespace http
   {
+    //================================================================//
     bool path_exists(const std::string& input_path)
     {
       struct stat s;
@@ -74,7 +75,183 @@ namespace manifold
       ret.erase(ret.find_last_of("/\\") + 1);
       return ret;
     }
+    //================================================================//
 
+    //================================================================//
+    document_root::document_root(const std::string& path, const std::map<std::string, std::string>& user_credentials)
+      : path_to_root_(path), user_credentials_(user_credentials)
+    {
+      std::seed_seq seed = {(long)(this), (long)std::chrono::high_resolution_clock::now().time_since_epoch().count()};
+      this->rng_.seed(seed);
+    }
+
+    document_root::~document_root()
+    {
+    }
+
+    void document_root::operator()(server::request&& req, server::response&& res, const std::smatch& matches)
+    {
+      res.head().header("content-type", "text/plain");
+
+      if (matches.size() < 2)
+      {
+        // TODO: Handle invalid regex.
+      }
+      else
+      {
+        bool allowed = true;
+
+        if (!allowed)
+        {
+          // TODO: Check authorization header
+        }
+        else
+        {
+          std::string file_path = this->path_to_root_ + matches[2].str();
+
+          if (req.head().method() == "HEAD")
+          {
+            this->handle_head(std::move(res), file_path);
+          }
+          else if (req.head().method() == "GET")
+          {
+            this->handle_get(std::move(res), file_path);
+          }
+          else if (req.head().method() == "PUT")
+          {
+            this->handle_put(std::move(req), std::move(res), file_path);
+          }
+          else
+          {
+            res.head().status_code(status_code::method_not_allowed);
+            res.end(status_code_to_reason_phrase(res.head().status_code()));
+          }
+        }
+      }
+    }
+
+    void document_root::handle_head(server::response&& res, const std::string& file_path)
+    {
+      struct stat st;
+      if (stat(file_path.c_str(), &st) != 0 || (st.st_mode & S_IFREG) == 0)
+      {
+        res.head().status_code(status_code::not_found);
+        res.end();
+      }
+      else
+      {
+        res.head().header("content-length", std::to_string(st.st_size));
+        res.end();
+      }
+    }
+
+    void document_root::handle_get(server::response&& res, const std::string& file_path)
+    {
+      struct stat st;
+      if (stat(file_path.c_str(), &st) != 0 || (st.st_mode & S_IFREG) == 0)
+      {
+        res.head().status_code(status_code::not_found);
+        res.end(status_code_to_reason_phrase(res.head().status_code()));
+      }
+      else
+      {
+        auto ifs = std::make_shared<std::ifstream>(file_path, std::ios::binary);
+        if (!ifs->good())
+        {
+          res.head().status_code(status_code::internal_server_error);
+          res.end(status_code_to_reason_phrase(res.head().status_code()));
+        }
+        else
+        {
+          auto res_ptr = std::make_shared<server::response>(std::move(res));
+          res_ptr->head().header("content-length", std::to_string(st.st_size));
+
+          std::array<char, 4096> buf;
+          long bytes_in_buf = ifs->read(buf.data(), buf.size()).gcount();
+          if (!ifs->good())
+          {
+            if (bytes_in_buf > 0)
+              res_ptr->end(buf.data(), (std::size_t)bytes_in_buf);
+            else
+              res_ptr->end();
+          }
+          else
+          {
+            res_ptr->on_drain([ifs, res_ptr]()
+            {
+              std::array<char, 4096> buf;
+              long bytes_in_buf = ifs->read(buf.data(), buf.size()).gcount();
+              if (bytes_in_buf > 0)
+                res_ptr->send(buf.data(), (std::size_t)bytes_in_buf);
+
+              if (!ifs->good())
+                res_ptr->end();
+            });
+            res_ptr->send(buf.data(), (std::size_t)bytes_in_buf);
+          }
+        }
+      }
+    }
+
+    void document_root::handle_put(server::request&& req, server::response&& res, const std::string& file_path)
+    {
+      std::stringstream ss;
+      ss << file_path << "_" << std::to_string(this->rng_()) << ".tmp";
+      std::string tmp_file_path(ss.str());
+      auto ofs = std::make_shared<std::ofstream>(tmp_file_path, std::ios::binary);
+
+      if (!ofs->good())
+      {
+        res.head().status_code(status_code::internal_server_error);
+        res.end(status_code_to_reason_phrase(res.head().status_code()));
+      }
+      else
+      {
+        // TODO: send continue if expected.
+
+        auto res_ptr = std::make_shared<server::response>(std::move(res));
+
+
+        req.on_data([ofs](const char*const data, std::size_t data_sz)
+        {
+          ofs->write(data, data_sz);
+        });
+
+        req.on_end([res_ptr, ofs, tmp_file_path, file_path]()
+        {
+          if (!ofs->good())
+          {
+            ofs->close();
+            std::remove(tmp_file_path.c_str());
+            res_ptr->head().status_code(status_code::internal_server_error);
+            res_ptr->end(status_code_to_reason_phrase(res_ptr->head().status_code()));
+          }
+          else
+          {
+            ofs->close();
+            if (std::rename(tmp_file_path.c_str(), file_path.c_str()) != 0)
+            {
+              std::remove(tmp_file_path.c_str());
+              res_ptr->head().status_code(status_code::internal_server_error);
+              res_ptr->end(status_code_to_reason_phrase(res_ptr->head().status_code()));
+            }
+            else
+            {
+              res_ptr->end();
+            }
+          }
+        });
+
+        req.on_close([tmp_file_path, ofs](errc ec)
+        {
+          ofs->close();
+          std::remove(tmp_file_path.c_str());
+        });
+      }
+    }
+    //================================================================//
+
+    //================================================================//
     file_download::file_download(asio::io_service &ioservice, const uri& remote_source, const std::string& local_destination, bool replace_existing_file)
       : url_(remote_source), local_path_(local_destination), replace_existing_file_(replace_existing_file)
     {
@@ -237,6 +414,6 @@ namespace manifold
     {
       this->c_->close();
     }
-
+    //================================================================//
   }
 }

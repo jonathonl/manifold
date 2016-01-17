@@ -52,7 +52,7 @@ namespace manifold
       value.erase(value.find_last_not_of(whitespace)+1);
 
       // make name lowercase
-      std::for_each(name.begin(), name.end(), ::tolower);
+      std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 
       for (auto it = this->headers_.begin(); it != this->headers_.end();)
       {
@@ -84,7 +84,7 @@ namespace manifold
       name.erase(name.find_last_not_of(whitespace)+1);
 
       // make name lowercase
-      std::for_each(name.begin(), name.end(), ::tolower);
+      std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 
       for (auto it = this->headers_.begin(); it != this->headers_.end();)
       {
@@ -118,7 +118,7 @@ namespace manifold
     bool v1_header_block::header_exists(std::string&& name) const
     {
       bool ret = false;
-      std::for_each(name.begin(), name.end(), ::tolower);
+      std::transform(name.begin(), name.end(), name.begin(), ::tolower);
       for (auto it = this->headers_.begin(); !ret && it != this->headers_.end(); ++it)
       {
         if (it->first == name)
@@ -142,7 +142,7 @@ namespace manifold
       name.erase(name.find_last_not_of(whitespace)+1);
 
       // make name lowercase
-      std::for_each(name.begin(), name.end(), ::tolower);
+      std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 
       for (auto it = this->headers_.begin(); it != this->headers_.end();)
       {
@@ -159,7 +159,7 @@ namespace manifold
     {
       std::string ret;
       std::string nameToLower(name);
-      std::for_each(nameToLower.begin(), nameToLower.end(), ::tolower);
+      std::transform(nameToLower.begin(), nameToLower.end(), nameToLower.begin(), ::tolower);
 
       for (auto it = this->headers_.rbegin(); ret.empty() && it != this->headers_.rend(); ++it)
       {
@@ -176,7 +176,7 @@ namespace manifold
     {
       std::list<std::string> ret;
       std::string nameToLower(name);
-      std::for_each(nameToLower.begin(), nameToLower.end(), ::tolower);
+      std::transform(nameToLower.begin(), nameToLower.end(), nameToLower.begin(), ::tolower);
 
       for (auto it = this->headers_.begin(); it != this->headers_.end(); ++it)
       {
@@ -254,7 +254,7 @@ namespace manifold
     //----------------------------------------------------------------//
     void v1_message_head::serialize(const v1_message_head& source, std::ostream& destination)
     {
-      destination << source.start_line_ << "\r\n";
+      destination << source.start_line() << "\r\n";
 
       v1_header_block::serialize(source, destination);
     }
@@ -263,10 +263,13 @@ namespace manifold
     //----------------------------------------------------------------//
     bool v1_message_head::deserialize(std::istream& source, v1_message_head& destination)
     {
-      std::getline(source, destination.start_line_);
-      destination.start_line_.erase(destination.start_line_.find_last_not_of(" \r")+1);
-
-      return v1_header_block::deserialize(source, destination);
+      bool ret = false;
+      std::string start_line;
+      std::getline(source, start_line);
+      start_line.erase(start_line.find_last_not_of(" \r")+1);
+      if (destination.start_line(std::move(start_line)))
+        ret = v1_header_block::deserialize(source, destination);
+      return ret;
     }
     //----------------------------------------------------------------//
   }

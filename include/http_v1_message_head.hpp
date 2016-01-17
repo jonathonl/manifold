@@ -67,7 +67,8 @@ namespace manifold
       static bool deserialize(std::istream& source, v1_message_head& destination);
       //----------------------------------------------------------------//
     protected:
-      std::string start_line_;
+      virtual bool start_line(std::string&& value) = 0;
+      virtual std::string start_line() const = 0;
     };
     //================================================================//
   }

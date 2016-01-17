@@ -85,7 +85,7 @@ namespace manifold
     bool v2_header_block::header_exists(std::string&& name) const
     {
       bool ret = false;
-      std::for_each(name.begin(), name.end(), ::tolower);
+      std::transform(name.begin(), name.end(), name.begin(), ::tolower);
       for (auto it = this->headers_.begin(); !ret && it != this->headers_.end(); ++it)
       {
         if (it->name == name)
@@ -115,7 +115,7 @@ namespace manifold
       value.erase(value.find_last_not_of(whitespace)+1);
 
       // make name lowercase
-      std::for_each(name.begin(), name.end(), ::tolower);
+      std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 
       for (auto it = this->headers_.begin(); it != this->headers_.end();)
       {
@@ -146,7 +146,7 @@ namespace manifold
       name.erase(name.find_last_not_of(whitespace)+1);
 
       // make name lowercase
-      std::for_each(name.begin(), name.end(), ::tolower);
+      std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 
       for (auto it = this->headers_.begin(); it != this->headers_.end();)
       {
@@ -178,7 +178,7 @@ namespace manifold
     std::string v2_header_block::header(std::string&& name) const
     {
       std::string ret;
-      std::for_each(name.begin(), name.end(), ::tolower);
+      std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 
       for (auto it = this->headers_.rbegin(); ret.empty() && it != this->headers_.rend(); ++it)
       {
@@ -201,7 +201,7 @@ namespace manifold
     std::list<std::string> v2_header_block::multi_header(std::string&& name) const
     {
       std::list<std::string> ret;
-      std::for_each(name.begin(), name.end(), ::tolower);
+      std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 
       for (auto it = this->headers_.begin(); it != this->headers_.end(); ++it)
       {

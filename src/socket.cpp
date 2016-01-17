@@ -135,7 +135,7 @@ namespace manifold
         const std::size_t bytes_actually_read = this->s_->receive(asio::buffer(buf + put_position, bytes_to_read), asio::ip::tcp::socket::message_peek, err);
         if (err)
         {
-          cb ? cb(ec, 0) : void();
+          cb ? cb(err, 0) : void();
         }
         else
         {

@@ -61,7 +61,7 @@ namespace manifold
     void v2_request_head::method(const std::string& value)
     {
       std::string tmp(value);
-      std::for_each(tmp.begin(), tmp.end(), ::toupper);
+      std::transform(tmp.begin(), tmp.end(), tmp.begin(), ::toupper);
       this->pseudo_header(":method", std::move(tmp));
     }
     //----------------------------------------------------------------//

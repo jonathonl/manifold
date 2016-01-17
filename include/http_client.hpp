@@ -167,7 +167,7 @@ namespace manifold
       class request : public outgoing_message<request_head, response_head>
       {
       public:
-        request(request_head&& head, const std::shared_ptr<http::connection<request_head, response_head>>& conn, std::uint32_t stream_id);
+        request(request_head&& head, const std::shared_ptr<http::connection<request_head, response_head>>& conn, std::uint32_t stream_id, const std::string& server_authority);
         request(request&& source);
         ~request();
 
@@ -180,6 +180,7 @@ namespace manifold
         void on_informational_headers(const std::function<void(response_head&& resp_head)>& cb);
       private:
         request_head head_;
+        std::string server_authority_;
       protected:
         //----------------------------------------------------------------//
         request_head& message_head() { return this->head_; }
@@ -200,14 +201,18 @@ namespace manifold
     public:
       client(asio::io_service& ioservice, const std::string& host, unsigned short port = 80);
       client(asio::io_service& ioservice, const std::string& host, const ssl_options& options, unsigned short port = 443);
+      client(client&& source);
       ~client();
 
       void on_connect(const std::function<void()>& fn);
       void on_close(const std::function<void(errc ec)>& fn);
       client::request make_request();
-      void close();
+      void close(errc ec = errc::no_error);
       void set_default_user_agent(const std::string user_agent);
     private:
+      client(const client&); //= delete;
+      client& operator=(const client&); //= delete;
+      client& operator=(client&&); //= delete;
       std::shared_ptr<client_impl> impl_;
     };
     //================================================================//

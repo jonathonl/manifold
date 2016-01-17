@@ -126,6 +126,7 @@ namespace manifold
       std::function<void(std::uint32_t transaction_id)> on_new_stream_;
 
       static bool incoming_head_is_head_request(const RecvMsg& head);
+      static bool deserialize_incoming_headers(std::istream& is, RecvMsg& generic_headers);
       void garbage_collect_transactions();
       transaction* current_send_transaction();
       transaction* current_recv_transaction();

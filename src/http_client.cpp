@@ -31,19 +31,27 @@ namespace manifold
     private:
       asio::io_service& io_service_;
       asio::ip::tcp::resolver tcp_resolver_;
-      std::uint32_t next_stream_id_;
       std::string default_user_agent_ = "Manifold";
-      bool closed_;
+      std::string socket_address_;
 
       std::unique_ptr<asio::ssl::context> ssl_context_;
       std::shared_ptr<http::connection<request_head, response_head>> connection_;
       // std::queue<std::pair<client::request, std::function<void(http::client::request && req)>>> pending_requests_;
 
-      std::function<void(http::client::request && req)> on_push_promise_;
       std::function<void()> on_connect_;
       std::function<void(errc ec)> on_close_;
       errc ec_;
+      bool closed_ = false;
 
+      void destroy_callbacks_later()
+      {
+        auto self = shared_from_this();
+        this->io_service_.post([self]()
+        {
+          self->on_connect_ = nullptr;
+          self->on_close_ = nullptr;
+        });
+      }
       //void send_connection_preface(std::function<void(const std::error_code& ec)>& fn);
     public:
       client_impl(asio::io_service& ioservice)
@@ -54,13 +62,19 @@ namespace manifold
 
       ~client_impl()
       {
-        this->close();
+        this->close(errc::cancel);
       }
 
       void connect(const std::string& host, unsigned short port)
       {
-        this->closed_ = false;
-        this->next_stream_id_= 1;
+        if (!port)
+          port = 80;
+
+        if (port != 80)
+          this->socket_address_ = host + std::to_string(port);
+        else
+          this->socket_address_ = host;
+
         auto sock = std::make_shared<manifold::non_tls_socket>(this->io_service_);
         auto self = shared_from_this();
         this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [self, sock](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
@@ -85,7 +99,7 @@ namespace manifold
               else
               {
                 self->connection_ = std::make_shared<v1_connection<request_head, response_head>>(std::move(*sock));
-                self->connection_->on_close([self](errc ec) { self->on_close_ ? self->on_close_(ec) : void(); });
+                self->connection_->on_close(std::bind(&client_impl::close, self, std::placeholders::_1));
                 self->connection_->run();
                 self->on_connect_ ? self->on_connect_() : void();
               }
@@ -96,9 +110,15 @@ namespace manifold
 
       void connect(const std::string& host, const client::ssl_options& options, unsigned short port)
       {
-        this->closed_ = false;
-        this->next_stream_id_ = 1;
         this->ssl_context_ = std::unique_ptr<asio::ssl::context>(new asio::ssl::context(options.method));
+
+        if (!port)
+          port = 443;
+
+        if (port != 443)
+          this->socket_address_ = host + std::to_string(port);
+        else
+          this->socket_address_ = host;
 
         std::vector<unsigned char> proto_list(::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS));
         std::copy_n(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS, ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS), proto_list.begin());
@@ -183,25 +203,18 @@ namespace manifold
 
       void on_connect(const std::function<void()>& fn)
       {
-        //bool had_previous_handler = (bool)this->on_connect_;
-        this->on_connect_ = fn;
-        /*if (!had_previous_handler && this->connection_ && this->on_connect_)
-          this->on_connect_();*/
+        if (this->connection_)
+          fn ? fn() : void();
+        else
+          this->on_connect_ = fn;
       }
 
       void on_close(const std::function<void(errc ec)>& fn)
       {
-        //bool had_previous_handler = (bool)this->on_close_;
-        this->on_close_ = fn;
-
-        /*if (!had_previous_handler)
-        {
-          if (this->ec_ && this->on_close_)
-            this->on_close_(this->ec_);
-          else if (this->connection_ && this->connection_->is_closed() && this->on_close_)
-            this->on_close_(this->ec_); // TODO: get error from connection;
-
-        }*/
+        if (this->closed_)
+          fn ? fn(this->ec_) : void();
+        else
+          this->on_close_ = fn;
       }
 
       client::request make_request()
@@ -214,10 +227,10 @@ namespace manifold
 
         std::uint32_t stream_id = this->connection_->create_stream(0, 0);
 
-        return client::request(request_head("/", "GET", {{"user-agent", this->default_user_agent_}}), this->connection_, stream_id);;
+        return client::request(request_head("/", "GET", {{"user-agent", this->default_user_agent_}}), this->connection_, stream_id, this->socket_address_);
       }
 
-      void close()
+      void close(errc ec)
       {
         if (!this->closed_)
         {
@@ -226,17 +239,15 @@ namespace manifold
 
           if (this->connection_)
           {
-            this->connection_->close(http::errc::cancel);
+            this->connection_->close(ec);
             this->connection_ = nullptr;
           }
-          else if (this->on_close_)
+          else
           {
-            this->on_close_(http::errc::cancel);
+            this->on_close_ ? this->on_close_(ec) : void();
           }
 
-          this->on_close_ = nullptr;
-          this->on_connect_ = nullptr;
-          this->on_push_promise_ = nullptr;
+          this->destroy_callbacks_later();
         }
       }
 
@@ -335,8 +346,8 @@ namespace manifold
 //    }
 
     //----------------------------------------------------------------//
-    client::request::request(request_head&& head, const std::shared_ptr<http::connection<request_head, response_head>>& conn, std::uint32_t stream_id)
-      : outgoing_message(conn, stream_id), head_(std::move(head))
+    client::request::request(request_head&& head, const std::shared_ptr<http::connection<request_head, response_head>>& conn, std::uint32_t stream_id, const std::string& server_authority)
+      : outgoing_message(conn, stream_id), head_(std::move(head)), server_authority_(server_authority)
     {
       conn->on_push_promise(stream_id, [conn](v2_header_block&& req, std::uint32_t promised_stream_id)
       {
@@ -347,7 +358,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     client::request::request(request&& source)
-     : outgoing_message(std::move(source)), head_(std::move(source.head_))
+     : outgoing_message(std::move(source)), head_(std::move(source.head_)), server_authority_(std::move(source.server_authority_))
     {
     }
     //----------------------------------------------------------------//
@@ -373,6 +384,8 @@ namespace manifold
     {
       if (this->head_.method() == "GET" || this->head_.method() == "HEAD")
         end_stream = true;
+      if (this->head().authority().empty())
+        this->head().authority(this->server_authority_);
       return outgoing_message::send_headers(end_stream);
     }
     //----------------------------------------------------------------//
@@ -384,7 +397,8 @@ namespace manifold
       std::uint32_t stream_id = this->stream_id_;
       this->connection_->on_push_promise(this->stream_id_, [cb, c, stream_id](request_head&& headers, std::uint32_t promised_stream_id)
       {
-        cb ? cb(http::client::request(std::move(headers), c, promised_stream_id)) : void();
+        std::string authority = headers.authority();
+        cb ? cb(http::client::request(std::move(headers), c, promised_stream_id, authority)) : void();
       });
     }
     //----------------------------------------------------------------//
@@ -454,15 +468,25 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    client::~client()
+    client::client(client&& source)
     {
+      this->impl_ = source.impl_;
+      source.impl_ = nullptr;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void client::close()
+    client::~client()
     {
-      this->impl_->close();
+      if (this->impl_)
+        this->impl_->close(errc::cancel);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void client::close(errc ec)
+    {
+      this->impl_->close(ec);
     }
     //----------------------------------------------------------------//
 

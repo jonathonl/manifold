@@ -48,7 +48,7 @@ namespace manifold
 
 
     std::string basename() const;
-    std::string socket() const;
+    std::string socket_address() const;
     std::string authority() const;
     std::string to_string() const;
     std::string path_with_query() const;

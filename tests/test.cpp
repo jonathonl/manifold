@@ -11,7 +11,7 @@
 #include "http_client.hpp"
 #include "http_router.hpp"
 #include "hpack.hpp"
-#include "http_file_transfer.hpp"
+#include "user_agent.hpp"
 
 
 
@@ -60,10 +60,53 @@ int main()
   std::tie(first, second, third) = return_move_only();
 
   asio::io_service ioservice;
-  http::file_download dl(ioservice, uri("https://127.0.0.1:8080/foo"), "foomanchu.txt");
-  dl.on_complete([](const http::file_transfer_error& err, const std::string file_path)
+  http::user_agent ua(ioservice);
+  auto r = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
+  r.on_response([](http::client::response&& resp)
   {
-    std::cout << "DL: " << file_path << std::endl;
+    std::cout << "status: " << resp.head().status_code() << std::endl;
+    auto resp_entity = std::make_shared<std::stringstream>();
+    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
+    {
+      resp_entity->write(data, data_sz);
+    });
+
+    resp.on_end([resp_entity]()
+    {
+      std::cout << resp_entity->str() << "[DONE]" << std::endl;
+    });
+  });
+
+  auto r2 = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
+  r2.on_response([](http::client::response&& resp)
+  {
+    std::cout << "status: " << resp.head().status_code() << std::endl;
+    auto resp_entity = std::make_shared<std::stringstream>();
+    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
+    {
+      resp_entity->write(data, data_sz);
+    });
+
+    resp.on_end([resp_entity]()
+    {
+      std::cout << resp_entity->str() << "[DONE2]" << std::endl;
+    });
+  });
+
+  auto r3 = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
+  r3.on_response([](http::client::response&& resp)
+  {
+    std::cout << "status: " << resp.head().status_code() << std::endl;
+    auto resp_entity = std::make_shared<std::stringstream>();
+    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
+    {
+      resp_entity->write(data, data_sz);
+    });
+
+    resp.on_end([resp_entity]()
+    {
+      std::cout << resp_entity->str() << "[DONE3]" << std::endl;
+    });
   });
 
 //  //----------------------------------------------------------------//

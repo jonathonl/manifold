@@ -26,16 +26,16 @@ namespace manifold
       request_head(const class v1_request_head& v1_headers);
       request_head(const class v2_request_head& v2_headers);
       ~request_head();
-      std::string method() const;
+      const std::string& method() const;
       void method(const std::string& value);
       void method(std::string&& value);
       void method(http::method value);
       bool method_is(http::method methodToCheck) const;
-      std::string path() const;
+      const std::string& path() const;
       void path(const std::string& value);
-      std::string scheme() const;
+      const std::string& scheme() const;
       void scheme(const std::string& value);
-      std::string authority() const;
+      const std::string& authority() const;
       void authority(const std::string& value);
       //----------------------------------------------------------------//
     private:
