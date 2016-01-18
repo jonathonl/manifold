@@ -179,7 +179,7 @@ int main()
   http::router app;
 
   app.register_handler(std::regex("^/files/(.*)$"), "HEAD", http::document_root("./"));
-  app.register_handler(std::regex("^/files/(.*)$"), "GET", http::document_root("./"));
+  app.register_handler(std::regex("^/files/(.*)$"), "GET", http::document_root("./", {{"user","pass"}}));
   app.register_handler(std::regex("^/files/(.*)$"), "PUT", http::document_root("./"));
 
   app.register_handler(std::regex("^/redirect-url$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
@@ -245,17 +245,17 @@ int main()
   {
     std::ifstream ifs("tests/certs/server.crt");
     if (ifs.good())
-      ops.chain.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+      ops.chain.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
   }
   {
     std::ifstream ifs("tests/certs/server.key");
     if (ifs.good())
-      ops.key.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+      ops.key.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
   }
   {
     std::ifstream ifs("tests/certs/dh2048.pem");
     if (ifs.good())
-      ops.dhparam.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+      ops.dhparam.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
   }
 
   http::server srv(ioservice, 8080, "0.0.0.0");
@@ -264,14 +264,14 @@ int main()
   //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
   //ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
   //----------------------------------------------------------------//
-  ioservice.run();
 
-  if (false)
+
+  if (true)
   {
     //----------------------------------------------------------------//
     // Client to Local Server Test
     //
-    http::client c1(ioservice, "127.0.0.1", http::client::ssl_options(), 8080);
+    http::client c1(ioservice, "127.0.0.1", 8080);
     c1.on_connect([&c1]()
     {
       http::client::request req = c1.make_request();
@@ -325,9 +325,8 @@ int main()
       std::cout << ec << std::endl;
       //ioservice.stop();
     });
-    //----------------------------------------------------------------//
-
     ioservice.run();
+    //----------------------------------------------------------------//
   }
 
 
@@ -424,6 +423,5 @@ int main()
     c2.on_close([](http::errc ec) { std::cerr << ec << std::endl; });
   }
   //----------------------------------------------------------------//
-
 };
 //################################################################//

@@ -78,6 +78,31 @@ namespace manifold
     //================================================================//
 
     //================================================================//
+    static const std::map<std::string, std::string> content_type_index =
+      {
+        {".json"  , "application/json"},
+        {".js"    , "application/javascript"},
+        {".html"  , "text/html"},
+        {".htm"   , "text/html"},
+        {".css"   , "text/css"},
+        {".xml"   , "text/xml"},
+        {".txt"   , "text/plain"},
+        {".md"    , "text/markdown"}
+      };
+
+    std::string content_type_from_extension(const std::string& extension)
+    {
+      std::string ret;
+
+      auto it = content_type_index.find(extension);
+      if (it != content_type_index.end())
+        ret = it->second;
+
+      return ret;
+    }
+    //================================================================//
+
+    //================================================================//
     document_root::document_root(const std::string& path, const std::map<std::string, std::string>& user_credentials)
       : path_to_root_(path), user_credentials_(user_credentials)
     {
@@ -87,6 +112,11 @@ namespace manifold
 
     document_root::~document_root()
     {
+    }
+
+    void document_root::on_successful_put(const std::function<void(const std::string& file_path)>& cb)
+    {
+      this->on_put_ = cb;
     }
 
     void document_root::operator()(server::request&& req, server::response&& res, const std::smatch& matches)
@@ -99,15 +129,36 @@ namespace manifold
       }
       else
       {
-        bool allowed = true;
+        bool authorized = true;
 
-        if (!allowed)
+        if (this->user_credentials_.size())
         {
-          // TODO: Check authorization header
+          authorized = false;
+
+          for (auto it = this->user_credentials_.begin(); !authorized && it != this->user_credentials_.end(); ++it)
+          {
+            if (req.head().header("authorization") == basic_auth(it->first, it->second))
+              authorized = true;
+          }
+        }
+
+
+        if (!authorized)
+        {
+          res.head().status_code(status_code::unauthorized);
+          res.head().header("WWW-Authenticate", "Basic realm=\"File Transfer\"");
+          res.end(status_code_to_reason_phrase(res.head().status_code()));
         }
         else
         {
-          std::string file_path = this->path_to_root_ + matches[1].str();
+          std::string path_suffix = matches[1].str();
+          std::size_t pos;
+          while ((pos = path_suffix.find("..")) != std::string::npos)
+          {
+            path_suffix.replace(pos, 2,"");
+          }
+
+          std::string file_path = this->path_to_root_ + path_suffix;
 
           if (req.head().method() == "HEAD")
           {
@@ -141,6 +192,8 @@ namespace manifold
       else
       {
         res.head().header("content-length", std::to_string(st.st_size));
+        std::string content_type(content_type_from_extension(extension(file_path)));
+        res.head().header("content-type", content_type.size() ? content_type : "application/octet-stream");
         res.end();
       }
     }
@@ -165,6 +218,8 @@ namespace manifold
         {
           auto res_ptr = std::make_shared<server::response>(std::move(res));
           res_ptr->head().header("content-length", std::to_string(st.st_size));
+          std::string content_type(content_type_from_extension(extension(file_path)));
+          res_ptr->head().header("content-type", content_type.size() ? content_type : "application/octet-stream");
 
           std::array<char, 4096> buf;
           long bytes_in_buf = ifs->read(buf.data(), buf.size()).gcount();
@@ -222,7 +277,7 @@ namespace manifold
           ofs->write(data, data_sz);
         });
 
-        req.on_end([res_ptr, ofs, tmp_file_path, file_path]()
+        req.on_end([res_ptr, ofs, tmp_file_path, file_path, this]()
         {
           if (!ofs->good())
           {
@@ -243,6 +298,7 @@ namespace manifold
             else
             {
               res_ptr->end();
+              this->on_put_ ? this->on_put_(file_path) : void();
             }
           }
         });

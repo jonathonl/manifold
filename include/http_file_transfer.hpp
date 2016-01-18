@@ -21,10 +21,12 @@ namespace manifold
       document_root(const std::string& path, const std::map<std::string, std::string>& user_credentials = {});
       ~document_root();
       void operator()(server::request&& req, server::response&& res, const std::smatch& matches);
+      void on_successful_put(const std::function<void(const std::string& file_path)>& cb);
     private:
       std::string path_to_root_;
       std::map<std::string, std::string> user_credentials_;
       std::minstd_rand rng_;
+      std::function<void(const std::string& file_path)> on_put_;
 
       void handle_head(server::response&& res, const std::string& file_path);
       void handle_get(server::response&& res, const std::string& file_path);

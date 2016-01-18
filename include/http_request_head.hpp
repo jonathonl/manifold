@@ -10,6 +10,10 @@ namespace manifold
   namespace http
   {
     //================================================================//
+    std::string basic_auth(const std::string& username, const std::string& password);
+    //================================================================//
+
+    //================================================================//
     enum class method { head = 1, get, post, put, del, options, trace, connect, patch };
     std::string method_enum_to_string(method method);
     //================================================================//
