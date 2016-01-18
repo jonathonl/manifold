@@ -28,17 +28,17 @@ namespace manifold
       bool both_matched = false;
       bool path_matched = false;
 
-      std::string request_path =req.head().path(); // TODO: make url class and get path without query string
+      std::string request_path = req.head().path(); // TODO: make url class and get path without query string
       std::string request_method = req.head().method();
       std::smatch sm;
 
-      for (auto rt : this->routes_)
+      for (auto rt = this->routes_.begin(); !both_matched && rt != this->routes_.end(); ++rt)
       {
-        if (std::regex_match(request_path, sm, rt.expression))
+        if (std::regex_match(request_path, sm, rt->expression))
         {
-          if (rt.method.empty() || rt.method == request_method)
+          if (rt->method.empty() || rt->method == request_method)
           {
-            rt.handler(std::move(req), std::move(res), sm);
+            rt->handler(std::move(req), std::move(res), sm);
             both_matched = true;
           }
           path_matched = true;
@@ -49,11 +49,13 @@ namespace manifold
       {
         if (path_matched)
         {
-          // TODO: method not allowed.
+          res.head().status_code(status_code::method_not_allowed);
+          res.end();
         }
         else
         {
-          // TODO: not found.
+          res.head().status_code(status_code::not_found);
+          res.end();
         }
       }
     }

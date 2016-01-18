@@ -107,7 +107,7 @@ namespace manifold
         }
         else
         {
-          std::string file_path = this->path_to_root_ + matches[2].str();
+          std::string file_path = this->path_to_root_ + matches[1].str();
 
           if (req.head().method() == "HEAD")
           {
@@ -189,6 +189,11 @@ namespace manifold
             });
             res_ptr->send(buf.data(), (std::size_t)bytes_in_buf);
           }
+
+          res_ptr->on_close([ifs](errc ec)
+          {
+            ifs->close();
+          });
         }
       }
     }

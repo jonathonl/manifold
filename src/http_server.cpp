@@ -241,6 +241,7 @@ namespace manifold
     //----------------------------------------------------------------//
     server::~server()
     {
+      this->close();
     }
     //----------------------------------------------------------------//
 
@@ -265,123 +266,125 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    void server::close()
+    {
+      this->acceptor_.close();
+      std::set<std::shared_ptr<http::connection<response_head, request_head>>> tmp;
+      tmp.swap(this->connections_);
+      for (auto it = tmp.begin(); it != tmp.end(); ++it)
+        (*it)->close(errc::cancel);
+      tmp.clear();
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     void server::accept()
     {
-      auto sock = std::make_shared<non_tls_socket>(this->io_service_);
-      acceptor_.async_accept((asio::ip::tcp::socket&)*sock, [this, sock](std::error_code ec)
+      if (acceptor_.is_open())
       {
-
-        if (!acceptor_.is_open())
+        auto sock = std::make_shared<non_tls_socket>(this->io_service_);
+        acceptor_.async_accept((asio::ip::tcp::socket&)*sock, [this, sock](std::error_code ec)
         {
-          std::cout << "acceptor not open" << ":" __FILE__ << "/" << __LINE__ << std::endl;
-          return;
-        }
-
-        if (!ec)
-        {
-          auto it = this->connections_.emplace(std::make_shared<v1_connection<response_head, request_head>>(std::move(*sock)));
-          if (it.second)
+          if (ec)
           {
-            this->manage_connection(*it.first);
-            (*it.first)->run();
+            std::cout << "accept error: " << ec.message() << std::endl;
           }
-        }
-        else
-        {
-          std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
-        }
+          else
+          {
+            auto it = this->connections_.emplace(std::make_shared<v1_connection<response_head, request_head>>(std::move(*sock)));
+            if (it.second)
+            {
+              this->manage_connection(*it.first);
+              (*it.first)->run();
+            }
+          }
 
-        if (!this->io_service_.stopped())
           this->accept();
-      });
+        });
+      }
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     void server::accept(asio::ssl::context& ctx)
     {
-      auto sock = std::make_shared<tls_socket>(this->io_service_, ctx);
-      acceptor_.async_accept(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).lowest_layer(), [this, sock, &ctx](std::error_code ec)
+      if (acceptor_.is_open())
       {
-
-        if (!acceptor_.is_open())
+        auto sock = std::make_shared<tls_socket>(this->io_service_, ctx);
+        acceptor_.async_accept(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).lowest_layer(), [this, sock, &ctx](std::error_code ec)
         {
-          std::cout << "acceptor not open" << ":" __FILE__ << "/" << __LINE__ << std::endl;
-          return;
-        }
-
-        if (ec)
-        {
-
-        }
-        else
-        {
-          ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).async_handshake(asio::ssl::stream_base::server, [this, sock] (const std::error_code& ec)
+          if (ec)
           {
-            std::cout << "Cipher: " << SSL_CIPHER_get_name(SSL_get_current_cipher(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle())) << std::endl;
-            const unsigned char* selected_alpn = nullptr;
-            unsigned int selected_alpn_sz = 0;
-            SSL_get0_alpn_selected(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle(), &selected_alpn, &selected_alpn_sz);
-            std::cout << "Server ALPN: " << std::string((char*)selected_alpn, selected_alpn_sz) << std::endl;
-            if (ec)
+            std::cout << "accept error: " << ec.message() << std::endl;
+          }
+          else
+          {
+            ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).async_handshake(asio::ssl::stream_base::server, [this, sock] (const std::error_code& ec)
             {
-              std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
-            }
-#ifndef MANIFOLD_DISABLE_HTTP2
-            else if (std::string((char*)selected_alpn, selected_alpn_sz) == "h2")
-            {
-              auto* preface_buf = new std::array<char,v2_connection::preface.size()>();
-              sock->recv(preface_buf->data(), v2_connection::preface.size(), [this, sock, preface_buf](const std::error_code& ec, std::size_t bytes_read)
+              std::cout << "Cipher: " << SSL_CIPHER_get_name(SSL_get_current_cipher(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle())) << std::endl;
+              const unsigned char* selected_alpn = nullptr;
+              unsigned int selected_alpn_sz = 0;
+              SSL_get0_alpn_selected(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle(), &selected_alpn, &selected_alpn_sz);
+              std::cout << "Server ALPN: " << std::string((char*)selected_alpn, selected_alpn_sz) << std::endl;
+              if (ec)
               {
-                if (ec)
+                std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
+              }
+  #ifndef MANIFOLD_DISABLE_HTTP2
+              else if (std::string((char*)selected_alpn, selected_alpn_sz) == "h2")
+              {
+                auto* preface_buf = new std::array<char,v2_connection::preface.size()>();
+                sock->recv(preface_buf->data(), v2_connection::preface.size(), [this, sock, preface_buf](const std::error_code& ec, std::size_t bytes_read)
                 {
-                  std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
-                  std::string err = ec.message();
-                  if (ec.category() == asio::error::get_ssl_category())
+                  if (ec)
                   {
-                    err = std::string(" (");
-                    //ERR_PACK /* crypto/err/err.h */
-                    char buf[128];
-                    ::ERR_error_string_n(ec.value(), buf, sizeof(buf));
-                    err += buf;
-                  }
-                }
-                else
-                {
-                  const char* t = preface_buf->data();
-                  if (*preface_buf != v2_connection::preface)
-                  {
-                    std::cout << "Invalid Connection Preface" << ":" __FILE__ << "/" << __LINE__ << std::endl;
+                    std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
+                    std::string err = ec.message();
+                    if (ec.category() == asio::error::get_ssl_category())
+                    {
+                      err = std::string(" (");
+                      //ERR_PACK /* crypto/err/err.h */
+                      char buf[128];
+                      ::ERR_error_string_n(ec.value(), buf, sizeof(buf));
+                      err += buf;
+                    }
                   }
                   else
                   {
-                    auto it = this->connections_.emplace(std::make_shared<server::v2_connection>(std::move(*sock)));
-                    if (it.second)
+                    const char* t = preface_buf->data();
+                    if (*preface_buf != v2_connection::preface)
                     {
-                      this->manage_connection(*it.first);
-                      (*it.first)->run();
+                      std::cout << "Invalid Connection Preface" << ":" __FILE__ << "/" << __LINE__ << std::endl;
+                    }
+                    else
+                    {
+                      auto it = this->connections_.emplace(std::make_shared<server::v2_connection>(std::move(*sock)));
+                      if (it.second)
+                      {
+                        this->manage_connection(*it.first);
+                        (*it.first)->run();
+                      }
                     }
                   }
-                }
-                delete preface_buf;
-              });
-            }
-#endif //MANIFOLD_DISABLE_HTTP2
-            else
-            {
-              auto it = this->connections_.emplace(std::make_shared<v1_connection<response_head, request_head>>(std::move(*sock)));
-              if (it.second)
-              {
-                this->manage_connection(*it.first);
-                (*it.first)->run();
+                  delete preface_buf;
+                });
               }
-            }
-          });
-        }
+  #endif //MANIFOLD_DISABLE_HTTP2
+              else
+              {
+                auto it = this->connections_.emplace(std::make_shared<v1_connection<response_head, request_head>>(std::move(*sock)));
+                if (it.second)
+                {
+                  this->manage_connection(*it.first);
+                  (*it.first)->run();
+                }
+              }
+            });
+          }
 
-        if (!this->io_service_.stopped())
           this->accept(ctx);
-      });
+        });
+      }
     }
     //----------------------------------------------------------------//
 

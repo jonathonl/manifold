@@ -3,6 +3,8 @@ project(manifold)
 
 include_directories("include" "/opt/local/include")
 
+set(CMAKE_MACOSX_RPATH 1)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-local-typedefs -DASIO_STANDALONE -DASIO_HAS_MOVE -std=c++11 -stdlib=libc++")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -DASIO_STANDALONE -std=c++11 -stdlib=libc++")
 

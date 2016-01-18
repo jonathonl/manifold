@@ -12,6 +12,7 @@
 #include "http_router.hpp"
 #include "hpack.hpp"
 #include "user_agent.hpp"
+#include "http_file_transfer.hpp"
 
 
 
@@ -60,54 +61,54 @@ int main()
   std::tie(first, second, third) = return_move_only();
 
   asio::io_service ioservice;
-  http::user_agent ua(ioservice);
-  auto r = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
-  r.on_response([](http::client::response&& resp)
-  {
-    std::cout << "status: " << resp.head().status_code() << std::endl;
-    auto resp_entity = std::make_shared<std::stringstream>();
-    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
-    {
-      resp_entity->write(data, data_sz);
-    });
-
-    resp.on_end([resp_entity]()
-    {
-      std::cout << resp_entity->str() << "[DONE]" << std::endl;
-    });
-  });
-
-  auto r2 = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
-  r2.on_response([](http::client::response&& resp)
-  {
-    std::cout << "status: " << resp.head().status_code() << std::endl;
-    auto resp_entity = std::make_shared<std::stringstream>();
-    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
-    {
-      resp_entity->write(data, data_sz);
-    });
-
-    resp.on_end([resp_entity]()
-    {
-      std::cout << resp_entity->str() << "[DONE2]" << std::endl;
-    });
-  });
-
-  auto r3 = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
-  r3.on_response([](http::client::response&& resp)
-  {
-    std::cout << "status: " << resp.head().status_code() << std::endl;
-    auto resp_entity = std::make_shared<std::stringstream>();
-    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
-    {
-      resp_entity->write(data, data_sz);
-    });
-
-    resp.on_end([resp_entity]()
-    {
-      std::cout << resp_entity->str() << "[DONE3]" << std::endl;
-    });
-  });
+//  http::user_agent ua(ioservice);
+//  auto r = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
+//  r.on_response([](http::client::response&& resp)
+//  {
+//    std::cout << "status: " << resp.head().status_code() << std::endl;
+//    auto resp_entity = std::make_shared<std::stringstream>();
+//    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
+//    {
+//      resp_entity->write(data, data_sz);
+//    });
+//
+//    resp.on_end([resp_entity]()
+//    {
+//      std::cout << resp_entity->str() << "[DONE]" << std::endl;
+//    });
+//  });
+//
+//  auto r2 = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
+//  r2.on_response([](http::client::response&& resp)
+//  {
+//    std::cout << "status: " << resp.head().status_code() << std::endl;
+//    auto resp_entity = std::make_shared<std::stringstream>();
+//    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
+//    {
+//      resp_entity->write(data, data_sz);
+//    });
+//
+//    resp.on_end([resp_entity]()
+//    {
+//      std::cout << resp_entity->str() << "[DONE2]" << std::endl;
+//    });
+//  });
+//
+//  auto r3 = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
+//  r3.on_response([](http::client::response&& resp)
+//  {
+//    std::cout << "status: " << resp.head().status_code() << std::endl;
+//    auto resp_entity = std::make_shared<std::stringstream>();
+//    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
+//    {
+//      resp_entity->write(data, data_sz);
+//    });
+//
+//    resp.on_end([resp_entity]()
+//    {
+//      std::cout << resp_entity->str() << "[DONE3]" << std::endl;
+//    });
+//  });
 
 //  //----------------------------------------------------------------//
 //  std::uint32_t plus_sign_code = (0x7fb << (32 - 11));
@@ -176,12 +177,18 @@ int main()
   // Server Test
   //
   http::router app;
+
+  app.register_handler(std::regex("^/files/(.*)$"), "HEAD", http::document_root("./"));
+  app.register_handler(std::regex("^/files/(.*)$"), "GET", http::document_root("./"));
+  app.register_handler(std::regex("^/files/(.*)$"), "PUT", http::document_root("./"));
+
   app.register_handler(std::regex("^/redirect-url$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
   {
     res.head().status_code(http::status_code::found);
     res.head().header("location","/new-url");
     res.end();
   });
+
   app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
   {
     auto res_ptr = std::make_shared<http::server::response>(std::move(res));
@@ -251,7 +258,7 @@ int main()
       ops.dhparam.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
   }
 
-  http::server srv(ioservice, ops, 8080, "0.0.0.0");
+  http::server srv(ioservice, 8080, "0.0.0.0");
   srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
 
   //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
