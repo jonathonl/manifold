@@ -150,7 +150,7 @@ namespace manifold
     {
       std::string ret;
       std::string nameToLower(name);
-      std::transform(nameToLower.begin(), nameToLower.end(), nameToLower.end(), ::tolower);
+      std::transform(nameToLower.begin(), nameToLower.end(), nameToLower.begin(), ::tolower);
 
       for (auto it = this->headers_.rbegin(); ret.empty() && it != this->headers_.rend(); ++it)
       {

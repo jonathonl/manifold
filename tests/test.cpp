@@ -178,9 +178,12 @@ int main()
   //
   http::router app;
 
+  http::document_root get_doc_root("./");
+  get_doc_root.add_credentials("user", "pass");
   app.register_handler(std::regex("^/files/(.*)$"), "HEAD", http::document_root("./"));
-  app.register_handler(std::regex("^/files/(.*)$"), "GET", http::document_root("./", {{"user","pass"}}));
+  app.register_handler(std::regex("^/files/(.*)$"), "GET", std::ref(get_doc_root));
   app.register_handler(std::regex("^/files/(.*)$"), "PUT", http::document_root("./"));
+  get_doc_root.add_credentials("user", "password");
 
   app.register_handler(std::regex("^/redirect-url$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
   {

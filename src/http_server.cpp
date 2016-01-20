@@ -69,7 +69,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     server::response::response(response_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id, const std::string& request_method)
-      : outgoing_message<response_head, request_head>(conn, stream_id)
+      : outgoing_message<response_head, request_head>(conn, stream_id), request_method_(request_method)
     {
       this->head_ = std::move(head);
     }
@@ -77,7 +77,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     server::response::response(server::response&& source)
-      : outgoing_message(std::move(source)), head_(std::move(source.head_))
+      : outgoing_message(std::move(source)), head_(std::move(source.head_)), request_method_(std::move(source.request_method_))
     {
     }
     //----------------------------------------------------------------//

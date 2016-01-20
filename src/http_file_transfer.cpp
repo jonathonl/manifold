@@ -103,8 +103,8 @@ namespace manifold
     //================================================================//
 
     //================================================================//
-    document_root::document_root(const std::string& path, const std::map<std::string, std::string>& user_credentials)
-      : path_to_root_(path), user_credentials_(user_credentials)
+    document_root::document_root(const std::string& path)
+      : path_to_root_(path)
     {
       std::seed_seq seed = {(long)(this), (long)std::chrono::high_resolution_clock::now().time_since_epoch().count()};
       this->rng_.seed(seed);
@@ -112,6 +112,21 @@ namespace manifold
 
     document_root::~document_root()
     {
+    }
+
+    void document_root::reset_root(const std::string& path)
+    {
+      this->path_to_root_ = path;
+    }
+
+    void document_root::add_credentials(const std::string& username, const std::string& password)
+    {
+      this->user_credentials_[username] = password;
+    }
+
+    void document_root::remove_credentials(const std::string& username)
+    {
+      this->user_credentials_.erase(username);
     }
 
     void document_root::on_successful_put(const std::function<void(const std::string& file_path)>& cb)

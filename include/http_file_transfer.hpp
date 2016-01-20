@@ -18,9 +18,12 @@ namespace manifold
     class document_root
     {
     public:
-      document_root(const std::string& path, const std::map<std::string, std::string>& user_credentials = {});
+      document_root(const std::string& path = "");
       ~document_root();
       void operator()(server::request&& req, server::response&& res, const std::smatch& matches);
+      void reset_root(const std::string& path = "");
+      void add_credentials(const std::string& username, const std::string& password);
+      void remove_credentials(const std::string& username);
       void on_successful_put(const std::function<void(const std::string& file_path)>& cb);
     private:
       std::string path_to_root_;
