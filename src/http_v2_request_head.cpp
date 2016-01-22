@@ -51,7 +51,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string v2_request_head::method() const
+    const std::string& v2_request_head::method() const
     {
       return this->header(":method");
     }
@@ -74,7 +74,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string v2_request_head::path() const
+    const std::string& v2_request_head::path() const
     {
       return this->header(":path");
     }
@@ -88,7 +88,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string v2_request_head::scheme() const
+    const std::string& v2_request_head::scheme() const
     {
       return this->header(":scheme");
     }
@@ -102,7 +102,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string v2_request_head::authority() const
+    const std::string& v2_request_head::authority() const
     {
       return this->header(":authority");
     }

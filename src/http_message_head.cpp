@@ -15,6 +15,10 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
+    static const std::string empty_string;
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     header_block::header_block()
     {
     }
@@ -146,19 +150,24 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string header_block::header(const std::string& name) const
+    const std::string& header_block::header(const std::string& name) const
     {
-      std::string ret;
-      std::string nameToLower(name);
-      std::transform(nameToLower.begin(), nameToLower.end(), nameToLower.begin(), ::tolower);
+      return this->header(std::string(name));
+    }
+    //----------------------------------------------------------------//
 
-      for (auto it = this->headers_.rbegin(); ret.empty() && it != this->headers_.rend(); ++it)
+    //----------------------------------------------------------------//
+    const std::string& header_block::header(std::string&& name) const
+    {
+      std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+
+      for (auto it = this->headers_.rbegin(); it != this->headers_.rend(); ++it)
       {
-        if (it->first == nameToLower)
-          ret = it->second;
+        if (it->first == name)
+          return it->second;
       }
 
-      return ret;
+      return empty_string;
     }
     //----------------------------------------------------------------//
 

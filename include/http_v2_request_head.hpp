@@ -24,14 +24,14 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      std::string method() const;
+      const std::string& method() const;
       void method(const std::string& value);
       void method(http::method value);
-      std::string path() const;
+      const std::string& path() const;
       void path(const std::string& value);
-      std::string scheme() const;
+      const std::string& scheme() const;
       void scheme(const std::string& value);
-      std::string authority() const;
+      const std::string& authority() const;
       void authority(const std::string& value);
       //----------------------------------------------------------------//
     };

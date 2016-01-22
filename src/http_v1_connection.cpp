@@ -220,6 +220,7 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::recv_headers()
     {
+      this->activity_deadline_timer_.expires_from_now(this->activity_timeout_);
       auto self = casted_shared_from_this();
       this->socket_->recvline(this->recv_buffer_.data(), this->recv_buffer_.size(), [self](const std::error_code& ec, std::size_t bytes_read)
       {
@@ -309,6 +310,7 @@ namespace manifold
             {
               std::stringstream is(std::string(self->recv_buffer_.data(), bytes_read));
               v1_header_block::deserialize(is, current->incoming_trailers);
+              self->recv_trailers();
             }
             else
             {
@@ -325,7 +327,6 @@ namespace manifold
                 self->garbage_collect_transactions();
               }
 
-
               self->run_recv_loop();
             }
           }
@@ -336,6 +337,7 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::recv_chunk_encoded_body()
     {
+      this->activity_deadline_timer_.expires_from_now(this->activity_timeout_);
       auto self = casted_shared_from_this();
       this->socket_->recvline(this->recv_buffer_.data(), this->recv_buffer_.size(), [self](const std::error_code& ec, std::size_t bytes_read)
       {
@@ -447,6 +449,7 @@ namespace manifold
       }
       else
       {
+        this->activity_deadline_timer_.expires_from_now(this->activity_timeout_);
         std::size_t bytes_to_read = this->recv_buffer_.size();
         if (bytes_to_read > content_length)
           bytes_to_read = content_length;
@@ -486,6 +489,7 @@ namespace manifold
         if (current)
         {
           this->send_loop_running_ = true;
+          this->activity_deadline_timer_.expires_from_now(this->activity_timeout_);
 
           if (!current->head_sent)
           {

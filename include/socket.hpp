@@ -44,7 +44,7 @@ namespace manifold
   class non_tls_socket : public socket
   {
   public:
-    non_tls_socket(asio::io_service &ioservice)
+    non_tls_socket(asio::io_service& ioservice)
       : s_(new asio::ip::tcp::socket(ioservice)) { }
 
     non_tls_socket(non_tls_socket&& source)
@@ -87,7 +87,7 @@ namespace manifold
   class tls_socket : public socket
   {
   public:
-    tls_socket(asio::io_service &ioservice, asio::ssl::context& ctx)
+    tls_socket(asio::io_service& ioservice, asio::ssl::context& ctx)
       : s_(new asio::ssl::stream<asio::ip::tcp::socket>(ioservice, ctx))
     {
       SSL_CTX_set_mode(ctx.native_handle(), SSL_MODE_AUTO_RETRY);

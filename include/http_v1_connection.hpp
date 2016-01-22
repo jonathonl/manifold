@@ -10,6 +10,7 @@
 #include <deque>
 #include <queue>
 #include <memory>
+#include <chrono>
 
 namespace manifold
 {
@@ -24,7 +25,9 @@ namespace manifold
           closed_(false),
           //recv_buffer_(8192),
           next_transaction_id_(1),
-          send_loop_running_(false)
+          send_loop_running_(false),
+          activity_timeout_(std::chrono::seconds::max()),
+          activity_deadline_timer_(socket_->io_service(), std::chrono::seconds::max())
 
       {}
       v1_connection(tls_socket&& sock)
@@ -32,7 +35,9 @@ namespace manifold
           closed_(false),
           //recv_buffer_(8192),
           next_transaction_id_(1),
-          send_loop_running_(false)
+          send_loop_running_(false),
+          activity_timeout_(std::chrono::seconds::max()),
+          activity_deadline_timer_(socket_->io_service(), std::chrono::seconds::max())
       {}
       virtual ~v1_connection()
       {
@@ -120,6 +125,8 @@ namespace manifold
       std::deque<transaction> transaction_queue_;
       std::uint32_t next_transaction_id_;
       bool send_loop_running_;
+      std::chrono::seconds activity_timeout_;
+      asio::basic_waitable_timer<std::chrono::system_clock> activity_deadline_timer_;
 
 
       std::function<void(errc error_code)> on_close_;

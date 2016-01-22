@@ -304,6 +304,7 @@ namespace manifold
           else
           {
             ofs->close();
+            std::remove(file_path.c_str());
             if (std::rename(tmp_file_path.c_str(), file_path.c_str()) != 0)
             {
               std::remove(tmp_file_path.c_str());

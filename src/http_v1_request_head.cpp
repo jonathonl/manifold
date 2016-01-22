@@ -9,6 +9,10 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
+    static const std::string empty_string;
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     v1_request_head::v1_request_head(const request_head& generic_head)
     {
       this->headers_ = generic_head.raw_headers();
@@ -81,7 +85,7 @@ namespace manifold
     //----------------------------------------------------------------//
     const std::string& v1_request_head::scheme() const
     {
-      return "";
+      return empty_string;
     }
     //----------------------------------------------------------------//
 
