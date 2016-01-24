@@ -100,7 +100,21 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::run()
     {
+      this->run_timeout_loop();
       this->run_recv_loop();
+    }
+
+    template <typename SendMsg, typename RecvMsg>
+    void v1_connection<SendMsg, RecvMsg>::run_timeout_loop(const std::error_code& ec)
+    {
+      auto self = casted_shared_from_this();
+      if (!self->is_closed())
+      {
+        if (self->activity_deadline_timer_.expires_from_now() <= std::chrono::system_clock::duration(0))
+          this->close(errc::internal_error);
+        else
+          this->activity_deadline_timer_.async_wait(std::bind(&v1_connection::run_timeout_loop, self, std::placeholders::_1));
+      }
     }
 
     template <typename SendMsg, typename RecvMsg>
@@ -121,6 +135,8 @@ namespace manifold
         }
 
         this->on_close_ ? this->on_close_(ec) : void();
+
+        this->activity_deadline_timer_.cancel();
         auto self = casted_shared_from_this();
         this->socket_->io_service().post([self]()
         {

@@ -26,8 +26,8 @@ namespace manifold
           //recv_buffer_(8192),
           next_transaction_id_(1),
           send_loop_running_(false),
-          activity_timeout_(std::chrono::seconds::max()),
-          activity_deadline_timer_(socket_->io_service(), std::chrono::seconds::max())
+          activity_timeout_(std::chrono::seconds(15)), //std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(15))), //std::chrono::system_clock::duration::max()),
+          activity_deadline_timer_(socket_->io_service(), activity_timeout_)
 
       {}
       v1_connection(tls_socket&& sock)
@@ -36,8 +36,8 @@ namespace manifold
           //recv_buffer_(8192),
           next_transaction_id_(1),
           send_loop_running_(false),
-          activity_timeout_(std::chrono::seconds::max()),
-          activity_deadline_timer_(socket_->io_service(), std::chrono::seconds::max())
+          activity_timeout_(std::chrono::system_clock::duration::max()),
+          activity_deadline_timer_(socket_->io_service(), activity_timeout_)
       {}
       virtual ~v1_connection()
       {
@@ -48,6 +48,7 @@ namespace manifold
       }
 
       void run();
+      void run_timeout_loop(const std::error_code& ec = std::error_code());
       void close(errc ec);
       bool is_closed() const;
 
@@ -125,7 +126,7 @@ namespace manifold
       std::deque<transaction> transaction_queue_;
       std::uint32_t next_transaction_id_;
       bool send_loop_running_;
-      std::chrono::seconds activity_timeout_;
+      std::chrono::system_clock::duration activity_timeout_;
       asio::basic_waitable_timer<std::chrono::system_clock> activity_deadline_timer_;
 
 

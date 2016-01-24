@@ -274,16 +274,16 @@ int main()
     //----------------------------------------------------------------//
     // Client to Local Server Test
     //
-    http::client c1(ioservice, "127.0.0.1", 8080);
-    c1.on_connect([&c1]()
+    auto c1 =std::make_shared<http::client>(ioservice, "127.0.0.1", 8080);
+    c1->on_connect([c1]()
     {
-      http::client::request req = c1.make_request();
+      http::client::request req = c1->make_request();
       req.head() = http::request_head("/foobar", http::method::post,
         {
           {"content-type","application/x-www-form-urlencoded"}
         });
 
-      req.on_response([&c1](http::client::response && resp)
+      req.on_response([c1](http::client::response && resp)
       {
         for (auto it : resp.head().raw_headers())
           std::cout << it.first << ": " << it.second << std::endl;
@@ -295,26 +295,26 @@ int main()
         else
         {
           auto response_data = std::make_shared<std::stringstream>("");
-          resp.on_data([response_data, &c1](const char *const data, std::size_t datasz)
+          resp.on_data([response_data](const char *const data, std::size_t datasz)
           {
             response_data->write(data, datasz);
           });
 
-          resp.on_end([response_data, &c1]()
+          resp.on_end([response_data, c1]()
           {
             if (response_data->rdbuf()->in_avail())
               std::cout << response_data->rdbuf() << std::endl;
-            c1.close();
+            c1->close();
           });
         }
       });
 
       req.on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req.stream_id()));
 
-      req.on_close([&c1](http::errc e)
+      req.on_close([c1](http::errc e)
       {
         std::cout << "on_close called on client" << std::endl;
-        c1.close();
+        c1->close();
       });
 
       req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
@@ -323,12 +323,11 @@ int main()
       req.end(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
     });
 
-    c1.on_close([&ioservice](http::errc ec)
+    c1->on_close([&ioservice](http::errc ec)
     {
       std::cout << ec << std::endl;
       //ioservice.stop();
     });
-    ioservice.run();
     //----------------------------------------------------------------//
   }
 
@@ -426,5 +425,7 @@ int main()
     c2.on_close([](http::errc ec) { std::cerr << ec << std::endl; });
   }
   //----------------------------------------------------------------//
-};
+
+  ioservice.run();
+}
 //################################################################//

@@ -240,12 +240,9 @@ namespace manifold
           if (this->connection_)
           {
             this->connection_->close(ec);
-            this->connection_ = nullptr;
           }
-          else
-          {
-            this->on_close_ ? this->on_close_(ec) : void();
-          }
+
+          this->on_close_ ? this->on_close_(ec) : void();
 
           this->destroy_callbacks_later();
         }
