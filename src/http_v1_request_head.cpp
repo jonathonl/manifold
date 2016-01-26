@@ -132,7 +132,7 @@ namespace manifold
     //----------------------------------------------------------------//
     std::string v1_request_head::start_line() const
     {
-      std::string ret(this->method_ + " " + this->path_ + " http/1.1");
+      std::string ret(this->method_ + " " + this->path_ + " HTTP/1.1");
       return ret;
     }
     //----------------------------------------------------------------//
