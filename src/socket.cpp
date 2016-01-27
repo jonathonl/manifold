@@ -7,7 +7,7 @@
 #include "socket.hpp"
 
 #include <assert.h>
-
+#include <iostream>
 #include <thread>
 //################################################################//
 namespace manifold

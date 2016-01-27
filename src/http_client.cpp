@@ -70,42 +70,14 @@ namespace manifold
         if (!port)
           port = 80;
 
-        if (port != 80)
-          this->socket_address_ = host + std::to_string(port);
+        if (true) //port != 80)
+          this->socket_address_ = host + ":" + std::to_string(port);
         else
           this->socket_address_ = host;
 
-        auto sock = std::make_shared<manifold::non_tls_socket>(this->io_service_);
+
         auto self = shared_from_this();
-        this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [self, sock](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
-        {
-          if (ec)
-          {
-            self->ec_ = errc::internal_error;
-            self->on_close_ ? self->on_close_(self->ec_) : void();
-          }
-          else
-          {
-            std::cout << it->host_name() << std::endl;
-            std::cout << it->endpoint().address().to_string() << std::endl;
-            std::cout << it->endpoint().port() << std::endl;
-            ((asio::ip::tcp::socket&)*sock).async_connect(*it, [self, sock](const std::error_code& ec)
-            {
-              if (ec)
-              {
-                self->ec_ = errc::internal_error;
-                self->on_close_ ? self->on_close_(self->ec_) : void();
-              }
-              else
-              {
-                self->connection_ = std::make_shared<v1_connection<request_head, response_head>>(std::move(*sock));
-                self->connection_->on_close(std::bind(&client_impl::close, self, std::placeholders::_1));
-                self->connection_->run();
-                self->on_connect_ ? self->on_connect_() : void();
-              }
-            });
-          }
-        });
+        this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), std::bind(&client_impl::handle_resolve, self, std::placeholders::_1, std::placeholders::_2));
       }
 
       void connect(const std::string& host, const client::ssl_options& options, unsigned short port)
@@ -115,90 +87,126 @@ namespace manifold
         if (!port)
           port = 443;
 
-        if (port != 443)
-          this->socket_address_ = host + std::to_string(port);
+        if (true) //port != 443)
+          this->socket_address_ = host + ":" + std::to_string(port);
         else
           this->socket_address_ = host;
-
-        std::vector<unsigned char> proto_list(::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS));
-        std::copy_n(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS, ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS), proto_list.begin());
-        //SSL_CTX_set_alpn_select_cb(this->ssl_context_->impl(), client_alpn_select_proto_cb, nullptr);
-        const unsigned char* test = this->ssl_context_->impl()->alpn_client_proto_list;
-        auto r = SSL_CTX_set_alpn_protos(this->ssl_context_->impl(), proto_list.data(), proto_list.size());
-        const unsigned char* test2 = this->ssl_context_->impl()->alpn_client_proto_list;
-        auto sock = std::make_shared<manifold::tls_socket>(this->io_service_, *this->ssl_context_);
-        std::error_code e;
-        ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).set_verify_mode(asio::ssl::verify_none, e);
-        //((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).set_verify_callback(verify_certificate, e);
 
         this->ssl_context_->set_default_verify_paths();
 
         auto self = shared_from_this();
-        this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), [self, sock](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
+        this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(host, std::to_string(port)), std::bind(&client_impl::handle_resolve_tls, self, std::placeholders::_1, std::placeholders::_2));
+      }
+
+      void handle_resolve(const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
+      {
+        if (it == asio::ip::tcp::resolver::iterator())
         {
-          if (ec)
+          this->ec_ = errc::internal_error;
+          this->on_close_ ? this->on_close_(this->ec_) : void();
+        }
+        else
+        {
+          std::cout << it->host_name() << std::endl;
+          std::cout << it->endpoint().address().to_string() << std::endl;
+          std::cout << it->endpoint().port() << std::endl;
+
+          auto sock = std::make_shared<manifold::non_tls_socket>(this->io_service_);
+
+          auto self = shared_from_this();
+          ((asio::ip::tcp::socket&)*sock).async_connect(*it, [self, sock, it](const std::error_code& ec)
           {
-            self->ec_ = errc::internal_error;
-            self->on_close_ ? self->on_close_(self->ec_) : void();
-          }
-          else
-          {
-            std::cout << it->host_name() << std::endl;
-            std::cout << it->endpoint().port() << std::endl;
-            ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).next_layer().async_connect(*it, [self, sock](const std::error_code& ec)
+            if (ec)
             {
-              if (ec)
+              self->handle_resolve(ec, ++asio::ip::tcp::resolver::iterator(it));
+            }
+            else
+            {
+              self->connection_ = std::make_shared<v1_connection<request_head, response_head>>(std::move(*sock));
+              self->connection_->on_close(std::bind(&client_impl::close, self, std::placeholders::_1));
+              self->connection_->run();
+              self->on_connect_ ? self->on_connect_() : void();
+            }
+          });
+        }
+      }
+
+      void handle_resolve_tls(const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
+      {
+        if (it == asio::ip::tcp::resolver::iterator())
+        {
+          this->ec_ = errc::internal_error;
+          this->on_close_ ? this->on_close_(this->ec_) : void();
+        }
+        else
+        {
+          std::cout << it->host_name() << std::endl;
+          std::cout << it->endpoint().address().to_string() << std::endl;
+          std::cout << it->endpoint().port() << std::endl;
+
+          std::vector<unsigned char> proto_list(::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS));
+          std::copy_n(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS, ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS), proto_list.begin());
+          //SSL_CTX_set_alpn_select_cb(this->ssl_context_->impl(), client_alpn_select_proto_cb, nullptr);
+          const unsigned char* test = this->ssl_context_->impl()->alpn_client_proto_list;
+          auto r = SSL_CTX_set_alpn_protos(this->ssl_context_->impl(), proto_list.data(), proto_list.size());
+          const unsigned char* test2 = this->ssl_context_->impl()->alpn_client_proto_list;
+          auto sock = std::make_shared<manifold::tls_socket>(this->io_service_, *this->ssl_context_);
+          std::error_code e;
+          ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).set_verify_mode(asio::ssl::verify_none, e);
+          //((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).set_verify_callback(verify_certificate, e);
+
+          auto self = shared_from_this();
+          ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).next_layer().async_connect(*it, [self, sock, it](const std::error_code& ec)
+          {
+            if (ec)
+            {
+              self->handle_resolve_tls(ec, ++asio::ip::tcp::resolver::iterator(it));
+            }
+            else
+            {
+              ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).async_handshake(asio::ssl::stream_base::client, [self, sock](const std::error_code& ec)
               {
-                std::cout << "ERROR: " << ec.message() << std::endl;
-                self->ec_ = errc::internal_error;
-                self->on_close_ ? self->on_close_(self->ec_) : void();
-              }
-              else
-              {
-                ((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).async_handshake(asio::ssl::stream_base::client, [self, sock](const std::error_code& ec)
+                const unsigned char* selected_alpn = nullptr;
+                unsigned int selected_alpn_sz = 0;
+                SSL_get0_alpn_selected(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle(), &selected_alpn, &selected_alpn_sz);
+                std::cout << "Client ALPN: " << std::string((char*)selected_alpn, selected_alpn_sz) << std::endl;
+                if (ec)
                 {
-                  const unsigned char* selected_alpn = nullptr;
-                  unsigned int selected_alpn_sz = 0;
-                  SSL_get0_alpn_selected(((asio::ssl::stream<asio::ip::tcp::socket>&)*sock).native_handle(), &selected_alpn, &selected_alpn_sz);
-                  std::cout << "Client ALPN: " << std::string((char*)selected_alpn, selected_alpn_sz) << std::endl;
-                  if (ec)
-                  {
-                    std::cout << "ERROR: " << ec.message() << std::endl;
-                    self->ec_ = errc::internal_error;
-                    self->on_close_ ? self->on_close_(self->ec_) : void();
-                  }
+                  std::cout << "ERROR: " << ec.message() << std::endl;
+                  self->ec_ = errc::internal_error;
+                  self->on_close_ ? self->on_close_(self->ec_) : void();
+                }
 #ifndef MANIFOLD_DISABLE_HTTP2
-                    else if (std::string((char*)selected_alpn, selected_alpn_sz) == "h2")
+                  else if (std::string((char*)selected_alpn, selected_alpn_sz) == "h2")
                 {
-                  sock->send(v2_connection::preface.data(), v2_connection::preface.size(), [this, sock](const std::error_code& ec, std::size_t bytes_transfered)
+                  sock->send(http::v2_connection<request_head, response_head>::preface.data(), http::v2_connection<request_head, response_head>::preface.size(), [self, sock](const std::error_code& ec, std::size_t bytes_transfered)
                   {
                     if (ec)
                     {
-                      this->ec_ = errc::internal_error;
-                      this->on_close_ ? this->on_close_(this->ec_) : void();
+                      self->ec_ = errc::internal_error;
+                      self->on_close_ ? self->on_close_(self->ec_) : void();
                     }
                     else
                     {
-                      this->connection_ = std::make_shared<v2_connection>(std::move(*sock));
-                      this->connection_->on_close([this](errc ec) { this->on_close_ ? this->on_close_(ec) : void(); });
-                      this->connection_->run();
-                      this->on_connect_ ? this->on_connect_() : void();
+                      self->connection_ = std::make_shared<http::v2_connection<request_head, response_head>>(std::move(*sock));
+                      self->connection_->on_close([self](errc ec) { self->on_close_ ? self->on_close_(ec) : void(); });
+                      self->connection_->run();
+                      self->on_connect_ ? self->on_connect_() : void();
                     }
                   });
                 }
 #endif //MANIFOLD_DISABLE_HTTP2
-                  else
-                  {
-                    self->connection_ = std::make_shared<v1_connection<request_head, response_head>>(std::move(*sock));
-                    self->connection_->on_close([self](errc ec) { self->on_close_ ? self->on_close_(ec) : void(); });
-                    self->connection_->run();
-                    self->on_connect_ ? self->on_connect_() : void();
-                  }
-                });
-              }
-            });
-          }
-        });
+                else
+                {
+                  self->connection_ = std::make_shared<http::v1_connection<request_head, response_head>>(std::move(*sock));
+                  self->connection_->on_close([self](errc ec) { self->on_close_ ? self->on_close_(ec) : void(); });
+                  self->connection_->run();
+                  self->on_connect_ ? self->on_connect_() : void();
+                }
+              });
+            }
+          });
+        }
       }
 
       void on_connect(const std::function<void()>& fn)
