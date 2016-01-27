@@ -248,20 +248,32 @@ namespace manifold
     //----------------------------------------------------------------//
     void server::listen(const std::function<void(server::request&& req, server::response&& res)>& handler)
     {
+      std::error_code ec;
+      this->listen(handler, ec);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void server::listen(const std::function<void(server::request&& req, server::response&& res)>& handler, std::error_code& ec)
+    {
       this->request_handler_ = handler;
       // Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
       //asio::ip::tcp::resolver resolver(io_service_);
       //asio::ip::tcp::endpoint endpoint = *(resolver.resolve({host, std::to_string(port)}));
       auto ep = asio::ip::tcp::endpoint(asio::ip::address::from_string(this->host_), this->port_);
-      acceptor_.open(ep.protocol());
-      acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
-      acceptor_.bind(ep);
-      acceptor_.listen();
 
-      if (this->ssl_context_)
-        this->accept(*this->ssl_context_);
-      else
-        this->accept();
+      acceptor_.open(ep.protocol(), ec);
+      if (!ec) acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true), ec);
+      if (!ec) acceptor_.bind(ep, ec);
+      if (!ec) acceptor_.listen(asio::socket_base::max_connections, ec);
+
+      if (!ec)
+      {
+        if (this->ssl_context_)
+          this->accept(*this->ssl_context_);
+        else
+          this->accept();
+      }
     };
     //----------------------------------------------------------------//
 

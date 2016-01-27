@@ -185,6 +185,7 @@ namespace manifold
 
       //----------------------------------------------------------------//
       void listen(const std::function<void(server::request&& req, server::response&& res)>& handler);
+      void listen(const std::function<void(server::request&& req, server::response&& res)>& handler, std::error_code& ec);
       void close();
       //void register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler);
       void set_default_server_header(const std::string& value);
