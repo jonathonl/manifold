@@ -30,7 +30,7 @@ namespace manifold
     //----------------------------------------------------------------//
     std::string v1_response_head::start_line() const
     {
-      std::string ret("http/1.1 " + std::to_string(this->status_code_) + " " + status_code_to_reason_phrase(this->status_code_));
+      std::string ret("HTTP/1.1 " + std::to_string(this->status_code_) + " " + status_code_to_reason_phrase(this->status_code_));
       return ret;
     }
     //----------------------------------------------------------------//
