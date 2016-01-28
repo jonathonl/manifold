@@ -276,7 +276,7 @@ int main()
     //----------------------------------------------------------------//
     // Client to Local Server Test
     //
-    agnt.make_request(http::endpoint("127.0.0.1", false, 8080), [](const std::error_code& ec, http::client::request&& req)
+    agnt.make_request(http::endpoint(false, "127.0.0.1", 8080), [](const std::error_code& ec, http::client::request&& req)
     {
       req.head() = http::request_head("/foobar", http::method::post,
         {

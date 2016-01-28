@@ -23,16 +23,18 @@ namespace manifold
         if (!port_)
           port_ = (unsigned short)(encrypted_ ? 443 : 80);
       }
-      endpoint(const std::string& host, bool encrypted = false, unsigned short port = 0)
+      endpoint(bool encrypted, const std::string& host, unsigned short port = 0)
         : host_(host), port_(port), encrypted_(encrypted)
       {
         if (!port_)
           port_ = (unsigned short)(encrypted_ ? 443 : 80);
       }
-      bool operator<(const endpoint& other) const
+
+      bool operator==(const endpoint& other) const
       {
-        return (this->host_ < other.host_ || this->port_ < other.port_ || (int)this->encrypted_ < (int)other.encrypted_);
+        return (this->host_ == other.host_ && this->port_ == other.port_ && this->encrypted_ == other.encrypted_);
       }
+
       const std::string& host() const { return host_; }
       unsigned short port() const { return port_; }
       bool encrypted() const { return encrypted_; }
@@ -47,7 +49,30 @@ namespace manifold
       unsigned short port_;
       bool encrypted_;
     };
+  }
+}
 
+namespace std
+{
+  template <>
+  class hash<manifold::http::endpoint>
+  {
+  public:
+    size_t operator()(const manifold::http::endpoint& ep) const
+    {
+      // computes the hash of an employee using a variant
+      // of the Fowler-Noll-Vo hash function
+      size_t result = hash<std::string>()(ep.host());
+      result = result ^ hash<unsigned short>()(ep.port());
+      return result ^ (std::size_t)ep.encrypted();
+    }
+  };
+}
+
+namespace manifold
+{
+  namespace http
+  {
     class user_agent
     {
     public:
@@ -78,7 +103,7 @@ namespace manifold
         }
         else
         {
-          session& sess = this->sessions_[socket_address];
+          session& sess = this->sessions_[ep];
           sess.pending_requests.emplace(cb);
           sess.ep = ep;
 
@@ -93,9 +118,9 @@ namespace manifold
             non_tls_socket s(this->io_service_);
             sess.test.emplace(std::move(s));
 
-            this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(ep.host(), std::to_string(ep.port())), [this, socket_address](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
+            this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(ep.host(), std::to_string(ep.port())), [this, ep](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
             {
-              auto sess_it = this->sessions_.find(socket_address);
+              auto sess_it = this->sessions_.find(ep);
               if (sess_it != this->sessions_.end())
               {
                 if (ec)
@@ -108,9 +133,9 @@ namespace manifold
                   std::cout << it->endpoint().address().to_string() << std::endl;
                   std::cout << it->endpoint().port() << std::endl;
                   non_tls_socket& sock = dynamic_cast<non_tls_socket&>(*sess_it->second.sock);
-                  ((asio::ip::tcp::socket&)sock).async_connect(*it, [this, socket_address](const std::error_code& ec)
+                  ((asio::ip::tcp::socket&)sock).async_connect(*it, [this, ep](const std::error_code& ec)
                   {
-                    auto sess_it = this->sessions_.find(socket_address);
+                    auto sess_it = this->sessions_.find(ep);
                     if (sess_it != this->sessions_.end())
                     {
                       if (ec)
@@ -120,7 +145,7 @@ namespace manifold
                       else
                       {
                         sess_it->second.conn = std::make_shared<v1_connection<request_head, response_head>>(std::move(dynamic_cast<non_tls_socket&>(*sess_it->second.sock)));
-                        sess_it->second.conn->on_close(std::bind(&user_agent::handle_connection_close, this, std::placeholders::_1, sess_it->second.ep.socket_address()));
+                        sess_it->second.conn->on_close(std::bind(&user_agent::handle_connection_close, this, std::placeholders::_1, ep));
                         sess_it->second.conn->run();
                         sess_it->second.process_pending_requests(std::error_code());
                       }
@@ -139,7 +164,7 @@ namespace manifold
       public:
         endpoint ep;
         std::shared_ptr<http::connection<request_head, response_head>> conn;
-        std::shared_ptr<socket> sock;
+        std::unique_ptr<socket> sock;
         std::queue<std::function<void(const std::error_code& connect_error, client::request&& req)>> pending_requests;
         std::queue<non_tls_socket> test;
 
@@ -172,11 +197,11 @@ namespace manifold
 
       asio::io_service& io_service_;
       asio::ip::tcp::resolver tcp_resolver_;
-      std::map<endpoint, session> sessions_;
+      std::unordered_map<endpoint, session> sessions_;
 
-      void handle_connection_close(errc ec, const std::string& sock_addr)
+      void handle_connection_close(errc ec, const endpoint& ep)
       {
-        this->sessions_.erase(sock_addr);
+        this->sessions_.erase(ep);
       }
 
 
