@@ -42,9 +42,7 @@ namespace manifold
       virtual ~v1_connection()
       {
         std::cout << "~v1_connection()" << std::endl;
-        this->close(errc::cancel);
-        if (this->socket_)
-          delete this->socket_;
+        this->socket_->close();
       }
 
       void run();
@@ -119,7 +117,7 @@ namespace manifold
         }
       };
 
-      socket* socket_;
+      std::unique_ptr<socket> socket_;
       bool closed_;
       std::array<char, 8192> recv_buffer_;
       //asio::streambuf recv_buffer_;

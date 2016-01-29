@@ -107,9 +107,9 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::run_timeout_loop(const std::error_code& ec)
     {
-      auto self = casted_shared_from_this();
-      if (!self->is_closed())
+      if (!this->is_closed())
       {
+        auto self = casted_shared_from_this();
         if (self->activity_deadline_timer_.expires_from_now() <= std::chrono::system_clock::duration(0))
           this->close(errc::internal_error);
         else

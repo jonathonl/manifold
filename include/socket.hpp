@@ -36,6 +36,7 @@ namespace manifold
     virtual void send(const char*const data, std::size_t data_sz, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
     virtual void send(const char*const data, std::size_t data_sz, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
     virtual void close() = 0;
+    virtual void reset() = 0;
     virtual bool is_encrypted() const = 0;
   };
   //================================================================//
@@ -57,6 +58,13 @@ namespace manifold
     {
       if (this->s_)
         delete this->s_;
+    }
+
+    void reset()
+    {
+      auto* new_sock = new asio::ip::tcp::socket(this->s_->get_io_service());
+      delete this->s_;
+      this->s_ = new_sock;
     }
 
 
@@ -88,13 +96,13 @@ namespace manifold
   {
   public:
     tls_socket(asio::io_service& ioservice, asio::ssl::context& ctx)
-      : s_(new asio::ssl::stream<asio::ip::tcp::socket>(ioservice, ctx))
+      : s_(new asio::ssl::stream<asio::ip::tcp::socket>(ioservice, ctx)), ssl_ctx_(ctx)
     {
       SSL_CTX_set_mode(ctx.native_handle(), SSL_MODE_AUTO_RETRY);
     }
 
     tls_socket(tls_socket&& source)
-      : s_(source.s_)
+      : s_(source.s_), ssl_ctx_(source.ssl_ctx_)
     {
       source.s_ = nullptr;
     }
@@ -103,6 +111,13 @@ namespace manifold
     {
       if (this->s_)
         delete this->s_;
+    }
+
+    void reset()
+    {
+      auto* new_sock = new asio::ssl::stream<asio::ip::tcp::socket>(this->s_->get_io_service(), this->ssl_ctx_);
+      delete this->s_;
+      this->s_ = new_sock;
     }
 
     asio::io_service& io_service() { return this->s_->get_io_service(); }
@@ -123,6 +138,7 @@ namespace manifold
     operator asio::ssl::stream<asio::ip::tcp::socket>& () { return *this->s_; }
   private:
     asio::ssl::stream<asio::ip::tcp::socket>* s_;
+    asio::ssl::context& ssl_ctx_;
     asio::streambuf recvline_buffer_;
 
     //void recvline(char* buf, std::size_t bufSize, std::size_t putPosition, char* bufEnd, std::function<void(const std::error_code& ec, std::size_t bytes_transferred)>&& cb, const std::string& delim);

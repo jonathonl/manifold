@@ -286,7 +286,7 @@ namespace manifold
       //----------------------------------------------------------------//
     private:
       //----------------------------------------------------------------//
-      socket* socket_;
+      std::unique_ptr<socket> socket_;
       // TODO: Make settings class.
       std::map<setting_code,std::uint32_t> peer_settings_;
       hpack::encoder hpack_encoder_;

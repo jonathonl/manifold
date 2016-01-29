@@ -9,10 +9,8 @@
 #include "asio.hpp"
 #include "http_server.hpp"
 #include "http_client.hpp"
-#include "user_agent.hpp"
 #include "http_router.hpp"
 #include "hpack.hpp"
-#include "user_agent.hpp"
 #include "http_file_transfer.hpp"
 
 
@@ -62,6 +60,9 @@ int main()
   std::tie(first, second, third) = return_move_only();
 
   asio::io_service ioservice;
+  asio::ssl::context client_ssl_ctx(asio::ssl::context::tlsv12);
+  asio::ssl::context server_ssl_ctx(asio::ssl::context::tlsv12);
+
 //  http::user_agent ua(ioservice);
 //  auto r = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
 //  r.on_response([](http::client::response&& resp)
@@ -229,7 +230,7 @@ int main()
   });
 
 
-  auto ops = http::server::ssl_options(asio::ssl::context::method::sslv23);
+//  auto ops = http::server::ssl_options(asio::ssl::context::method::sslv23);
 //  {
 //    std::ifstream ifs("/Users/jonathonl/Developer/certs/server.key");
 //    if (ifs.good())
@@ -246,189 +247,203 @@ int main()
 //      ops.ca.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 //  }
 
+  std::vector<char> chain;
+  std::vector<char> key;
+  std::vector<char> dhparam;
   {
     std::ifstream ifs("tests/certs/server.crt");
     if (ifs.good())
-      ops.chain.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+      chain.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
   }
   {
     std::ifstream ifs("tests/certs/server.key");
     if (ifs.good())
-      ops.key.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+      key.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
   }
   {
     std::ifstream ifs("tests/certs/dh2048.pem");
     if (ifs.good())
-      ops.dhparam.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+      dhparam.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
   }
 
-  http::server srv(ioservice, 8080, "0.0.0.0");
+  server_ssl_ctx.use_certificate_chain(asio::buffer(chain.data(), chain.size()));
+  server_ssl_ctx.use_private_key(asio::buffer(key.data(), key.size()), asio::ssl::context::pem);
+  server_ssl_ctx.use_tmp_dh(asio::buffer(dhparam.data(), dhparam.size()));
+
+  http::server srv(ioservice, 8080);
   srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
 
   //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
   //ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
   //----------------------------------------------------------------//
 
-  http::user_agent agnt(ioservice);
+  http::client agnt(ioservice, client_ssl_ctx);
 
-  if (false)
+  if (true)
   {
     //----------------------------------------------------------------//
     // Client to Local Server Test
     //
-    agnt.make_request(http::endpoint(false, "127.0.0.1", 8080), [](const std::error_code& ec, http::client::request&& req)
+    agnt.make_request("localhost", 8080, [](const std::error_code& ec, http::client::request&& req)
     {
-      req.head() = http::request_head("/foobar", http::method::post,
+      if (ec)
+      {
+        std::cout << ec.message() << std::endl;
+      }
+      else
+      {
+        req.head() = http::request_head("/foobar", http::method::post,
+          {
+            {"content-type", "application/x-www-form-urlencoded"}
+          });
+
+        req.on_response([](http::client::response&& resp)
         {
-          {"content-type","application/x-www-form-urlencoded"}
+          for (auto it : resp.head().raw_headers())
+            std::cout << it.first << ": " << it.second << std::endl;
+
+          if (!resp.head().has_successful_status())
+          {
+            resp.close();
+          }
+          else
+          {
+            auto response_data = std::make_shared<std::stringstream>("");
+            resp.on_data([response_data](const char* const data, std::size_t datasz)
+            {
+              response_data->write(data, datasz);
+            });
+
+            resp.on_end([response_data]()
+            {
+              if (response_data->rdbuf()->in_avail())
+                std::cout << response_data->rdbuf() << std::endl;
+            });
+          }
         });
 
-      req.on_response([](http::client::response && resp)
-      {
-        for (auto it : resp.head().raw_headers())
-          std::cout << it.first << ": " << it.second << std::endl;
+        req.on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req.stream_id()));
 
-        if (!resp.head().has_successful_status())
+        req.on_close([](http::errc e)
         {
-          resp.close();
-        }
-        else
-        {
-          auto response_data = std::make_shared<std::stringstream>("");
-          resp.on_data([response_data](const char *const data, std::size_t datasz)
-          {
-            response_data->write(data, datasz);
-          });
+          std::cout << "on_close called on client" << std::endl;
+        });
 
-          resp.on_end([response_data]()
-          {
-            if (response_data->rdbuf()->in_avail())
-              std::cout << response_data->rdbuf() << std::endl;
-          });
-        }
-      });
-
-      req.on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req.stream_id()));
-
-      req.on_close([](http::errc e)
-      {
-        std::cout << "on_close called on client" << std::endl;
-      });
-
-      req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
-      req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
-      req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
-      req.end(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
+        req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
+        req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
+        req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
+        req.end(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
+      }
     });
     //----------------------------------------------------------------//
   }
 
 
-  //----------------------------------------------------------------//
-  // Client to Google Test
-  //
-  else if (true)
-  {
-    http::client c2(ioservice, "www.google.com", http::client::ssl_options());
-    c2.on_connect([&c2]()
-    {
-      if (true)
-      {
-        auto request = std::make_shared<http::client::request>(c2.make_request());
-
-        request->on_response([request, &c2](http::client::response && resp)
-        {
-          std::cout << resp.head().status_code() << std::endl;
-          for (auto it : resp.head().raw_headers())
-            std::cout << it.first << ": " << it.second << std::endl;
-
-          auto response = std::make_shared<http::client::response>(std::move(resp));
-
-
-          response->on_data([](const char *const data, std::size_t datasz)
-          {
-            std::cout << std::string(data, datasz);
-          });
-
-          response->on_end([]()
-          {
-            std::cout << std::endl << "DONE" << std::endl;
-          });
-        });
-
-        request->on_close([&c2](http::errc error_code)
-        {
-          std::cout << "client request on_close: " << error_code << std::endl;
-        });
-
-        request->head().header("connection","keep-alive");
-        request->end();
-
-//        request->head().path("/foobar");
-//        request->head().method(http::method::post);
-//        request->head().header("content-type","application/x-www-form-urlencoded");
-//        request->head().header("accept","text/html,application/json,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-//        request->end("name=value&name2=value2");
-
-
-      }
-
-      if (false)
-      {
-        auto req2(c2.make_request());
-
-
-        auto req_ptr = std::make_shared<http::client::request>(std::move(req2));
-
-        // Create file stream for response.
-        auto ofs = std::make_shared<std::ofstream>("./reponse_file.txt.tmp");
-
-        // Set on response handler.
-        req_ptr->on_response([&ofs, req_ptr](http::client::response &&res)
-        {
-          auto res_ptr = std::make_shared<http::client::response>(std::move(res));
-
-          if (res.head().status_code() != 200)
-          {
-            req_ptr->close();
-          }
-          else
-          {
-            // Write response data to file.
-            res_ptr->on_data([ofs](const char *const data, std::size_t datasz)
-            {
-              ofs->write(data, datasz);
-            });
-
-            // Close and rename file when done.
-            res_ptr->on_end([ofs]()
-            {
-              ofs->close();
-              std::rename("./response_file.txt.tmp","./resonse_file.txt");
-            });
-          }
-        });
-
-        //
-        req_ptr->on_close([ofs](http::errc ec)
-        {
-          ofs->close();
-          std::remove("./response_file.txt.tmp");
-        });
-
-        req_ptr->on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req_ptr->stream_id()));
-
-        req_ptr->end();
-      }
-    });
-
-    c2.on_close([](http::errc ec)
-    {
-      std::cerr << ec << std::endl;
-    });
-    ioservice.run();
-  }
-  //----------------------------------------------------------------//
+//  //----------------------------------------------------------------//
+//  // Client to Google Test
+//  //
+//  else if (false)
+//  {
+//    http::client c2(ioservice, "www.google.com", http::client::ssl_options());
+//    c2.on_connect([&c2]()
+//    {
+//      if (true)
+//      {
+//        auto request = std::make_shared<http::client::request>(c2.make_request());
+//
+//        request->on_response([request, &c2](http::client::response && resp)
+//        {
+//          std::cout << resp.head().status_code() << std::endl;
+//          for (auto it : resp.head().raw_headers())
+//            std::cout << it.first << ": " << it.second << std::endl;
+//
+//          auto response = std::make_shared<http::client::response>(std::move(resp));
+//
+//
+//          response->on_data([](const char *const data, std::size_t datasz)
+//          {
+//            std::cout << std::string(data, datasz);
+//          });
+//
+//          response->on_end([]()
+//          {
+//            std::cout << std::endl << "DONE" << std::endl;
+//          });
+//        });
+//
+//        request->on_close([&c2](http::errc error_code)
+//        {
+//          std::cout << "client request on_close: " << error_code << std::endl;
+//        });
+//
+//        request->head().header("connection","keep-alive");
+//        request->end();
+//
+////        request->head().path("/foobar");
+////        request->head().method(http::method::post);
+////        request->head().header("content-type","application/x-www-form-urlencoded");
+////        request->head().header("accept","text/html,application/json,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+////        request->end("name=value&name2=value2");
+//
+//
+//      }
+//
+//      if (false)
+//      {
+//        auto req2(c2.make_request());
+//
+//
+//        auto req_ptr = std::make_shared<http::client::request>(std::move(req2));
+//
+//        // Create file stream for response.
+//        auto ofs = std::make_shared<std::ofstream>("./reponse_file.txt.tmp");
+//
+//        // Set on response handler.
+//        req_ptr->on_response([&ofs, req_ptr](http::client::response &&res)
+//        {
+//          auto res_ptr = std::make_shared<http::client::response>(std::move(res));
+//
+//          if (res.head().status_code() != 200)
+//          {
+//            req_ptr->close();
+//          }
+//          else
+//          {
+//            // Write response data to file.
+//            res_ptr->on_data([ofs](const char *const data, std::size_t datasz)
+//            {
+//              ofs->write(data, datasz);
+//            });
+//
+//            // Close and rename file when done.
+//            res_ptr->on_end([ofs]()
+//            {
+//              ofs->close();
+//              std::rename("./response_file.txt.tmp","./resonse_file.txt");
+//            });
+//          }
+//        });
+//
+//        //
+//        req_ptr->on_close([ofs](http::errc ec)
+//        {
+//          ofs->close();
+//          std::remove("./response_file.txt.tmp");
+//        });
+//
+//        req_ptr->on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req_ptr->stream_id()));
+//
+//        req_ptr->end();
+//      }
+//    });
+//
+//    c2.on_close([](http::errc ec)
+//    {
+//      std::cerr << ec << std::endl;
+//    });
+//    ioservice.run();
+//  }
+//  //----------------------------------------------------------------//
 
   ioservice.run();
 }

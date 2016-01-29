@@ -43,14 +43,16 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void message<SendMsg,RecvMsg>::close(http::errc error_code)
     {
-      this->connection_->send_reset_stream(this->stream_id_, error_code);
+      if (this->connection_)
+        this->connection_->send_reset_stream(this->stream_id_, error_code);
     }
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     void message<SendMsg,RecvMsg>::on_close(const std::function<void(errc ec)>& cb)
     {
-      this->connection_->on_close(this->stream_id_, cb);
+      if (this->connection_)
+        this->connection_->on_close(this->stream_id_, cb);
     }
     //----------------------------------------------------------------//
 

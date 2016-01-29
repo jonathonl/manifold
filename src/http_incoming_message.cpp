@@ -14,10 +14,13 @@ namespace manifold
     incoming_message<SendMsg, RecvMsg>::incoming_message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::int32_t stream_id)
       : message<SendMsg, RecvMsg>(conn, stream_id)
     {
-      this->connection_->on_trailers(this->stream_id_, [this](header_block&& trailers)
+      if (this->connection_)
       {
-        this->trailers_ = std::move(trailers);
-      });
+        this->connection_->on_trailers(this->stream_id_, [this](header_block&& trailers)
+        {
+          this->trailers_ = std::move(trailers);
+        });
+      }
     }
     //----------------------------------------------------------------//
 
@@ -26,10 +29,13 @@ namespace manifold
     incoming_message<SendMsg, RecvMsg>::incoming_message(incoming_message&& source)
       : message<SendMsg, RecvMsg>(std::move(source)), trailers_(std::move(source.trailers_))
     {
-      this->connection_->on_trailers(this->stream_id_, [this](header_block&& trailers)
+      if (this->connection_)
       {
-        this->trailers_ = std::move(trailers);
-      });
+        this->connection_->on_trailers(this->stream_id_, [this](header_block&& trailers)
+        {
+          this->trailers_ = std::move(trailers);
+        });
+      }
     }
     //----------------------------------------------------------------//
 
@@ -46,7 +52,8 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void incoming_message<SendMsg, RecvMsg>::on_data(const std::function<void(const char*const buff, std::size_t buff_size)>& fn)
     {
-      this->connection_->on_data(this->stream_id_, fn);
+      if (this->connection_)
+        this->connection_->on_data(this->stream_id_, fn);
     }
     //----------------------------------------------------------------//
 
@@ -54,7 +61,8 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void incoming_message<SendMsg, RecvMsg>::on_end(const std::function<void()>& fn)
     {
-      this->connection_->on_end(this->stream_id_, fn);
+      if (this->connection_)
+        this->connection_->on_end(this->stream_id_, fn);
     }
     //----------------------------------------------------------------//
 

@@ -33,19 +33,19 @@ namespace manifold
     //----------------------------------------------------------------------//
 
     //----------------------------------------------------------------------//
-    error_category_t::error_category_t(): std::error_category()
+    error_category_impl::error_category_impl(): std::error_category()
     {
     }
     //----------------------------------------------------------------------//
 
     //----------------------------------------------------------------------//
-    error_category_t::~error_category_t()
+    error_category_impl::~error_category_impl()
     {
     }
     //----------------------------------------------------------------------//
 
     //----------------------------------------------------------------------//
-    const char* error_category_t::name() const noexcept
+    const char* error_category_impl::name() const noexcept
     {
       return "http";
     }
@@ -79,7 +79,7 @@ namespace manifold
 //    //----------------------------------------------------------------------//
 
     //----------------------------------------------------------------------//
-    std::string error_category_t::message(int ev) const
+    std::string error_category_impl::message(int ev) const
     {
       switch (ev)
       {

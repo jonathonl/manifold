@@ -35,8 +35,7 @@ set(HEADER_FILES
     include/http_v2_request_head.hpp
     include/http_message_head.hpp
     include/http_v1_response_head.hpp
-    include/http_file_transfer.hpp
-    include/user_agent.hpp)
+    include/http_file_transfer.hpp)
 
 set(SOURCE_FILES
     src/socket.cpp
@@ -62,8 +61,7 @@ set(SOURCE_FILES
     src/http_v2_request_head.cpp
     src/http_v1_request_head.cpp
     src/http_message_head.cpp
-    src/http_file_transfer.cpp
-    src/user_agent.cpp)
+    src/http_file_transfer.cpp)
 
 add_library(manifold SHARED ${SOURCE_FILES} ${HEADER_FILES})
 #target_link_libraries(manifold libssl.dylib)

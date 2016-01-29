@@ -185,7 +185,8 @@ namespace manifold
   //----------------------------------------------------------------//
   void non_tls_socket::close()
   {
-    this->s_->close();
+    std::error_code ec;
+    this->s_->close(ec);
   }
   //----------------------------------------------------------------//
 
@@ -357,7 +358,8 @@ namespace manifold
   //----------------------------------------------------------------//
   void tls_socket::close()
   {
-    this->s_->next_layer().close();
+    std::error_code ec;
+    this->s_->next_layer().close(ec);
   }
   //----------------------------------------------------------------//
 

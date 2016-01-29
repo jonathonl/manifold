@@ -6,7 +6,7 @@
 #include <string>
 #include <system_error>
 
-#define _MSC_VER 1800
+//#define _MSC_VER 1800
 #ifdef _MSC_VER
 #if (_MSC_VER < 1900)
 #define MANIFOLD_DISABLE_HTTP2
@@ -54,11 +54,11 @@ namespace manifold
   {
     //**********************************************************************//
     // custom category:
-    class error_category_t : public std::error_category
+    class error_category_impl : public std::error_category
     {
     public:
-      error_category_t();
-      ~error_category_t();
+      error_category_impl();
+      ~error_category_impl();
       //----------------------------------------------------------------------//
       const char* name() const noexcept;
       //std::error_condition default_error_condition (int ev) const noexcept;
@@ -67,7 +67,7 @@ namespace manifold
       //----------------------------------------------------------------------//
     };
     //**********************************************************************//
-    const error_category_t error_category_object;
+    const error_category_impl error_category_object;
     //const error_category_t& error_category();
 
     std::error_code make_error_code(manifold::http::errc e);

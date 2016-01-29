@@ -179,10 +179,7 @@ namespace manifold
     {
       std::cout << "~v2_connection()" << std::endl;
 
-      this->close(errc::cancel);
-
-      if (this->socket_)
-        delete this->socket_;
+      this->socket_->close();
     }
     //----------------------------------------------------------------//
 

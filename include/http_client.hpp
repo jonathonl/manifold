@@ -56,7 +56,90 @@ namespace manifold
 {
   namespace http
   {
+    class endpoint;
 
+    class non_tls_session;
+
+    class tls_session;
+  }
+}
+
+namespace std
+{
+  template <>
+  struct hash<manifold::http::endpoint>
+  {
+  public:
+    size_t operator()(const manifold::http::endpoint& ep) const;
+  };
+}
+
+namespace manifold
+{
+  namespace http
+  {
+    //================================================================//
+    class client
+    {
+    public:
+      //================================================================//
+      class response : public incoming_message<request_head, response_head>
+      {
+      public:
+        response(response_head&& head, const std::shared_ptr<http::connection<request_head, response_head>>& conn, std::uint32_t stream_id);
+        response(response&& source);
+        ~response();
+
+        const response_head& head() const;
+      private:
+        response_head head_;
+      protected:
+        response_head& message_head() { return this->head_; }
+      };
+      //================================================================//
+
+      //================================================================//
+      class request : public outgoing_message<request_head, response_head>
+      {
+      public:
+        request(request_head&& head, const std::shared_ptr<http::connection<request_head, response_head>>& conn, std::uint32_t stream_id, const std::string& server_authority);
+        request(request&& source);
+        ~request();
+
+        request_head& head();
+
+        bool send_headers(bool end_stream = false);
+
+        void on_push_promise(const std::function<void(http::client::request && request)>& cb);
+        void on_response(const std::function<void(http::client::response && resp)>& cb);
+        void on_informational_headers(const std::function<void(response_head&& resp_head)>& cb);
+      private:
+        request_head head_;
+        std::string server_authority_;
+      protected:
+        request_head& message_head() { return this->head_; }
+      };
+      //================================================================//
+
+      client(asio::io_service& ioservice, asio::ssl::context& ctx);
+      ~client();
+
+      void shutdown();
+      void make_request(const std::string& host, std::uint16_t port, const std::function<void(const std::error_code& connect_error, request&& req)>& cb);
+      void make_secure_request(const std::string& host, std::uint16_t port, const std::function<void(const std::error_code& connect_error, request&& req)>& cb);
+    private:
+      asio::io_service& io_service_;
+      asio::ssl::context& ssl_ctx_;
+      asio::ip::tcp::resolver tcp_resolver_;
+      std::unordered_multimap<endpoint,std::shared_ptr<non_tls_session>> non_tls_sessions_;
+      std::unordered_multimap<endpoint,std::shared_ptr<tls_session>> tls_sessions_;
+
+      void handle_non_tls_session_close(const std::error_code& ec, const std::shared_ptr<non_tls_session>& sess);
+      void handle_tls_session_close(const std::error_code& ec, const std::shared_ptr<tls_session>& sess);
+    };
+    //================================================================//
+
+#if 0 // OLD CLIENT
     class client_impl;
 
     //================================================================//
@@ -216,6 +299,7 @@ namespace manifold
       std::shared_ptr<client_impl> impl_;
     };
     //================================================================//
+#endif
   }
 }
 
