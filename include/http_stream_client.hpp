@@ -41,12 +41,20 @@ namespace manifold
       stream_client(client& c);
       ~stream_client();
 
-      promise send_request(const std::string& method, const uri& request_url, std::ostream& res_entity, std::uint8_t max_redirects = 5);
-      promise send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::ostream& res_entity, std::uint8_t max_redirects = 5);
-      promise send_request(const std::string& method, const uri& request_url, std::istream& req_entity, std::ostream& res_entity, std::uint8_t max_redirects = 5);
-      promise send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::istream& req_entity, std::ostream& res_entity, std::uint8_t max_redirects = 5);
+      promise send_request(const std::string& method, const uri& request_url, std::ostream& res_entity);
+      promise send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::ostream& res_entity);
+      promise send_request(const std::string& method, const uri& request_url, std::istream& req_entity, std::ostream& res_entity);
+      promise send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::istream& req_entity, std::ostream& res_entity);
+
+      void reset_max_redirects(std::uint8_t value = 5);
     private:
       client& client_;
+      std::uint8_t max_redirects_;
+
+      promise send_request(const std::string& method, const uri& request_url, std::ostream& res_entity, std::uint8_t max_redirects);
+      promise send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::ostream& res_entity, std::uint8_t max_redirects);
+      promise send_request(const std::string& method, const uri& request_url, std::istream& req_entity, std::ostream& res_entity, std::uint8_t max_redirects);
+      promise send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::istream& req_entity, std::ostream& res_entity, std::uint8_t max_redirects);
 
       void handle_request(const std::error_code& ec, client::request&& req, const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::istream* req_entity, std::ostream* resp_entity, std::uint8_t max_redirects, const std::shared_ptr<promise_impl>& prom);
     };

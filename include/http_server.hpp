@@ -138,6 +138,20 @@ namespace manifold
         return std::string(&buf[0]);
       }
       //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      static std::string date_string(time_t& t)
+      {
+        const int RFC1123_TIME_LEN = 29;
+        struct tm* tm;
+        char buf[RFC1123_TIME_LEN+1] = {'\0'};
+
+        tm = std::gmtime(&t);
+
+        strftime(buf, RFC1123_TIME_LEN+1, "%a, %d %b %Y %H:%M:%S GMT", tm);
+        return std::string(&buf[0]);
+      }
+      //----------------------------------------------------------------//
     private:
       std::shared_ptr<class server_impl> impl_;
     };

@@ -14,6 +14,11 @@ namespace manifold
 {
   namespace http
   {
+    enum class authentication
+    {
+      basic = 0
+    };
+
     class document_root
     {
     public:
@@ -37,24 +42,62 @@ namespace manifold
 
     class file_transfer_client
     {
+    public:
+      struct statistics
+      {
+        bool file_size_known;
+        std::uint64_t file_size;
+        std::string mime_type;
+        std::string modification_date;
+        // TODO: cache expire
+      };
     private:
-      class download_promise_impl
+      class base_promise_impl
+      {
+      public:
+        void cancel();
+        void on_cancel(const std::function<void()>& fn);
+      private:
+        bool cancelled_ = false;
+        std::function<void()> on_cancel_;
+      };
+
+      class download_promise_impl : public base_promise_impl
       {
       public:
         void fulfill(const std::error_code& ec, const std::string& local_file_path);
-        void cancel();
         void on_complete(const std::function<void(const std::error_code& ec, const std::string& local_file_path)>& fn);
-        void on_cancel(const std::function<void()>& fn);
       private:
         bool fulfilled_ = false;
-        bool cancelled_ = false;
-        std::function<void(const std::error_code& ec, const response_head& headers)> on_complete_;
-        std::function<void()> on_cancel_;
+        std::function<void(const std::error_code&, const std::string&)> on_complete_;
+        std::string local_file_path_;
         std::error_code ec_;
-        response_head headers_;
+      };
+
+      class upload_promise_impl : public base_promise_impl
+      {
+      public:
+        void fulfill(const std::error_code& ec);
+        void on_complete(const std::function<void(const std::error_code& ec)>& fn);
+      private:
+        bool fulfilled_ = false;
+        std::function<void(const std::error_code&)> on_complete_;
+        std::error_code ec_;
+      };
+
+      class remote_stat_promise_impl : public base_promise_impl
+      {
+      public:
+        void fulfill(const std::error_code& ec, const statistics& stats);
+        void on_complete(const std::function<void(const std::error_code& ec, const statistics& stats)>& fn);
+      private:
+        bool fulfilled_ = false;
+        std::function<void(const std::error_code&, const statistics&)> on_complete_;
+        statistics stats_;
+        std::error_code ec_;
       };
     public:
-      file_transfer_client(client& c);
+      file_transfer_client(stream_client& c);
 
       class download_promise
       {
@@ -68,17 +111,40 @@ namespace manifold
 
       class upload_promise
       {
+      public:
+        upload_promise(const std::shared_ptr<upload_promise_impl>& impl);
+        void on_complete(const std::function<void(const std::error_code& ec)>& fn);
+        void cancel();
+      private:
+        std::shared_ptr<upload_promise_impl> impl_;
       };
 
       class remote_stat_promise
       {
+      public:
+        remote_stat_promise(const std::shared_ptr<remote_stat_promise_impl>& impl);
+        void on_complete(const std::function<void(const std::error_code& ec, const statistics& stats)>& fn);
+        void cancel();
+      private:
+        std::shared_ptr<remote_stat_promise_impl> impl_;
       };
 
-      download_promise download_file(const uri& remote_source, const std::string& local_destination, bool replace_existing_file = false);
-      download_promise upload_file(const std::string& local_source, const uri& remote_destination);
-      remote_stat_promise stat_remote_file(const std::string& remote_file);
+
+
+      struct options
+      {
+        bool replace_existing_file = false; // Download only.
+        authentication auth_type = authentication::basic;
+      };
+
+      download_promise download_file(const uri& remote_source, const std::string& local_destination);
+      download_promise download_file(const uri& remote_source, const std::string& local_destination, options ops);
+      upload_promise upload_file(const std::string& local_source, const uri& remote_destination);
+      upload_promise upload_file(const std::string& local_source, const uri& remote_destination, options ops);
+      remote_stat_promise stat_remote_file(const uri& remote_file);
+      remote_stat_promise stat_remote_file(const uri& remote_file, options ops);
     private:
-      stream_client stream_client_;
+      stream_client& stream_client_;
       std::mt19937 rng_;
     };
 

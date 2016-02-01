@@ -69,11 +69,37 @@ namespace manifold
     stream_client::stream_client(client& c)
       : client_(c)
     {
+      this->reset_max_redirects();
     }
 
     stream_client::~stream_client()
     {
 
+    }
+
+    void stream_client::reset_max_redirects(std::uint8_t value)
+    {
+      this->max_redirects_ = value;
+    }
+
+    stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, std::ostream& res_entity)
+    {
+      return send_request(method, request_url, res_entity, max_redirects_);
+    }
+
+    stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::ostream& res_entity)
+    {
+      return send_request(method, request_url, header_list, res_entity, max_redirects_);
+    }
+
+    stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, std::istream& req_entity, std::ostream& res_entity)
+    {
+      return send_request(method, request_url, req_entity, res_entity, max_redirects_);
+    }
+
+    stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::istream& req_entity, std::ostream& res_entity)
+    {
+      return send_request(method, request_url, header_list, req_entity, res_entity, max_redirects_);
     }
 
     void stream_client::handle_request(const std::error_code& ec, client::request&& tmp_req, const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::istream* req_entity, std::ostream* resp_entity, std::uint8_t max_redirects, const std::shared_ptr<promise_impl>& prom)

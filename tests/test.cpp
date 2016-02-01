@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <tuple>
 #include <thread>
+#include <future>
 
 #include "asio.hpp"
 #include "http_server.hpp"
@@ -12,6 +13,7 @@
 #include "http_router.hpp"
 #include "hpack.hpp"
 #include "http_file_transfer.hpp"
+
 
 
 
@@ -277,17 +279,20 @@ int main()
   //ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
   //----------------------------------------------------------------//
 
-  http::client agnt(ioservice, client_ssl_ctx);
-  http::stream_client stream_agnt(agnt);
-
   if (true)
   {
     //----------------------------------------------------------------//
     // Client to Local Server Test
     //
-    auto get_resp_entity = std::make_shared<std::stringstream>();
-    auto get = stream_agnt.send_request("GET", uri("http://localhost:8080/redirect-url?query"), *get_resp_entity);
-    get.on_complete([get_resp_entity](const std::error_code& ec, const http::response_head& headers)
+
+    http::client agnt(ioservice, client_ssl_ctx);
+    http::stream_client stream_agnt(agnt);
+    http::file_transfer_client file_transfer_agnt(stream_agnt);
+
+
+    http::file_transfer_client::options ops;
+    ops.replace_existing_file = true;
+    file_transfer_agnt.upload_file("./my_local_file.txt", uri("http://user:password@localhost:8080/files/uploaded_file.txt")).on_complete([&file_transfer_agnt](const std::error_code& ec)
     {
       if (ec)
       {
@@ -295,10 +300,35 @@ int main()
       }
       else
       {
-        std::cout << "status: " << headers.status_code() << std::endl;
-        std::cout << get_resp_entity->str() << std::endl;
+        std::cout << "PUT SUCCEEDED" << std::endl;
       }
     });
+
+    file_transfer_agnt.stat_remote_file(uri("http://user:password@localhost:8080/files/uploaded_file.txt")).on_complete([&file_transfer_agnt](const std::error_code& ec, const http::file_transfer_client::statistics& stats)
+    {
+      if (ec)
+      {
+        std::cout << ec.message() << std::endl;
+      }
+      else
+      {
+        std::cout << "HEAD SUCCEEDED" << std::endl;
+      }
+    });
+
+    file_transfer_agnt.download_file(uri("http://user:password@localhost:8080/files/uploaded_file.txt"), "./").on_complete([](const std::error_code& ec, const std::string& file_path)
+    {
+      if (ec)
+      {
+        std::cout << ec.message() << std::endl;
+      }
+      else
+      {
+        std::cout << "GET SUCCEEDED" << std::endl;
+      }
+    });
+
+    ioservice.run();
 
     auto post_data = std::make_shared<std::stringstream>("name=value&foo=bar");
     auto post_resp_entity = std::make_shared<std::stringstream>();

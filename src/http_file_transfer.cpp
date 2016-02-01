@@ -2,6 +2,7 @@
 #include "http_file_transfer.hpp"
 
 #include <chrono>
+#include <iomanip>
 
 namespace manifold
 {
@@ -103,24 +104,24 @@ namespace manifold
     //================================================================//
 
     //================================================================//
-    // TODO: make real uuids.
+    // xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    const std::uint64_t y[4] = {0x8000000000000000, 0x9000000000000000, 0xa000000000000000, 0xb000000000000000};
+
     template<typename Rng>
     std::array<std::uint64_t, 2> gen_uuid(Rng& rng)
     {
       std::array<std::uint64_t, 2> ret;
 
-      std::uint32_t tmp;
-      tmp = rng();
-      ret[0] = tmp;
-      ret[0] = ret[0] << 32;
-      tmp = rng();
-      ret[0] |= tmp;
+      std::uint32_t r32 = (std::uint32_t)rng();
 
-      tmp = rng();
-      ret[1] = tmp;
-      ret[1] = ret[1] << 32;
-      tmp = rng();
-      ret[1] |= tmp;
+      std::uint64_t r64_1 = rng();
+      r64_1 = r64_1 << 32;
+
+      std::uint64_t r64_2 = rng();
+      r64_2 = r64_2 << 32;
+
+      ret[0] = (0xFFFFFFFFFFFF0FFF & (r64_1 | rng())) | 0x4000;
+      ret[1] = ((0x0FFFFFFF00000000 & (r64_2 | rng())) | r32) | y[0x03 & r32]; // Should be using a separate rand call to choose index, but this is faster.
 
       return ret;
     }
@@ -128,10 +129,20 @@ namespace manifold
     template<typename Rng>
     std::string gen_uuid_str(Rng& rng)
     {
-      std::stringstream ss;
       std::array<std::uint64_t, 2> tmp = gen_uuid(rng);
-      ss << tmp[0] << tmp[1];
-      return ss.str();
+      std::stringstream ret;
+      ret << std::hex << std::setfill('0');
+      ret << std::setw(8) << (0xFFFFFFFF & (tmp[0] >> 32));
+      ret << "-";
+      ret << std::setw(4) << (0xFFFF & (tmp[0] >> 16));
+      ret << "-";
+      ret << std::setw(4) << (0xFFFF & tmp[0]);
+      ret << "-";
+      ret << std::setw(4) << (0xFFFF & tmp[1] >> 48);
+      ret << "-";
+      ret << std::setw(12) << (0xFFFFFFFFFFFF & tmp[1]);
+      std::cout << ret.str() << std::endl;
+      return ret.str();
     }
     //================================================================//
 
@@ -242,6 +253,12 @@ namespace manifold
         res.head().header("content-length", std::to_string(st.st_size));
         std::string content_type(content_type_from_extension(extension(file_path)));
         res.head().header("content-type", content_type.size() ? content_type : "application/octet-stream");
+#if defined(__APPLE__)
+        res.head().header("last-modified", server::date_string(st.st_mtimespec.tv_sec));
+#else
+        res.head().header("last-modified", server::date_string(st.st_mtime));
+#endif
+
         res.end();
       }
     }
@@ -268,6 +285,11 @@ namespace manifold
           res_ptr->head().header("content-length", std::to_string(st.st_size));
           std::string content_type(content_type_from_extension(extension(file_path)));
           res_ptr->head().header("content-type", content_type.size() ? content_type : "application/octet-stream");
+#if defined(__APPLE__)
+          res_ptr->head().header("last-modified", server::date_string(st.st_mtimespec.tv_sec));
+#else
+          res_ptr->head().header("last-modified", server::date_string(st.st_mtime));
+#endif
 
           std::array<char, 4096> buf;
           long bytes_in_buf = ifs->read(buf.data(), buf.size()).gcount();
@@ -362,15 +384,167 @@ namespace manifold
     //================================================================//
 
     //================================================================//
-    file_transfer_client::file_transfer_client(client& c)
-      : stream_client_(c)
+    void file_transfer_client::base_promise_impl::cancel()
     {
-      this->rng_.seed(std::chrono::system_clock::now().time_since_epoch().count());
+      if (!cancelled_)
+      {
+        cancelled_ = true;
+
+        on_cancel_ ? on_cancel_() : void();
+        on_cancel_ = nullptr;
+      }
     }
 
-    file_transfer_client::download_promise file_transfer_client::download_file(const uri& remote_source, const std::string& local_destination, bool replace_existing_file)
+    void file_transfer_client::base_promise_impl::on_cancel(const std::function<void()>& fn)
     {
-      download_promise_impl dl_prom;
+      if (cancelled_)
+        fn ? fn() : void();
+      else
+        on_cancel_ = fn;
+    }
+    //================================================================//
+
+    //================================================================//
+    void file_transfer_client::download_promise_impl::fulfill(const std::error_code& ec, const std::string& local_file_path)
+    {
+      if (!fulfilled_)
+      {
+        fulfilled_ = true;
+
+        ec_ = ec;
+        local_file_path_ = local_file_path;
+
+        on_complete_ ? on_complete_(ec_, local_file_path_) : void();
+        on_complete_ = nullptr;
+      }
+    }
+
+    void file_transfer_client::download_promise_impl::on_complete(const std::function<void(const std::error_code&, const std::string&)>& fn)
+    {
+      if (fulfilled_)
+        fn ? fn(ec_, local_file_path_) : void();
+      else
+        on_complete_ = fn;
+    }
+    //================================================================//
+
+    //================================================================//
+    void file_transfer_client::upload_promise_impl::fulfill(const std::error_code& ec)
+    {
+      if (!fulfilled_)
+      {
+        fulfilled_ = true;
+
+        ec_ = ec;
+
+        on_complete_ ? on_complete_(ec_) : void();
+        on_complete_ = nullptr;
+      }
+    }
+
+    void file_transfer_client::upload_promise_impl::on_complete(const std::function<void(const std::error_code& ec)>& fn)
+    {
+      if (fulfilled_)
+        fn ? fn(ec_) : void();
+      else
+        on_complete_ = fn;
+    }
+    //================================================================//
+
+    //================================================================//
+    void file_transfer_client::remote_stat_promise_impl::fulfill(const std::error_code& ec, const statistics& stats)
+    {
+      if (!fulfilled_)
+      {
+        fulfilled_ = true;
+
+        ec_ = ec;
+        stats_ = stats;
+
+        on_complete_ ? on_complete_(ec_, stats_) : void();
+        on_complete_ = nullptr;
+      }
+    }
+
+    void file_transfer_client::remote_stat_promise_impl::on_complete(const std::function<void(const std::error_code&, const statistics&)>& fn)
+    {
+      if (fulfilled_)
+        fn ? fn(ec_, stats_) : void();
+      else
+        on_complete_ = fn;
+    }
+    //================================================================//
+
+    //================================================================//
+    file_transfer_client::download_promise::download_promise(const std::shared_ptr<download_promise_impl>& impl)
+      : impl_(impl)
+    {
+    }
+
+    void file_transfer_client::download_promise::on_complete(const std::function<void(const std::error_code&, const std::string&)>& fn)
+    {
+      this->impl_->on_complete(fn);
+    }
+
+    void file_transfer_client::download_promise::cancel()
+    {
+      this->impl_->cancel();
+    }
+    //================================================================//
+
+    //================================================================//
+    file_transfer_client::upload_promise::upload_promise(const std::shared_ptr<upload_promise_impl>& impl)
+      : impl_(impl)
+    {
+    }
+
+    void file_transfer_client::upload_promise::on_complete(const std::function<void(const std::error_code&)>& fn)
+    {
+      this->impl_->on_complete(fn);
+    }
+
+    void file_transfer_client::upload_promise::cancel()
+    {
+      this->impl_->cancel();
+    }
+    //================================================================//
+
+    //================================================================//
+    file_transfer_client::remote_stat_promise::remote_stat_promise(const std::shared_ptr<remote_stat_promise_impl>& impl)
+      : impl_(impl)
+    {
+    }
+
+    void file_transfer_client::remote_stat_promise::on_complete(const std::function<void(const std::error_code&, const file_transfer_client::statistics&)>& fn)
+    {
+      this->impl_->on_complete(fn);
+    }
+
+    void file_transfer_client::remote_stat_promise::cancel()
+    {
+      this->impl_->cancel();
+    }
+    //================================================================//
+
+    //================================================================//
+    file_transfer_client::file_transfer_client(stream_client& c)
+      : stream_client_(c)
+    {
+      auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+      std::uint32_t arr[3] = {(std::uint32_t)(0xFFFFFFFF & (millis >> 32)), (std::uint32_t)std::clock(), (std::uint32_t)(0xFFFFFFFF & millis)};
+      std::seed_seq seq(std::begin(arr), std::end(arr));
+      this->rng_.seed(seq);
+    }
+
+    file_transfer_client::download_promise file_transfer_client::download_file(const uri& remote_source, const std::string& local_destination)
+    {
+      options ops;
+      return download_file(remote_source, local_destination, ops);
+    }
+
+    file_transfer_client::download_promise file_transfer_client::download_file(const uri& remote_source, const std::string& local_destination, options ops)
+    {
+      auto dl_prom = std::make_shared<download_promise_impl>();
       download_promise ret(dl_prom);
 
       std::string tmp_file_path;
@@ -379,7 +553,6 @@ namespace manifold
         tmp_file_path = local_destination;
         if (tmp_file_path.size() && (tmp_file_path.back() != '/' && tmp_file_path.back() != '\\'))
           tmp_file_path.push_back('/');
-
       }
       else
       {
@@ -392,19 +565,21 @@ namespace manifold
 
       if (!dest_ofs->good())
       {
-        std::error_code file_open_error(errno, std::system_category());
-        if (!file_open_error)
-          file_open_error = std::errc::bad_file_descriptor;
-        dl_prom.fulfill(file_open_error, "");
+        dl_prom->fulfill(std::error_code(errno, std::system_category()), "");
       }
       else
       {
-        auto req_prom = stream_client_.send_request("GET", remote_source, {}, *dest_ofs);
-        req_prom.on_complete([local_destination, tmp_file_path, remote_source, replace_existing_file](const std::error_code& ec, const response_head& headers)
+        std::list<std::pair<std::string, std::string>> headers;
+        if (remote_source.password().size() || remote_source.username().size())
+          headers.emplace_back("authorization", basic_auth(remote_source.username(), remote_source.password()));
+
+        auto req_prom = std::make_shared<stream_client::promise>(stream_client_.send_request("GET", remote_source, headers, *dest_ofs));
+        dl_prom->on_cancel(std::bind(&stream_client::promise::cancel, req_prom));
+        req_prom->on_complete([dl_prom, dest_ofs, local_destination, tmp_file_path, remote_source, ops](const std::error_code& ec, const response_head& headers)
         {
           if (ec)
           {
-            dl_prom.fulfill(ec, "");
+            dl_prom->fulfill(ec, "");
           }
           else
           {
@@ -439,7 +614,7 @@ namespace manifold
 
 
 
-            if(!replace_existing_file)
+            if(!ops.replace_existing_file)
             {
               for(std::size_t i = 1; path_exists(destination_file_path); ++i)
               {
@@ -456,12 +631,12 @@ namespace manifold
             if (std::rename(tmp_file_path.c_str(), destination_file_path.c_str()) != 0)
             {
               std::remove(tmp_file_path.c_str());
-              std::errc::file
+              dl_prom->fulfill(std::error_code(errno, std::system_category()), "");
             }
             else
             {
               std::remove(tmp_file_path.c_str());
-              // TODO: success
+              dl_prom->fulfill(std::error_code(), destination_file_path);
             }
 
           }
@@ -470,8 +645,81 @@ namespace manifold
 
       return ret;
     }
-    //================================================================//
 
+    file_transfer_client::upload_promise file_transfer_client::upload_file(const std::string& local_source, const uri& remote_destination)
+    {
+      options ops;
+      return upload_file(local_source, remote_destination, ops);
+    }
+
+    file_transfer_client::upload_promise file_transfer_client::upload_file(const std::string& local_source, const uri& remote_destination, options ops)
+    {
+      auto ul_prom = std::make_shared<upload_promise_impl>();
+      upload_promise ret(ul_prom);
+
+      auto src_ifs = std::make_shared<std::ifstream>(local_source, std::ios::binary);
+
+      if (!src_ifs->good())
+      {
+        ul_prom->fulfill(std::error_code(errno, std::system_category()));
+      }
+      else
+      {
+        std::list<std::pair<std::string, std::string>> headers;
+        if (remote_destination.password().size() || remote_destination.username().size())
+          headers.emplace_back("authorization", basic_auth(remote_destination.username(), remote_destination.password()));
+
+        auto resp_entity = std::make_shared<std::stringstream>();
+        auto req_prom = std::make_shared<stream_client::promise>(stream_client_.send_request("PUT", remote_destination, headers, *src_ifs, *resp_entity));
+        ul_prom->on_cancel(std::bind(&stream_client::promise::cancel, req_prom));
+        req_prom->on_complete([ul_prom, src_ifs, resp_entity](const std::error_code& ec, const response_head& headers)
+        {
+          src_ifs->close();
+          ul_prom->fulfill(ec);
+        });
+      }
+
+      return ret;
+    }
+
+    file_transfer_client::remote_stat_promise file_transfer_client::stat_remote_file(const uri& remote_file)
+    {
+      options ops;
+      return stat_remote_file(remote_file, ops);
+    }
+
+    file_transfer_client::remote_stat_promise file_transfer_client::stat_remote_file(const uri& remote_file, options ops)
+    {
+      auto stat_prom = std::make_shared<remote_stat_promise_impl>();
+      remote_stat_promise ret(stat_prom);
+
+
+      std::list<std::pair<std::string, std::string>> headers;
+      if (remote_file.password().size() || remote_file.username().size())
+        headers.emplace_back("authorization", basic_auth(remote_file.username(), remote_file.password()));
+
+      auto resp_entity = std::make_shared<std::stringstream>();
+      auto req_prom = std::make_shared<stream_client::promise>(stream_client_.send_request("HEAD", remote_file, headers, *resp_entity));
+      stat_prom->on_cancel(std::bind(&stream_client::promise::cancel, req_prom));
+      req_prom->on_complete([stat_prom, resp_entity](const std::error_code& ec, const response_head& headers)
+      {
+        statistics st;
+        st.file_size_known = headers.header_exists("content-length");
+        st.file_size = 0;
+
+        std::stringstream ss(headers.header("content-length"));
+        ss >> (st.file_size);
+
+        st.mime_type = headers.header("content-type");
+
+        st.modification_date = headers.header("last-modified");
+
+        stat_prom->fulfill(ec, st);
+      });
+
+      return ret;
+    }
+    //================================================================//
 
 
 //    //================================================================//
