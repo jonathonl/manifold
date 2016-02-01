@@ -501,16 +501,6 @@ namespace manifold
         sess->push_request(cb);
 
         this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query(ep.host(), std::to_string(ep.port())), std::bind(&non_tls_session::handle_resolve, sess, std::placeholders::_1, std::placeholders::_2));
-        this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query("www.google.com", std::to_string(ep.port() - 1)), [](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
-        {
-          for (; it != asio::ip::tcp::resolver::iterator(); ++it)
-            std::cout << "-1:" << it->endpoint() << std::endl;
-        });
-        this->tcp_resolver_.async_resolve(asio::ip::tcp::resolver::query("google.com", std::to_string(ep.port() + 1)), [](const std::error_code& ec, asio::ip::tcp::resolver::iterator it)
-        {
-          for (; it != asio::ip::tcp::resolver::iterator(); ++it)
-            std::cout << "+1:" << it->endpoint() << std::endl;
-        });
       }
     }
     //----------------------------------------------------------------//

@@ -103,6 +103,39 @@ namespace manifold
     //================================================================//
 
     //================================================================//
+    // TODO: make real uuids.
+    template<typename Rng>
+    std::array<std::uint64_t, 2> gen_uuid(Rng& rng)
+    {
+      std::array<std::uint64_t, 2> ret;
+
+      std::uint32_t tmp;
+      tmp = rng();
+      ret[0] = tmp;
+      ret[0] = ret[0] << 32;
+      tmp = rng();
+      ret[0] |= tmp;
+
+      tmp = rng();
+      ret[1] = tmp;
+      ret[1] = ret[1] << 32;
+      tmp = rng();
+      ret[1] |= tmp;
+
+      return ret;
+    }
+
+    template<typename Rng>
+    std::string gen_uuid_str(Rng& rng)
+    {
+      std::stringstream ss;
+      std::array<std::uint64_t, 2> tmp = gen_uuid(rng);
+      ss << tmp[0] << tmp[1];
+      return ss.str();
+    }
+    //================================================================//
+
+    //================================================================//
     document_root::document_root(const std::string& path)
       : path_to_root_(path)
     {
@@ -327,6 +360,119 @@ namespace manifold
       }
     }
     //================================================================//
+
+    //================================================================//
+    file_transfer_client::file_transfer_client(client& c)
+      : stream_client_(c)
+    {
+      this->rng_.seed(std::chrono::system_clock::now().time_since_epoch().count());
+    }
+
+    file_transfer_client::download_promise file_transfer_client::download_file(const uri& remote_source, const std::string& local_destination, bool replace_existing_file)
+    {
+      download_promise_impl dl_prom;
+      download_promise ret(dl_prom);
+
+      std::string tmp_file_path;
+      if (is_directory(local_destination))
+      {
+        tmp_file_path = local_destination;
+        if (tmp_file_path.size() && (tmp_file_path.back() != '/' && tmp_file_path.back() != '\\'))
+          tmp_file_path.push_back('/');
+
+      }
+      else
+      {
+        tmp_file_path = directory(local_destination);
+      }
+
+      tmp_file_path += (gen_uuid_str(this->rng_) + ".tmp");
+
+      auto dest_ofs = std::make_shared<std::ofstream>(tmp_file_path, std::ios::binary);
+
+      if (!dest_ofs->good())
+      {
+        std::error_code file_open_error(errno, std::system_category());
+        if (!file_open_error)
+          file_open_error = std::errc::bad_file_descriptor;
+        dl_prom.fulfill(file_open_error, "");
+      }
+      else
+      {
+        auto req_prom = stream_client_.send_request("GET", remote_source, {}, *dest_ofs);
+        req_prom.on_complete([local_destination, tmp_file_path, remote_source, replace_existing_file](const std::error_code& ec, const response_head& headers)
+        {
+          if (ec)
+          {
+            dl_prom.fulfill(ec, "");
+          }
+          else
+          {
+            std::string local_file_path = local_destination;
+            std::replace(local_file_path.begin(), local_file_path.end(), '\\', '/');
+            if (is_directory(local_file_path))
+            {
+              if (local_file_path.size() && local_file_path.back() != '/')
+                local_file_path += "/";
+              std::string content_disposition = headers.header("content-disposition");
+              std::string filename;
+              std::regex exp(".*filename=(?:\"([^\"]*)\"|([^\\s;]*)).*", std::regex::ECMAScript);
+              std::smatch sm;
+              if (std::regex_match(content_disposition, sm, exp))
+              {
+                if (sm[1].matched)
+                  filename = basename(sm[1].str());
+                else if (sm[2].matched)
+                  filename = basename(sm[2].str());
+              }
+              else
+              {
+                filename = basename(remote_source.path());
+              }
+
+              if (filename.empty() || filename == "." || filename == "/")
+                filename = "file";
+              local_file_path += filename;
+            }
+
+            std::string destination_file_path = local_file_path;
+
+
+
+            if(!replace_existing_file)
+            {
+              for(std::size_t i = 1; path_exists(destination_file_path); ++i)
+              {
+                std::stringstream ss;
+                ss << directory(local_file_path) << basename_sans_extension(local_file_path) << "_" << i << extension(local_file_path);
+                destination_file_path = ss.str();
+              }
+            }
+            else if(is_regular_file(destination_file_path))
+            {
+              std::remove(destination_file_path.c_str());
+            }
+
+            if (std::rename(tmp_file_path.c_str(), destination_file_path.c_str()) != 0)
+            {
+              std::remove(tmp_file_path.c_str());
+              std::errc::file
+            }
+            else
+            {
+              std::remove(tmp_file_path.c_str());
+              // TODO: success
+            }
+
+          }
+        });
+      }
+
+      return ret;
+    }
+    //================================================================//
+
+
 
 //    //================================================================//
 //    file_download::file_download(asio::io_service &ioservice, const uri& remote_source, const std::string& local_destination, bool replace_existing_file)

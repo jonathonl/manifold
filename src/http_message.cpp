@@ -41,7 +41,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     template <typename SendMsg, typename RecvMsg>
-    void message<SendMsg,RecvMsg>::close(http::errc error_code)
+    void message<SendMsg,RecvMsg>::cancel(http::errc error_code)
     {
       if (this->connection_)
         this->connection_->send_reset_stream(this->stream_id_, error_code);

@@ -278,12 +278,46 @@ int main()
   //----------------------------------------------------------------//
 
   http::client agnt(ioservice, client_ssl_ctx);
+  http::stream_client stream_agnt(agnt);
 
   if (true)
   {
     //----------------------------------------------------------------//
     // Client to Local Server Test
     //
+    auto get_resp_entity = std::make_shared<std::stringstream>();
+    auto get = stream_agnt.send_request("GET", uri("http://localhost:8080/redirect-url?query"), *get_resp_entity);
+    get.on_complete([get_resp_entity](const std::error_code& ec, const http::response_head& headers)
+    {
+      if (ec)
+      {
+        std::cout << ec.message() << std::endl;
+      }
+      else
+      {
+        std::cout << "status: " << headers.status_code() << std::endl;
+        std::cout << get_resp_entity->str() << std::endl;
+      }
+    });
+
+    auto post_data = std::make_shared<std::stringstream>("name=value&foo=bar");
+    auto post_resp_entity = std::make_shared<std::stringstream>();
+    auto post = stream_agnt.send_request("POST", uri("http://localhost:8080/redirect-url"), {{"content-type","application/x-www-form-urlencoded"}}, *post_data, *post_resp_entity);
+    post.on_complete([post_resp_entity, post_data](const std::error_code& ec, const http::response_head& headers)
+    {
+      if (ec)
+      {
+        std::cout << ec.message() << std::endl;
+      }
+      else
+      {
+        std::cout << "status: " << headers.status_code() << std::endl;
+        std::cout << post_resp_entity->str() << std::endl;
+      }
+    });
+
+    ioservice.run();
+
     agnt.make_request("localhost", 8080, [](const std::error_code& ec, http::client::request&& req)
     {
       if (ec)
@@ -304,7 +338,7 @@ int main()
 
           if (!resp.head().has_successful_status())
           {
-            resp.close();
+            resp.cancel();
           }
           else
           {

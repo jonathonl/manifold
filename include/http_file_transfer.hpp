@@ -3,8 +3,7 @@
 #ifndef MANIFOLD_HTTP_FILE_TRANSFER_HPP
 #define MANIFOLD_HTTP_FILE_TRANSFER_HPP
 
-#include "uniform_resource_identifier.hpp"
-#include "http_client.hpp"
+#include "http_stream_client.hpp"
 #include "http_server.hpp"
 
 #include <regex>
@@ -34,6 +33,53 @@ namespace manifold
       void handle_head(server::response&& res, const std::string& file_path);
       void handle_get(server::response&& res, const std::string& file_path);
       void handle_put(server::request&& req, server::response&& res, const std::string& file_path);
+    };
+
+    class file_transfer_client
+    {
+    private:
+      class download_promise_impl
+      {
+      public:
+        void fulfill(const std::error_code& ec, const std::string& local_file_path);
+        void cancel();
+        void on_complete(const std::function<void(const std::error_code& ec, const std::string& local_file_path)>& fn);
+        void on_cancel(const std::function<void()>& fn);
+      private:
+        bool fulfilled_ = false;
+        bool cancelled_ = false;
+        std::function<void(const std::error_code& ec, const response_head& headers)> on_complete_;
+        std::function<void()> on_cancel_;
+        std::error_code ec_;
+        response_head headers_;
+      };
+    public:
+      file_transfer_client(client& c);
+
+      class download_promise
+      {
+      public:
+        download_promise(const std::shared_ptr<download_promise_impl>& impl);
+        void on_complete(const std::function<void(const std::error_code& ec, const std::string& local_file_path)>& fn);
+        void cancel();
+      private:
+        std::shared_ptr<download_promise_impl> impl_;
+      };
+
+      class upload_promise
+      {
+      };
+
+      class remote_stat_promise
+      {
+      };
+
+      download_promise download_file(const uri& remote_source, const std::string& local_destination, bool replace_existing_file = false);
+      download_promise upload_file(const std::string& local_source, const uri& remote_destination);
+      remote_stat_promise stat_remote_file(const std::string& remote_file);
+    private:
+      stream_client stream_client_;
+      std::mt19937 rng_;
     };
 
 //    class file_transfer_error
