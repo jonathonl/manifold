@@ -481,7 +481,7 @@ namespace manifold
         });
       });
 
-      conn->on_close([conn, this](errc ec)
+      conn->on_close([conn, this](const std::error_code& ec)
       {
         this->connections_.erase(conn);
       });

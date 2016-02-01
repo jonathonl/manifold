@@ -224,7 +224,7 @@ int main()
 
     });
 
-    req.on_close([](http::errc e)
+    req.on_close([](const std::error_code& e)
     {
       std::cout << "on_close called on server" << std::endl;
     });
@@ -388,7 +388,7 @@ int main()
 
         req.on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req.stream_id()));
 
-        req.on_close([](http::errc e)
+        req.on_close([](const std::error_code& e)
         {
           std::cout << "on_close called on client" << std::endl;
         });

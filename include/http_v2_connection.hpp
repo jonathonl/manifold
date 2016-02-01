@@ -158,7 +158,7 @@ namespace manifold
         void on_push_promise(const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn);
         void on_end(const std::function<void()>& fn);
         void on_drain(const std::function<void()>& fn);
-        void on_close(const std::function<void(errc error_code)>& fn);
+        void on_close(const std::function<void(const std::error_code& ec)>& fn);
 
         stream_state state() const { return this->state_; }
         std::uint32_t id() const { return this->id_; }
@@ -300,7 +300,7 @@ namespace manifold
       //----------------------------------------------------------------//
       // Connection level callbacks:
       std::function<void(std::uint32_t stream_id)> on_new_stream_;
-      std::function<void(errc error_code)> on_close_;
+      std::function<void(const std::error_code& error_code)> on_close_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -364,14 +364,14 @@ namespace manifold
 
       //----------------------------------------------------------------//
       void run();
-      void close(errc ec);
+      void close(const std::error_code& ec);
       bool is_closed() const;
       void cancelAllStreams();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       void on_new_stream(const std::function<void(std::uint32_t stream_id)>& fn);
-      void on_close(const std::function<void(errc error_code)>& fn);
+      void on_close(const std::function<void(const std::error_code& ec)>& fn);
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -382,7 +382,7 @@ namespace manifold
       void on_trailers(std::uint32_t stream_id, const std::function<void(header_block&& headers)>& fn);
       void on_data(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
       //void on_headers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn);
-      void on_close(std::uint32_t stream_id, const std::function<void(errc error_code)>& fn);
+      void on_close(std::uint32_t stream_id, const std::function<void(const std::error_code& ec)>& fn);
       void on_push_promise(std::uint32_t stream_id, const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn);
 
 

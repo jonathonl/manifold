@@ -10,13 +10,13 @@ namespace manifold
   namespace http
   {
     template <typename SendMsg, typename RecvMsg>
-    void v1_connection<SendMsg, RecvMsg>::on_close(const std::function<void(errc error_code)>& fn)
+    void v1_connection<SendMsg, RecvMsg>::on_close(const std::function<void(const std::error_code&)>& fn)
     {
       this->on_close_ = fn;
     }
 
     template <typename SendMsg, typename RecvMsg>
-    void v1_connection<SendMsg, RecvMsg>::on_new_stream(const std::function<void(std::uint32_t transaction_id)>& fn)
+    void v1_connection<SendMsg, RecvMsg>::on_new_stream(const std::function<void(std::uint32_t)>& fn)
     {
       this->on_new_stream_ = fn;
     }
@@ -42,7 +42,7 @@ namespace manifold
     }
 
     template <typename SendMsg, typename RecvMsg>
-    void v1_connection<SendMsg, RecvMsg>::on_informational_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&& headers)>& fn)
+    void v1_connection<SendMsg, RecvMsg>::on_informational_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&&)>& fn)
     {
       auto it = std::find_if(this->transaction_queue_.begin(), this->transaction_queue_.end(), [transaction_id](const transaction& t) { return t.id == transaction_id; });
       if (it != this->transaction_queue_.end())
@@ -62,7 +62,7 @@ namespace manifold
     }
 
     template <typename SendMsg, typename RecvMsg>
-    void v1_connection<SendMsg, RecvMsg>::on_close(std::uint32_t transaction_id, const std::function<void(errc)>& fn)
+    void v1_connection<SendMsg, RecvMsg>::on_close(std::uint32_t transaction_id, const std::function<void(const std::error_code&)>& fn)
     {
       auto it = std::find_if(this->transaction_queue_.begin(), this->transaction_queue_.end(), [transaction_id](const transaction& t) { return t.id == transaction_id; });
       if (it != this->transaction_queue_.end())
@@ -118,7 +118,7 @@ namespace manifold
     }
 
     template <typename SendMsg, typename RecvMsg>
-    void v1_connection<SendMsg, RecvMsg>::close(errc ec)
+    void v1_connection<SendMsg, RecvMsg>::close(const std::error_code& ec)
     {
       if (!this->closed_)
       {

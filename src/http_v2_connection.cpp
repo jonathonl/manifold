@@ -185,20 +185,19 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::close(errc ec)
+    void v2_connection<SendMsg, RecvMsg>::close(const std::error_code& ec)
     {
       if (!this->closed_)
       {
         this->closed_ = true;
 
         //TODO: This needs to be fixed.
-
-        this->send_goaway(ec);
+        this->send_goaway(errc::internal_error);
         for (auto it = this->streams_.begin(); it != this->streams_.end(); ++it)
         {
           if (it->second.state() != stream_state::closed)
           {
-            it->second.handle_outgoing_rst_stream_state_change(ec);
+            it->second.handle_outgoing_rst_stream_state_change(errc::internal_error);
           }
         }
 
@@ -562,7 +561,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::on_data(const std::function<void(const char* const buf, std::size_t buf_size)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::stream::on_data(const std::function<void(const char* const, std::size_t)>& fn)
     {
       this->on_data_ = fn;
     }
@@ -570,7 +569,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::on_headers(const std::function<void(RecvMsg&& headers)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::stream::on_headers(const std::function<void(RecvMsg&&)>& fn)
     {
       this->on_headers_ = fn;
     }
@@ -578,7 +577,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::on_informational_headers(const std::function<void(RecvMsg&& headers)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::stream::on_informational_headers(const std::function<void(RecvMsg&&)>& fn)
     {
       this->on_informational_headers_ = fn;
     }
@@ -586,7 +585,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::on_trailers(const std::function<void(header_block&& headers)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::stream::on_trailers(const std::function<void(header_block&&)>& fn)
     {
       this->on_trailers_ = fn;
     }
@@ -594,7 +593,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::on_rst_stream(const std::function<void(std::uint32_t error_code)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::stream::on_rst_stream(const std::function<void(std::uint32_t)>& fn)
     {
       this->on_rst_stream_ = fn;
     }
@@ -602,7 +601,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::on_push_promise(const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::stream::on_push_promise(const std::function<void(SendMsg&&, std::uint32_t)>& fn)
     {
       this->on_push_promise_ = fn;
     }
@@ -629,7 +628,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::on_close(const std::function<void(errc error_code)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::stream::on_close(const std::function<void(const std::error_code&)>& fn)
     {
       if (this->state_ == stream_state::closed)
         fn ? fn(errc::no_error) : void(); // TODO: pass error if there is one.
@@ -1136,7 +1135,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::on_new_stream(const std::function<void(std::uint32_t stream_id)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::on_new_stream(const std::function<void(std::uint32_t)>& fn)
     {
       this->on_new_stream_ = fn;
     }
@@ -1144,7 +1143,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::on_close(const std::function<void(errc ec)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::on_close(const std::function<void(const std::error_code&)>& fn)
     {
       this->on_close_ = fn;
     }
@@ -1152,7 +1151,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::on_data(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::on_data(std::uint32_t stream_id, const std::function<void(const char* const, std::size_t)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -1168,7 +1167,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::on_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&& headers)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::on_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&&)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -1184,7 +1183,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::on_informational_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&& headers)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::on_informational_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&&)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -1200,7 +1199,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::on_trailers(std::uint32_t stream_id, const std::function<void(header_block&& headers)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::on_trailers(std::uint32_t stream_id, const std::function<void(header_block&&)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -1216,7 +1215,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::on_close(std::uint32_t stream_id, const std::function<void(errc error_code)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::on_close(std::uint32_t stream_id, const std::function<void(const std::error_code&)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
@@ -1232,7 +1231,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::on_push_promise(std::uint32_t stream_id, const std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)>& fn)
+    void v2_connection<SendMsg, RecvMsg>::on_push_promise(std::uint32_t stream_id, const std::function<void(SendMsg&&, std::uint32_t)>& fn)
     {
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())

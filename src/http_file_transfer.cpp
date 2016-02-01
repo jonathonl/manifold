@@ -315,7 +315,7 @@ namespace manifold
             res_ptr->send(buf.data(), (std::size_t)bytes_in_buf);
           }
 
-          res_ptr->on_close([ifs](errc ec)
+          res_ptr->on_close([ifs](const std::error_code& ec)
           {
             ifs->close();
           });
@@ -374,7 +374,7 @@ namespace manifold
           }
         });
 
-        req.on_close([tmp_file_path, ofs](errc ec)
+        req.on_close([tmp_file_path, ofs](const std::error_code& ec)
         {
           ofs->close();
           std::remove(tmp_file_path.c_str());

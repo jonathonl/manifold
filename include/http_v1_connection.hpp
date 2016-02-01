@@ -47,11 +47,11 @@ namespace manifold
 
       void run();
       void run_timeout_loop(const std::error_code& ec = std::error_code());
-      void close(errc ec);
+      void close(const std::error_code& ec);
       bool is_closed() const;
 
 
-      void on_close(const std::function<void(errc error_code)>& fn);
+      void on_close(const std::function<void(const std::error_code& ec)>& fn);
       void on_new_stream(const std::function<void(std::uint32_t transaction_id)>& fn);
 
       void on_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&& headers)>& fn);
@@ -59,7 +59,7 @@ namespace manifold
       void on_trailers(std::uint32_t transaction_id, const std::function<void(header_block&& headers)>& fn);
       void on_push_promise(std::uint32_t transaction_id, const std::function<void(SendMsg&& headers, std::uint32_t promised_transaction_id)>& fn) {}
       void on_data(std::uint32_t transaction_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
-      void on_close(std::uint32_t transaction_id, const std::function<void(errc error_code)>& fn);
+      void on_close(std::uint32_t transaction_id, const std::function<void(const std::error_code& ec)>& fn);
       void on_end(std::uint32_t transaction_id, const std::function<void()>& fn);
       void on_drain(std::uint32_t transaction_id, const std::function<void()>& fn);
 
@@ -99,18 +99,18 @@ namespace manifold
         std::string outgoing_trailer_data;
         bool outgoing_ended = false;
 
-        std::function<void(RecvMsg&& headers)> on_headers;
-        std::function<void(RecvMsg&& headers)> on_informational_headers;
-        std::function<void(header_block&& headers)> on_trailers;
+        std::function<void(RecvMsg&&)> on_headers;
+        std::function<void(RecvMsg&&)> on_informational_headers;
+        std::function<void(header_block&&)> on_trailers;
         bool ignore_incoming_body = false;
         v1_header_block incoming_trailers;
-        std::function<void(const char* const buf, std::size_t buf_size)> on_data;
+        std::function<void(const char* const, std::size_t)> on_data;
         std::function<void()> on_end;
         std::function<void()> on_drain;
 
         const std::uint32_t id;
         transaction_state state = transaction_state::open;
-        std::function<void(errc error_code)> on_close;
+        std::function<void(const std::error_code& ec)> on_close;
         transaction(std::uint32_t transaction_id)
           : id(transaction_id)
         {
@@ -128,8 +128,8 @@ namespace manifold
       asio::basic_waitable_timer<std::chrono::system_clock> activity_deadline_timer_;
 
 
-      std::function<void(errc error_code)> on_close_;
-      std::function<void(std::uint32_t transaction_id)> on_new_stream_;
+      std::function<void(const std::error_code&)> on_close_;
+      std::function<void(std::uint32_t)> on_new_stream_;
 
       static bool incoming_head_is_head_request(const RecvMsg& head);
       static bool deserialize_incoming_headers(std::istream& is, RecvMsg& generic_headers);
