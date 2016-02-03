@@ -311,6 +311,9 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     typename std::map<std::uint32_t, typename v2_connection<SendMsg, RecvMsg>::stream>::iterator v2_connection<SendMsg, RecvMsg>::find_stream_with_data()
     {
+      if (this->streams_.empty())
+        return this->streams_.end();
+
       auto random_stream_it = this->streams_.begin();
       std::advance(random_stream_it, this->rng_() % this->streams_.size());
 
@@ -832,6 +835,8 @@ namespace manifold
     {
       if (this->state_ != stream_state::closed)
       {
+        std::queue<frame> rmv;
+        this->outgoing_data_frames.swap(rmv);
         this->state_= stream_state::closed;
         this->on_close_ ? this->on_close_(int_to_errc(incoming_rst_stream_frame.error_code())) : void();
       }
@@ -856,22 +861,22 @@ namespace manifold
             switch (it->first)
             {
               case (std::uint16_t)setting_code::header_table_size:
-                this->peer_settings_[setting_code::header_table_size] = it->second;
+                this->local_settings_[setting_code::header_table_size] = it->second;
                 break;
               case (std::uint16_t)setting_code::enable_push:
-                this->peer_settings_[setting_code::enable_push] = it->second;
+                this->local_settings_[setting_code::enable_push] = it->second;
                 break;
               case (std::uint16_t)setting_code::max_concurrent_streams:
-                this->peer_settings_[setting_code::max_concurrent_streams] = it->second;
+                this->local_settings_[setting_code::max_concurrent_streams] = it->second;
                 break;
               case (std::uint16_t)setting_code::initial_window_size:
-                this->peer_settings_[setting_code::initial_window_size] = it->second;
+                this->local_settings_[setting_code::initial_window_size] = it->second;
                 break;
               case (std::uint16_t)setting_code::max_frame_size:
-                this->peer_settings_[setting_code::max_frame_size] = it->second;
+                this->local_settings_[setting_code::max_frame_size] = it->second;
                 break;
               case (std::uint16_t)setting_code::max_header_list_size:
-                this->peer_settings_[setting_code::max_header_list_size] = it->second;
+                this->local_settings_[setting_code::max_header_list_size] = it->second;
                 break;
             }
           }
@@ -880,8 +885,10 @@ namespace manifold
       else
       {
         std::list<std::pair<std::uint16_t, std::uint32_t>> settings_list(incoming_settings_frame.settings());
+        std::cout << settings_list.size() << std::endl;
         for (auto it = settings_list.begin(); it != settings_list.end(); ++it)
         {
+          std::cout << it->first << ":" << it->second << std::endl;
           switch (it->first)
           {
             case (std::uint16_t)setting_code::header_table_size:
@@ -991,7 +998,9 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::handle_incoming_frame(const goaway_frame& incoming_goaway_frame)
     {
-      // TODO:
+      auto c = incoming_goaway_frame.error_code();
+      std::string s(incoming_goaway_frame.additional_debug_data(), incoming_goaway_frame.additional_debug_data_length());
+      auto sz = s.size();
     }
     //----------------------------------------------------------------//
 
@@ -1124,6 +1133,8 @@ namespace manifold
           return false;
         default:
           this->outgoing_non_data_frames_.push(http::frame(http::rst_stream_frame(ec), this->id_));
+          std::queue<frame> rmv;
+          this->outgoing_data_frames.swap(rmv);
           this->state_ = stream_state::closed;
           this->on_close_ ? this->on_close_(ec) : void();
           return true;

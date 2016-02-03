@@ -297,7 +297,7 @@ namespace manifold
       //SSL_CTX_set_cipher_list(ssl_context_->impl(), DEFAULT_CIPHER_LIST);
 
 
-      SSL_CTX_set_alpn_select_cb(this->ssl_context_->impl(), alpn_select_proto_cb, nullptr);
+      ::SSL_CTX_set_alpn_select_cb(this->ssl_context_->impl(), alpn_select_proto_cb, nullptr);
       this->port_ = port;
       this->host_ = host;
     }

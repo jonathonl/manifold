@@ -452,7 +452,9 @@ namespace manifold
     client::client(asio::io_service& ioservice, asio::ssl::context& ctx)
       : io_service_(ioservice), ssl_ctx_(ctx), tcp_resolver_(ioservice)
     {
-
+      std::vector<unsigned char> proto_list(::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS));
+      std::copy_n(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS, ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS), proto_list.begin());
+      ::SSL_CTX_set_alpn_protos(this->ssl_ctx_.impl(), proto_list.data(), proto_list.size());
     }
     //----------------------------------------------------------------//
 

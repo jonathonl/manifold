@@ -374,7 +374,7 @@ namespace manifold
 
       std::size_t bytesToParse = this->buf_.size();
       std::size_t pos = 0;
-      while (bytesToParse > 6)
+      while (bytesToParse >= 6)
       {
         std::uint16_t key;
         std::uint32_t value;

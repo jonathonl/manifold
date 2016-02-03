@@ -272,9 +272,9 @@ int main()
   server_ssl_ctx.use_private_key(asio::buffer(key.data(), key.size()), asio::ssl::context::pem);
   server_ssl_ctx.use_tmp_dh(asio::buffer(dhparam.data(), dhparam.size()));
 
-  http::server srv(ioservice, 8080);
+  http::server srv(ioservice, server_ssl_ctx, 8080);
   srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
-
+  ioservice.run();
   //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
   //ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
   //----------------------------------------------------------------//
@@ -292,7 +292,7 @@ int main()
 
     http::file_transfer_client::options ops;
     ops.replace_existing_file = true;
-    file_transfer_agnt.upload_file("./my_local_file.txt", uri("http://user:password@localhost:8080/files/uploaded_file.txt")).on_complete([&file_transfer_agnt](const std::error_code& ec)
+    file_transfer_agnt.upload_file("./my_local_file.txt", uri("https://user:password@localhost:8080/files/uploaded_file.txt")).on_complete([&file_transfer_agnt](const std::error_code& ec)
     {
       if (ec)
       {
@@ -304,7 +304,7 @@ int main()
       }
     });
 
-    file_transfer_agnt.stat_remote_file(uri("http://user:password@localhost:8080/files/uploaded_file.txt")).on_complete([&file_transfer_agnt](const std::error_code& ec, const http::file_transfer_client::statistics& stats)
+    file_transfer_agnt.stat_remote_file(uri("https://user:password@localhost:8080/files/uploaded_file.txt")).on_complete([&file_transfer_agnt](const std::error_code& ec, const http::file_transfer_client::statistics& stats)
     {
       if (ec)
       {
@@ -316,7 +316,7 @@ int main()
       }
     });
 
-    file_transfer_agnt.download_file(uri("http://user:password@localhost:8080/files/uploaded_file.txt"), "./").on_complete([](const std::error_code& ec, const std::string& file_path)
+    file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/uploaded_file.txt"), "./").on_complete([](const std::error_code& ec, const std::string& file_path)
     {
       if (ec)
       {
