@@ -19,7 +19,10 @@ namespace manifold
       incoming_message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::int32_t stream_id);
       incoming_message(incoming_message&& source);
       virtual ~incoming_message();
+
+#ifndef MANIFOLD_REMOVED_TRAILERS
       const header_block& trailers() const { return this->trailers_; }
+#endif
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//

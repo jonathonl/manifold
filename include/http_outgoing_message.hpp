@@ -30,6 +30,8 @@ namespace manifold
         return this->send(dataBuffer.data(), dataBuffer.size());
       }
       void on_drain(const std::function<void()>& fn);
+
+#ifndef MANIFOLD_REMOVED_TRAILERS
       bool end(const char*const data, std::size_t data_sz, const header_block& trailers = {});
       bool end(const char* cstr, const header_block& trailers = {})
       {
@@ -41,6 +43,19 @@ namespace manifold
         return this->end(dataBuffer.data(), dataBuffer.size(), trailers);
       }
       bool end(const header_block& trailers = {});
+#else
+      bool end(const char*const data, std::size_t data_sz);
+      bool end(const char* cstr)
+      {
+        return this->end(std::string(cstr));
+      }
+      template <typename BufferT>
+      bool end(const BufferT& dataBuffer)
+      {
+        return this->end(dataBuffer.data(), dataBuffer.size());
+      }
+      bool end();
+#endif
       //----------------------------------------------------------------//
     private:
       //----------------------------------------------------------------//

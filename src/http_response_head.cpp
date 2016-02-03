@@ -148,19 +148,19 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    response_head::response_head(v1_message_head&& v1_headers)
-      : response_head(v1_response_head(std::move(v1_headers)))
-    {
-    }
-    //----------------------------------------------------------------//
+//    //----------------------------------------------------------------//
+//    response_head::response_head(v1_message_head&& v1_headers)
+//      : response_head(v1_response_head(std::move(v1_headers)))
+//    {
+//    }
+//    //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    response_head::response_head(v2_header_block&& v2_headers)
-      : response_head(v2_response_head(std::move(v2_headers)))
-    {
-    }
-    //----------------------------------------------------------------//
+//    //----------------------------------------------------------------//
+//    response_head::response_head(v2_header_block&& v2_headers)
+//      : response_head(v2_response_head(std::move(v2_headers)))
+//    {
+//    }
+//    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     response_head::response_head(const v1_response_head& v1_headers)

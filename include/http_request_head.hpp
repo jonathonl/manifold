@@ -25,8 +25,8 @@ namespace manifold
       //----------------------------------------------------------------//
       request_head(const std::string& path = "/", const std::string& meth = "GET", std::list<std::pair<std::string, std::string>>&& headers = {});
       request_head(const std::string& path, http::method meth, std::list<std::pair<std::string, std::string>>&& headers = {});
-      request_head(class v1_message_head&& v1_headers);
-      request_head(class v2_header_block&& v2_headers);
+      //request_head(class v1_message_head&& v1_headers);
+      //request_head(class v2_header_block&& v2_headers);
       request_head(const class v1_request_head& v1_headers);
       request_head(const class v2_request_head& v2_headers);
       ~request_head();

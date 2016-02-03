@@ -73,8 +73,8 @@ namespace manifold
     public:
       //----------------------------------------------------------------//
       response_head(std::uint16_t status = 200, std::list<std::pair<std::string, std::string>>&& headers = {});
-      response_head(class v1_message_head&& v1_headers);
-      response_head(class v2_header_block&& v2_headers);
+      //response_head(class v1_message_head&& v1_headers);
+      //response_head(class v2_header_block&& v2_headers);
       response_head(const class v1_response_head& v1_headers);
       response_head(const class v2_response_head& v2_headers);
       ~response_head();

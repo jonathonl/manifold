@@ -128,6 +128,7 @@ namespace manifold
       {
       protected:
         const std::uint32_t id_;
+        std::queue<frame>& outgoing_non_data_frames_;
         stream_state state_ = stream_state::idle;
         bool on_headers_called_ = false;
         std::function<void(const char* const buf, std::size_t buf_size)> on_data_;
@@ -162,12 +163,12 @@ namespace manifold
 
         stream_state state() const { return this->state_; }
         std::uint32_t id() const { return this->id_; }
-        bool has_sendable_frame(bool can_send_data);
-        frame pop_next_outgoing_frame(std::uint32_t connection_window_size);
+        bool has_data_frame();
+        bool has_sendable_data_frame();
+        frame pop_data_frame(std::uint32_t connection_window_size);
 
         std::queue<v2_header_block> incoming_message_heads;
-        std::queue<frame> incoming_data_frames;
-        std::queue<frame> outgoing_non_data_frames;
+        //std::queue<frame> outgoing_non_data_frames;
         std::queue<frame> outgoing_data_frames;
 
         std::uint32_t incoming_window_size = 65535;
@@ -176,10 +177,11 @@ namespace manifold
         std::uint8_t weight = 16;
 
         bool end_stream_frame_received = false;
-        stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size)
-          : id_(stream_id), incoming_window_size(initial_window_size), outgoing_window_size(initial_peer_window_size) {}
+        stream(std::uint32_t stream_id, std::queue<frame>& connection_outgoing_queue, uint32_t initial_window_size, uint32_t initial_peer_window_size)
+          : id_(stream_id), outgoing_non_data_frames_(connection_outgoing_queue), incoming_window_size(initial_window_size), outgoing_window_size(initial_peer_window_size) {}
         stream(stream&& source)
           : id_(std::move(source.id_)),
+            outgoing_non_data_frames_(source.outgoing_non_data_frames_),
             state_(std::move(source.state_)),
             on_headers_called_(std::move(source.on_headers_called_)),
             on_data_(std::move(source.on_data_)),
@@ -192,8 +194,8 @@ namespace manifold
             on_drain_(std::move(source.on_drain_)),
             on_close_(std::move(source.on_close_)),
             incoming_message_heads(std::move(source.incoming_message_heads)),
-            incoming_data_frames(std::move(source.incoming_data_frames)),
-            outgoing_non_data_frames(std::move(source.outgoing_non_data_frames)),
+            //incoming_data_frames(std::move(source.incoming_data_frames)),
+            //outgoing_non_data_frames(std::move(source.outgoing_non_data_frames)),
             outgoing_data_frames(std::move(source.outgoing_data_frames)),
             incoming_window_size(std::move(source.incoming_window_size)),
             outgoing_window_size(std::move(source.outgoing_window_size)),
@@ -214,14 +216,21 @@ namespace manifold
         //----------------------------------------------------------------//
 
         //----------------------------------------------------------------//
-        bool handle_outgoing_headers_state_change();
-        bool handle_outgoing_end_stream_state_change();
-        bool handle_outgoing_push_promise_state_change();
-        bool handle_outgoing_rst_stream_state_change(errc ec);
+        bool send_data_frame(const char*const data, std::uint32_t data_sz, bool end_stream, std::uint32_t max_frame_size);
+        bool send_headers_frame(const v2_header_block& headers, bool end_stream, hpack::encoder& enc, std::uint32_t max_frame_size);
+        bool handle_outgoing_priority_frame_state_change();
+        bool send_rst_stream_frame(errc ec);
+        bool send_push_promise_frame(const v2_header_block& headers, stream& promised_stream, hpack::encoder& enc, std::uint32_t max_frame_size);
+        bool send_window_update_frame(std::uint32_t amount);
+
+//        bool handle_outgoing_headers_state_change();
+//        bool handle_outgoing_end_stream_state_change();
+//        bool handle_outgoing_push_promise_state_change();
+//        bool handle_outgoing_rst_stream_state_change(errc ec);
         //----------------------------------------------------------------//
       };
       //================================================================//
-
+#ifndef MANIFOLD_REMOVED_PRIORITY
       //================================================================//
       class stream_dependency_tree_child_node;
       class stream_dependency_tree
@@ -276,7 +285,7 @@ namespace manifold
         //----------------------------------------------------------------//
       };
       //================================================================//
-
+#endif
 
       //----------------------------------------------------------------//
       std::map<std::uint32_t,stream> streams_;
@@ -291,7 +300,7 @@ namespace manifold
       std::map<setting_code,std::uint32_t> peer_settings_;
       hpack::encoder hpack_encoder_;
       hpack::decoder hpack_decoder_;
-      std::minstd_rand rg_;
+      std::minstd_rand rng_;
       bool started_;
       bool closed_;
       bool send_loop_running_;
@@ -313,12 +322,15 @@ namespace manifold
       std::queue<http::frame> incoming_header_block_fragments_;
       http::frame outgoing_frame_;
       std::queue<frame> outgoing_frames_;
+#ifndef MANIFOLD_REMOVED_PRIORITY
       stream_dependency_tree stream_dependency_tree_;
+#endif
       std::uint32_t connection_level_outgoing_window_size() const { return this->outgoing_window_size_; }
       std::uint32_t connection_level_incoming_window_size() const { return this->incoming_window_size_; }
       void garbage_collect_streams();
       bool receiving_push_promise_is_allowed();
       bool sending_push_promise_is_allowed();
+      typename std::map<std::uint32_t, stream>::iterator find_stream_with_data();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -379,7 +391,9 @@ namespace manifold
       // window_update is for both.
       void on_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&& headers)>& fn);
       void on_informational_headers(std::uint32_t stream_id, const std::function<void(RecvMsg&& headers)>& fn);
+#ifndef MANIFOLD_REMOVED_TRAILERS
       void on_trailers(std::uint32_t stream_id, const std::function<void(header_block&& headers)>& fn);
+#endif
       void on_data(std::uint32_t stream_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
       //void on_headers(std::uint32_t stream_id, const std::function<void(v2_header_block&& headers)>& fn);
       void on_close(std::uint32_t stream_id, const std::function<void(const std::error_code& ec)>& fn);
@@ -395,7 +409,9 @@ namespace manifold
       std::uint32_t create_stream(std::uint32_t dependency_stream_id, std::uint32_t stream_id);
       bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream);
       bool send_headers(std::uint32_t stream_id, const SendMsg& head, bool end_headers, bool end_stream);
+#ifndef MANIFOLD_REMOVED_TRAILERS
       bool send_trailers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream);
+#endif
       bool send_headers(std::uint32_t stream_id, const v2_header_block& head, bool end_headers, bool end_stream);
       bool send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream);
       bool send_priority(std::uint32_t stream_id, priority_options options);
@@ -405,7 +421,7 @@ namespace manifold
       void send_ping(std::uint64_t opaque_data);
       void send_goaway(http::errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0);
       bool send_window_update(std::uint32_t stream_id, std::uint32_t amount);
-      bool send_countinuation(std::uint32_t stream_id, const v2_header_block& head, bool end_headers);
+      //bool send_countinuation(std::uint32_t stream_id, const v2_header_block& head, bool end_headers);
       //----------------------------------------------------------------//
 
 

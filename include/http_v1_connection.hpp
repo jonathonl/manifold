@@ -56,7 +56,9 @@ namespace manifold
 
       void on_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&& headers)>& fn);
       void on_informational_headers(std::uint32_t transaction_id, const std::function<void(RecvMsg&& headers)>& fn);
+#ifdef MANIFOLD_REMOVED_TRAILERS
       void on_trailers(std::uint32_t transaction_id, const std::function<void(header_block&& headers)>& fn);
+#endif
       void on_push_promise(std::uint32_t transaction_id, const std::function<void(SendMsg&& headers, std::uint32_t promised_transaction_id)>& fn) {}
       void on_data(std::uint32_t transaction_id, const std::function<void(const char* const buf, std::size_t buf_size)>& fn);
       void on_close(std::uint32_t transaction_id, const std::function<void(const std::error_code& ec)>& fn);
@@ -67,7 +69,9 @@ namespace manifold
       std::uint32_t create_stream(std::uint32_t dependency_transaction_id, std::uint32_t transaction_id);
       bool send_data(std::uint32_t stream_id, const char *const data, std::uint32_t data_sz, bool end_stream);
       bool send_headers(std::uint32_t stream_id, const SendMsg& head, bool end_headers, bool end_stream);
+#ifndef MANIFOLD_REMOVED_TRAILERS
       bool send_trailers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream);
+#endif
       //bool send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream);
       //bool send_priority(std::uint32_t stream_id, priority_options options);
       bool send_reset_stream(std::uint32_t stream_id, http::errc error_code)  { this->close(error_code); return true; }

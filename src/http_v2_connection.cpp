@@ -15,7 +15,7 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg> const std::uint32_t v2_connection<SendMsg, RecvMsg>::default_enable_push            = 1;
     template <typename SendMsg, typename RecvMsg> const std::uint32_t v2_connection<SendMsg, RecvMsg>::default_initial_window_size    = 65535;
     template <typename SendMsg, typename RecvMsg> const std::uint32_t v2_connection<SendMsg, RecvMsg>::default_max_frame_size         = 16384;
-
+#ifndef MANIFOLD_REMOVED_PRIORITY
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     v2_connection<SendMsg, RecvMsg>::stream_dependency_tree::stream_dependency_tree()
@@ -89,7 +89,7 @@ namespace manifold
       this->children_.clear();
     }
     //----------------------------------------------------------------//
-
+#endif
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     const std::array<char,24> v2_connection<SendMsg, RecvMsg>::preface{{0x50, 0x52, 0x49, 0x20, 0x2a, 0x20, 0x48, 0x54, 0x54, 0x50, 0x2f, 0x32, 0x2e, 0x30, 0x0d, 0x0a, 0x0d, 0x0a, 0x53, 0x4d, 0x0d, 0x0a, 0x0d, 0x0a}};
@@ -106,11 +106,10 @@ namespace manifold
         last_newly_accepted_stream_id_(0),
         next_stream_id_(initial_stream_id),
         outgoing_window_size_(default_initial_window_size),
-        incoming_window_size_(default_initial_window_size),
-        stream_dependency_tree_()
+        incoming_window_size_(default_initial_window_size)
     {
-      std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
-      this->rg_.seed(seed);
+      std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)}); // Entropy is not important here, since rng is for priority distribution.
+      this->rng_.seed(seed);
 
       // header_table_size      = 0x1, // 4096
       // enable_push            = 0x2, // 1
@@ -144,11 +143,10 @@ namespace manifold
         last_newly_accepted_stream_id_(0),
         next_stream_id_(initial_stream_id),
         outgoing_window_size_(default_initial_window_size),
-        incoming_window_size_(default_initial_window_size),
-        stream_dependency_tree_()
+        incoming_window_size_(default_initial_window_size)
     {
-      std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)});
-      this->rg_.seed(seed);
+      std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)}); // Entropy is not important here, since rng is for priority distribution.
+      this->rng_.seed(seed);
 
       // header_table_size      = 0x1, // 4096
       // enable_push            = 0x2, // 1
@@ -197,7 +195,7 @@ namespace manifold
         {
           if (it->second.state() != stream_state::closed)
           {
-            it->second.handle_outgoing_rst_stream_state_change(errc::internal_error);
+            it->second.send_rst_stream_frame(errc::internal_error); // Frame will never actually be sent. This is just being called to change state and call callback.
           }
         }
 
@@ -213,7 +211,7 @@ namespace manifold
       return this->closed_;
     }
     //----------------------------------------------------------------//
-
+#ifndef MANIFOLD_REMOVED_PRIORITY
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     typename v2_connection<SendMsg, RecvMsg>::stream* v2_connection<SendMsg, RecvMsg>::stream_dependency_tree::get_next_send_stream_ptr(std::uint32_t connection_window_size, std::minstd_rand& rng)
@@ -287,6 +285,7 @@ namespace manifold
       return ret;
     }
     //----------------------------------------------------------------//
+#endif
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
@@ -294,9 +293,11 @@ namespace manifold
     {
       for (auto it = this->streams_.begin(); it != this->streams_.end(); )
       {
-        if (it->second.state() == stream_state::closed && !(it->second.has_sendable_frame(true)))
+        if (it->second.state() == stream_state::closed && !it->second.has_data_frame())
         {
+#ifndef MANIFOLD_REMOVED_PRIORITY
           this->stream_dependency_tree_.remove(it->second);
+#endif
           it = this->streams_.erase(it);
         }
         else
@@ -306,6 +307,28 @@ namespace manifold
       }
     }
     //----------------------------------------------------------------//
+
+    template <typename SendMsg, typename RecvMsg>
+    typename std::map<std::uint32_t, typename v2_connection<SendMsg, RecvMsg>::stream>::iterator v2_connection<SendMsg, RecvMsg>::find_stream_with_data()
+    {
+      auto random_stream_it = this->streams_.begin();
+      std::advance(random_stream_it, this->rng_() % this->streams_.size());
+
+      for (auto it = random_stream_it; it != this->streams_.end(); ++it)
+      {
+        if (it->second.has_sendable_data_frame())
+          return it;
+      }
+
+
+      for (auto it = this->streams_.begin(); it != random_stream_it; ++it)
+      {
+        if (it->second.has_sendable_data_frame())
+          return it;
+      }
+
+      return this->streams_.end();
+    }
 
     //----------------------------------------------------------------//
     template<> bool v2_connection<request_head, response_head>::receiving_push_promise_is_allowed()
@@ -582,7 +605,7 @@ namespace manifold
       this->on_informational_headers_ = fn;
     }
     //----------------------------------------------------------------//
-
+#ifndef MANIFOLD_REMOVED_TRAILERS
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::stream::on_trailers(const std::function<void(header_block&&)>& fn)
@@ -590,7 +613,7 @@ namespace manifold
       this->on_trailers_ = fn;
     }
     //----------------------------------------------------------------//
-
+#endif
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::stream::on_rst_stream(const std::function<void(std::uint32_t)>& fn)
@@ -639,33 +662,38 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::stream::has_sendable_frame(bool can_send_data)
+    bool v2_connection<SendMsg, RecvMsg>::stream::has_data_frame()
     {
-      return (this->outgoing_non_data_frames.size()
-        || (can_send_data && this->outgoing_data_frames.size() && this->outgoing_window_size > 0)
+      return !this->outgoing_data_frames.empty();
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    bool v2_connection<SendMsg, RecvMsg>::stream::has_sendable_data_frame()
+    {
+      return ((this->outgoing_data_frames.size() && this->outgoing_window_size > 0)
         || (this->outgoing_data_frames.size() && this->outgoing_data_frames.front().payload_length() == 0));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    frame v2_connection<SendMsg, RecvMsg>::stream::pop_next_outgoing_frame(std::uint32_t connection_window_size)
+    frame v2_connection<SendMsg, RecvMsg>::stream::pop_data_frame(std::uint32_t connection_window_size)
     {
       frame ret;
-      if (this->outgoing_non_data_frames.size())
-      {
-        ret = std::move(this->outgoing_non_data_frames.front());
-        this->outgoing_non_data_frames.pop();
-      }
-      else if (this->outgoing_data_frames.size() && this->outgoing_window_size > 0 && connection_window_size > 0)
+
+      if (this->outgoing_data_frames.size() && this->outgoing_window_size > 0 && connection_window_size > 0)
       {
         if (connection_window_size > this->outgoing_window_size)
           connection_window_size = this->outgoing_window_size;
         if (this->outgoing_data_frames.front().data_frame().data_length() > connection_window_size)
           ret = frame(this->outgoing_data_frames.front().data_frame().split(connection_window_size), this->id_);
         else
+        {
           ret = std::move(this->outgoing_data_frames.front());
-        this->outgoing_data_frames.pop();
+          this->outgoing_data_frames.pop();
+        }
         this->outgoing_window_size -= ret.data_frame().data_length();
 
         if (this->outgoing_data_frames.empty() && this->on_drain_)
@@ -805,8 +833,6 @@ namespace manifold
       if (this->state_ != stream_state::closed)
       {
         this->state_= stream_state::closed;
-        std::queue<frame> empty;
-        std::swap(this->outgoing_data_frames, empty);
         this->on_close_ ? this->on_close_(int_to_errc(incoming_rst_stream_frame.error_code())) : void();
       }
     }
@@ -829,6 +855,10 @@ namespace manifold
           {
             case (std::uint16_t)setting_code::header_table_size:
               this->peer_settings_[setting_code::header_table_size] = it->second;
+              if (it->second < 4096)
+                this->hpack_encoder_.add_table_size_update(it->second);
+              else
+                this->hpack_encoder_.add_table_size_update(4096);
               break;
             case (std::uint16_t)setting_code::enable_push:
               this->peer_settings_[setting_code::enable_push] = it->second;
@@ -841,15 +871,10 @@ namespace manifold
               break;
             case (std::uint16_t)setting_code::max_frame_size:
               this->peer_settings_[setting_code::max_frame_size] = it->second;
-              if (it->second < 4096)
-                this->hpack_encoder_.add_table_size_update(it->second);
-              else
-                this->hpack_encoder_.add_table_size_update(4096);
               break;
             case (std::uint16_t)setting_code::max_header_list_size:
               this->peer_settings_[setting_code::max_header_list_size] = it->second;
               break;
-
           }
         }
         this->outgoing_frames_.push(http::frame(http::settings_frame(ack_flag()), 0x0));
@@ -885,7 +910,8 @@ namespace manifold
           else
           {
             idle_promised_stream.state_ = stream_state::reserved_remote;
-            this->on_push_promise_ ? this->on_push_promise_(std::move(headers), incoming_push_promise_frame.promised_stream_id()) : void();
+            SendMsg generic_head(std::move(headers));
+            this->on_push_promise_ ? this->on_push_promise_(std::move(generic_head), incoming_push_promise_frame.promised_stream_id()) : void();
           }
 
           break;
@@ -901,7 +927,7 @@ namespace manifold
               //              auto it = this->parent_connection_.streams_.find(this->parent_connection_.last_newly_accepted_stream_id_);
               //              assert(it != this->parent_connection_.streams_.end());
               idle_promised_stream.state_ = stream_state::reserved_remote;
-              idle_promised_stream.outgoing_non_data_frames.push(http::frame(http::rst_stream_frame(errc::refused_stream), idle_promised_stream.id_));
+              idle_promised_stream.send_rst_stream_frame(errc::refused_stream);
               //this->parent_connection_.send_reset_stream(this->parent_connection_.last_newly_accepted_stream_id_, errc::refused_stream);
             }
             else
@@ -956,39 +982,23 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::stream::handle_outgoing_headers_state_change()
+    bool v2_connection<SendMsg, RecvMsg>::stream::send_data_frame(const char*const data, std::uint32_t data_sz, bool end_stream, std::uint32_t max_frame_size)
     {
-      switch (this->state_)
-      {
-        case stream_state::idle:
-          this->state_ = stream_state::open;
-          return true;
-        case stream_state::reserved_local:
-          this->state_ = stream_state::half_closed_remote;
-          return true;
-        case stream_state::reserved_remote:
-        case stream_state::half_closed_local:
-        case stream_state::closed:
-          return false;
-        case stream_state::open:
-        case stream_state::half_closed_remote:
-          return true;
-      }
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::stream::handle_outgoing_end_stream_state_change()
-    {
+      // TODO: Check max_frame_size
       switch (this->state_)
       {
         case stream_state::open:
-          this->state_ = stream_state::half_closed_local;
+          this->outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), this->id_));
+          if (end_stream)
+            this->state_ = stream_state::half_closed_local;
           return true;
         case stream_state::half_closed_remote:
-          this->state_ = stream_state::closed;
-          this->on_close_ ? this->on_close_(errc::no_error) : void();
+          this->outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), this->id_));
+          if (end_stream)
+          {
+            this->state_ = stream_state::closed;
+            this->on_close_ ? this->on_close_(errc::no_error) : void();
+          }
           return true;
         case stream_state::reserved_remote:
         case stream_state::idle:
@@ -997,27 +1007,84 @@ namespace manifold
         case stream_state::closed:
           return false;
       }
+
+      return false;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::stream::handle_outgoing_push_promise_state_change()
+    bool v2_connection<SendMsg, RecvMsg>::stream::send_headers_frame(const v2_header_block& headers, bool end_stream, hpack::encoder& enc, std::uint32_t max_frame_size)
     {
       switch (this->state_)
       {
         case stream_state::idle:
-          this->state_ = stream_state::reserved_local;
+        case stream_state::reserved_local:
+        case stream_state::open:
+        case stream_state::half_closed_remote:
+        {
+          std::string header_data;
+          v2_header_block::serialize(enc, headers, header_data);
+
+          const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
+          if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > max_frame_size)
+          {
+            assert("impl");
+            // TODO: Split header into continuation frames.
+          }
+          else
+          {
+            this->outgoing_non_data_frames_.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t) header_data.size(), true, end_stream), this->id_));
+          }
+
+          switch (this->state_)
+          {
+            case stream_state::idle:
+              this->state_ = stream_state::open;
+              break;
+            case stream_state::reserved_local:
+              this->state_ = stream_state::half_closed_remote;
+              break;
+            case stream_state::open:
+              if (end_stream)
+                this->state_ = stream_state::half_closed_local;
+              break;
+            case stream_state::half_closed_remote:
+              if (end_stream)
+              {
+                this->state_ = stream_state::closed;
+                this->on_close_ ? this->on_close_(errc::no_error) : void();
+              }
+              break;
+          }
+
           return true;
-        default:
+        }
+        case stream_state::reserved_remote:
+        case stream_state::half_closed_local:
+        case stream_state::closed:
           return false;
+      }
+
+      return false;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    bool v2_connection<SendMsg, RecvMsg>::stream::handle_outgoing_priority_frame_state_change()
+    {
+      switch (this->state_)
+      {
+        default:
+          return true;
       }
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::stream::handle_outgoing_rst_stream_state_change(errc ec)
+    bool v2_connection<SendMsg, RecvMsg>::stream::send_rst_stream_frame(errc ec)
     {
       switch (this->state_)
       {
@@ -1025,14 +1092,140 @@ namespace manifold
         case stream_state::closed:
           return false;
         default:
+          this->outgoing_non_data_frames_.push(http::frame(http::rst_stream_frame(ec), this->id_));
           this->state_ = stream_state::closed;
-          std::queue<frame> empty;
-          std::swap(empty, this->outgoing_data_frames);
           this->on_close_ ? this->on_close_(ec) : void();
           return true;
       }
     }
     //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    bool v2_connection<SendMsg, RecvMsg>::stream::send_push_promise_frame(const v2_header_block& headers, stream& promised_stream, hpack::encoder& enc, std::uint32_t max_frame_size)
+    {
+      switch (this->state_)
+      {
+        case stream_state::open:
+        case stream_state::half_closed_remote:
+        {
+          std::string header_data;
+          v2_header_block::serialize(enc, headers, header_data);
+
+          const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
+          if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > max_frame_size)
+          {
+            assert("impl");
+            // TODO: Split header into continuation frames.
+          }
+          else
+          {
+            this->outgoing_non_data_frames_.push(http::frame(http::push_promise_frame(header_data.data(), (std::uint32_t)header_data.size(), promised_stream.id(), true), this->id_));
+          }
+
+          promised_stream.state_ = stream_state::reserved_local;
+          return true;
+        }
+        default:
+          return false;
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    bool v2_connection<SendMsg, RecvMsg>::stream::send_window_update_frame(std::uint32_t amount)
+    {
+      switch (this->state_)
+      {
+        case stream_state::idle:
+        case stream_state::closed:
+        case stream_state::reserved_local:
+          return false;
+        default:
+          this->outgoing_non_data_frames_.push(http::frame(http::window_update_frame(amount), this->id_)); // TODO: increment count.
+          return true;
+      }
+    }
+    //----------------------------------------------------------------//
+
+//    //----------------------------------------------------------------//
+//    template <typename SendMsg, typename RecvMsg>
+//    bool v2_connection<SendMsg, RecvMsg>::stream::handle_outgoing_headers_state_change()
+//    {
+//      switch (this->state_)
+//      {
+//        case stream_state::idle:
+//          this->state_ = stream_state::open;
+//          return true;
+//        case stream_state::reserved_local:
+//          this->state_ = stream_state::half_closed_remote;
+//          return true;
+//        case stream_state::reserved_remote:
+//        case stream_state::half_closed_local:
+//        case stream_state::closed:
+//          return false;
+//        case stream_state::open:
+//        case stream_state::half_closed_remote:
+//          return true;
+//      }
+//    }
+//    //----------------------------------------------------------------//
+//
+//    //----------------------------------------------------------------//
+//    template <typename SendMsg, typename RecvMsg>
+//    bool v2_connection<SendMsg, RecvMsg>::stream::handle_outgoing_end_stream_state_change()
+//    {
+//      switch (this->state_)
+//      {
+//        case stream_state::open:
+//          this->state_ = stream_state::half_closed_local;
+//          return true;
+//        case stream_state::half_closed_remote:
+//          this->state_ = stream_state::closed;
+//          this->on_close_ ? this->on_close_(errc::no_error) : void();
+//          return true;
+//        case stream_state::reserved_remote:
+//        case stream_state::idle:
+//        case stream_state::reserved_local:
+//        case stream_state::half_closed_local:
+//        case stream_state::closed:
+//          return false;
+//      }
+//    }
+//    //----------------------------------------------------------------//
+//
+//    //----------------------------------------------------------------//
+//    template <typename SendMsg, typename RecvMsg>
+//    bool v2_connection<SendMsg, RecvMsg>::stream::handle_outgoing_push_promise_state_change()
+//    {
+//      switch (this->state_)
+//      {
+//        case stream_state::idle:
+//          this->state_ = stream_state::reserved_local;
+//          return true;
+//        default:
+//          return false;
+//      }
+//    }
+//    //----------------------------------------------------------------//
+//
+//    //----------------------------------------------------------------//
+//    template <typename SendMsg, typename RecvMsg>
+//    bool v2_connection<SendMsg, RecvMsg>::stream::handle_outgoing_rst_stream_state_change(errc ec)
+//    {
+//      switch (this->state_)
+//      {
+//        case stream_state::idle:
+//        case stream_state::closed:
+//          return false;
+//        default:
+//          this->state_ = stream_state::closed;
+//          this->on_close_ ? this->on_close_(ec) : void();
+//          return true;
+//      }
+//    }
+//    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
@@ -1058,7 +1251,9 @@ namespace manifold
               frame::send_frame(*this->socket_, this->outgoing_frame_, [self](const std::error_code& ec)
               {
                 self->socket_->close();
+#ifndef MANIFOLD_REMOVED_PRIORITY
                 self->stream_dependency_tree_.clear_children();
+#endif
                 self->streams_.clear();
                 self->on_new_stream_ = nullptr;
                 self->on_close_ = nullptr;
@@ -1075,9 +1270,17 @@ namespace manifold
             this->outgoing_frames_.pop();
             outgoing_frame_set = true;
           }
-          else
+          else if (this->outgoing_window_size_)
           {
-            stream* prioritized_stream_ptr = this->stream_dependency_tree_.get_next_send_stream_ptr(this->outgoing_window_size_, this->rg_);
+            auto stream_it = this->find_stream_with_data();
+            if (stream_it != this->streams_.end())
+            {
+              this->outgoing_frame_ = std::move(stream_it->second.pop_data_frame(this->outgoing_window_size_));
+              this->outgoing_window_size_ -= this->outgoing_frame_.data_frame().data_length();
+              outgoing_frame_set = true;
+            }
+#ifndef MANIFOLD_REMOVED_PRIORITY
+            stream* prioritized_stream_ptr = this->stream_dependency_tree_.get_next_send_stream_ptr(this->outgoing_window_size_, this->rng_);
 
             if (prioritized_stream_ptr)
             {
@@ -1086,6 +1289,7 @@ namespace manifold
                 this->outgoing_window_size_ -= this->outgoing_frame_.data_frame().data_length();
               outgoing_frame_set = true;
             }
+#endif
           }
 
           if (outgoing_frame_set)
@@ -1124,7 +1328,15 @@ namespace manifold
       {
         std::list<std::pair<std::uint16_t,std::uint32_t>> settings;
         for (auto it = this->local_settings_.begin(); it != this->local_settings_.end(); ++it)
-          settings.emplace_back(static_cast<std::uint16_t>(it->first), it->second);
+        {
+          if ( (it->first == setting_code::header_table_size && it->second != default_header_table_size)
+            || (it->first == setting_code::enable_push && it->second != default_enable_push )
+            || (it->first == setting_code::initial_window_size && it->second != default_initial_window_size )
+            || (it->first == setting_code::max_frame_size && it->second != default_max_frame_size))
+          {
+            settings.emplace_back(static_cast<std::uint16_t>(it->first), it->second);
+          }
+        }
         this->send_settings(settings);
         this->run_recv_loop();
 
@@ -1196,7 +1408,7 @@ namespace manifold
       }
     }
     //----------------------------------------------------------------//
-
+#ifndef MANIFOLD_REMOVED_TRAILERS
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::on_trailers(std::uint32_t stream_id, const std::function<void(header_block&&)>& fn)
@@ -1212,7 +1424,7 @@ namespace manifold
       }
     }
     //----------------------------------------------------------------//
-
+#endif
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::on_close(std::uint32_t stream_id, const std::function<void(const std::error_code&)>& fn)
@@ -1289,11 +1501,12 @@ namespace manifold
         stream_id = this->get_next_stream_id();
       if (stream_id)
       {
-        auto insert_res = this->streams_.emplace(stream_id, stream(stream_id, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size)));
+        auto insert_res = this->streams_.emplace(stream_id, stream(stream_id, this->outgoing_frames_, this->local_settings().at(setting_code::initial_window_size), this->peer_settings().at(setting_code::initial_window_size)));
         if (insert_res.second)
         {
+#ifndef MANIFOLD_REMOVED_PRIORITY
           this->stream_dependency_tree_.insert_child(stream_dependency_tree_child_node(&(insert_res.first->second)));
-
+#endif
           ret = insert_res.first->first;
         }
       }
@@ -1331,7 +1544,7 @@ namespace manifold
       return this->send_headers(stream_id, v2_response_head(head), end_headers, end_stream);
     }
     //----------------------------------------------------------------//
-
+#ifndef MANIFOLD_REMOVED_TRAILERS
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     bool v2_connection<SendMsg, RecvMsg>::send_trailers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream)
@@ -1339,7 +1552,7 @@ namespace manifold
       return this->send_headers(stream_id, v2_header_block(head), end_headers, end_stream);
     }
     //----------------------------------------------------------------//
-
+#endif
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     bool v2_connection<SendMsg, RecvMsg>::send_headers(std::uint32_t stream_id, const v2_header_block& head, bool end_headers, bool end_stream)
@@ -1353,30 +1566,15 @@ namespace manifold
       }
       else
       {
-        std::string header_data;
-        v2_header_block::serialize(this->hpack_encoder_, head, header_data);
-        const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
-        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
+        if (!it->second.send_headers_frame(head, end_stream, this->hpack_encoder_, this->peer_settings_[setting_code::max_frame_size]))
         {
-          // TODO: Handle error
+          assert(!"Stream state change not allowed.");
         }
         else
         {
-          // TODO: check for errors below
-          bool state_change_result = it->second.handle_outgoing_headers_state_change();
-          if (end_stream && state_change_result)
-            state_change_result = it->second.handle_outgoing_end_stream_state_change();
 
-          if (state_change_result)
-          {
-            it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream), stream_id));
-            this->run_send_loop();
-            ret = true;
-          }
-          else
-          {
-            assert(!"Stream state_ change not allowed.");
-          }
+          this->run_send_loop();
+          ret = true;
         }
       }
 
@@ -1389,7 +1587,7 @@ namespace manifold
     bool v2_connection<SendMsg, RecvMsg>::send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream)
     {
       bool ret = false;
-
+#ifndef MANIFOLD_REMOVED_PRIORITY
       auto it = this->streams_.find(stream_id);
 
       if (it == this->streams_.end())
@@ -1398,33 +1596,26 @@ namespace manifold
       }
       else
       {
-        std::string header_data;
-        v2_header_block::serialize(this->hpack_encoder_, head, header_data);
-        const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
-        if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
+        if (!it->second.handle_outgoing_headers_frame_state_change(end_stream))
         {
-          // TODO: Handle error
+          assert(!"Stream state change not allowed.");
         }
         else
         {
-          // TODO: check for errors below
-          auto state_change_result = it->second.handle_outgoing_headers_state_change();
-          if (end_stream && state_change_result)
-            state_change_result = it->second.handle_outgoing_end_stream_state_change();
+          std::string header_data;
+          v2_header_block::serialize(this->hpack_encoder_, head, header_data);
+          const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
+          if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
+          {
+            // TODO: Split header into continuation frames.
+          }
 
-          if (state_change_result)
-          {
-            it->second.outgoing_non_data_frames.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream, priority), stream_id));
-            this->run_send_loop();
-            ret = true;
-          }
-          else
-          {
-            assert(!"Stream state_ change not allowed.");
-          }
+          this->outgoing_frames_.push(http::frame(http::headers_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers, end_stream, priority), stream_id));
+          this->run_send_loop();
+          ret = true;
         }
       }
-
+#endif
       return ret;
     }
     //----------------------------------------------------------------//
@@ -1434,13 +1625,13 @@ namespace manifold
     bool v2_connection<SendMsg, RecvMsg>::send_priority(std::uint32_t stream_id, priority_options options)
     {
       bool ret = false;
-
+#ifndef MANIFOLD_REMOVED_PRIORITY
       auto it = this->streams_.find(stream_id);
       if (it == this->streams_.end())
       {
         it->second.outgoing_non_data_frames.push(http::frame(http::priority_frame(options), stream_id));
       }
-
+#endif
       return ret;
     }
     //----------------------------------------------------------------//
@@ -1452,11 +1643,10 @@ namespace manifold
       bool ret = false;
 
       auto it = this->streams_.find(stream_id);
-      if (it == this->streams_.end())
+      if (it != this->streams_.end())
       {
-        if (it->second.handle_outgoing_rst_stream_state_change(error_code))
+        if (it->second.send_rst_stream_frame(error_code))
         {
-          it->second.outgoing_non_data_frames.push(http::frame(http::rst_stream_frame(error_code), stream_id));
           this->run_send_loop();
           ret = true;
         }
@@ -1479,37 +1669,37 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::send_countinuation(std::uint32_t stream_id, const v2_header_block& head, bool end_headers)
-    {
-      bool ret = false;
-
-      auto it = this->streams_.find(stream_id);
-
-      if (it == this->streams_.end())
-      {
-        // TODO: Handle error
-      }
-      else
-      {
-        std::string header_data;
-        v2_header_block::serialize(this->hpack_encoder_, head, header_data);
-        if (header_data.size() > this->peer_settings_[setting_code::max_frame_size])
-        {
-          // TODO: Handle error
-        }
-        else
-        {
-          it->second.outgoing_non_data_frames.push(http::frame(http::continuation_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers), stream_id));
-          this->run_send_loop();
-          ret = true;
-        }
-      }
-
-      return ret;
-    }
-    //----------------------------------------------------------------//
+//    //----------------------------------------------------------------//
+//    template <typename SendMsg, typename RecvMsg>
+//    bool v2_connection<SendMsg, RecvMsg>::send_countinuation(std::uint32_t stream_id, const v2_header_block& head, bool end_headers)
+//    {
+//      bool ret = false;
+//
+//      auto it = this->streams_.find(stream_id);
+//
+//      if (it == this->streams_.end())
+//      {
+//        // TODO: Handle error
+//      }
+//      else
+//      {
+//        std::string header_data;
+//        v2_header_block::serialize(this->hpack_encoder_, head, header_data);
+//        if (header_data.size() > this->peer_settings_[setting_code::max_frame_size])
+//        {
+//          // TODO: Handle error
+//        }
+//        else
+//        {
+//          it->second.outgoing_non_data_frames.push(http::frame(http::continuation_frame(header_data.data(), (std::uint32_t)header_data.size(), end_headers), stream_id));
+//          this->run_send_loop();
+//          ret = true;
+//        }
+//      }
+//
+//      return ret;
+//    }
+//    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
@@ -1521,13 +1711,8 @@ namespace manifold
 
       if (it != this->streams_.end())
       {
-        bool state_change_result = true;
-        if (end_stream)
-          state_change_result = it->second.handle_outgoing_end_stream_state_change();
-
-        if (state_change_result)
+        if (it->second.send_data_frame(data, data_sz, end_stream, this->peer_settings_[setting_code::max_frame_size]))
         {
-          it->second.outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), stream_id));
           this->run_send_loop();
           ret = true;
         }
@@ -1557,27 +1742,24 @@ namespace manifold
         }
         else
         {
-          v2_header_block v2_head(head);
-          std::string header_data;
-          v2_header_block::serialize(this->hpack_encoder_, v2_head, header_data);
-          const std::uint8_t EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME = 0; //TODO: Set correct value
-          if ((header_data.size() + EXTRA_BYTE_LENGTH_NEEDED_FOR_HEADERS_FRAME) > this->peer_settings_[setting_code::max_frame_size])
+          promised_stream_id = this->create_stream(stream_id, 0);
+
+          if (!promised_stream_id)
           {
-            // TODO: Handle error
+            // TODO: stream_id's exhausted.
           }
           else
           {
-            promised_stream_id = this->create_stream(stream_id, 0);
+            auto promised_stream = this->streams_.find(promised_stream_id);
+            v2_header_block v2_head(head);
 
-            if (!promised_stream_id)
+            if(!it->second.send_push_promise_frame(v2_head, promised_stream->second, this->hpack_encoder_, this->peer_settings_[setting_code::max_frame_size]))
             {
-              // TODO: stream_id's exhausted.
+              promised_stream_id = 0;
+              this->streams_.erase(promised_stream);
             }
             else
             {
-              this->streams_.at(promised_stream_id).handle_outgoing_push_promise_state_change();
-
-              it->second.outgoing_non_data_frames.push(http::frame(http::push_promise_frame(header_data.data(), (std::uint32_t) header_data.size(), promised_stream_id, true), stream_id));
               this->run_send_loop();
             }
           }
@@ -1624,9 +1806,11 @@ namespace manifold
       auto it = this->streams_.find(stream_id);
       if (it != this->streams_.end())
       {
-        it->second.outgoing_non_data_frames.push(http::frame(http::window_update_frame(amount), stream_id));
-        this->run_send_loop();
-        ret = true;
+        if (it->second.send_window_update_frame(amount))
+        {
+          this->run_send_loop();
+          ret = true;
+        }
       }
 
       return ret;
@@ -1637,7 +1821,7 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::send_connection_level_window_update(std::uint32_t amount)
     {
-      this->outgoing_frames_.push(http::frame(http::window_update_frame(amount), 0x0));
+      this->outgoing_frames_.push(http::frame(http::window_update_frame(amount), 0x0)); // TODO: increment count
       this->run_send_loop();
     }
     //----------------------------------------------------------------//

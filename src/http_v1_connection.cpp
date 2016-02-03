@@ -50,7 +50,7 @@ namespace manifold
         it->on_informational_headers = fn;
       }
     }
-
+#ifndef MANIFOLD_REMOVED_TRAILERS
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::on_trailers(std::uint32_t transaction_id, const std::function<void(header_block&&)>& fn)
     {
@@ -60,7 +60,7 @@ namespace manifold
         it->on_trailers = fn;
       }
     }
-
+#endif
     template <typename SendMsg, typename RecvMsg>
     void v1_connection<SendMsg, RecvMsg>::on_close(std::uint32_t transaction_id, const std::function<void(const std::error_code&)>& fn)
     {
@@ -267,8 +267,6 @@ namespace manifold
             }
             else
             {
-
-
               if (incoming_head_is_head_request(headers))
                 current->outgoing_ended = true;
 
@@ -691,12 +689,13 @@ namespace manifold
 
       return ret;
     }
-
+#ifndef MANIFOLD_REMOVED_TRAILERS
     template <typename SendMsg, typename RecvMsg>
     bool v1_connection<SendMsg, RecvMsg>::send_trailers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream)
     {
       return this->end_message(stream_id, v1_header_block(head));
     }
+#endif
 
     template <typename SendMsg, typename RecvMsg>
     bool v1_connection<SendMsg, RecvMsg>::send_data(std::uint32_t transaction_id, const char*const data, std::uint32_t data_sz, bool end_stream)

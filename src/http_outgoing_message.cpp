@@ -80,7 +80,7 @@ namespace manifold
         this->connection_->on_drain(this->stream_id_, fn);
     }
     //----------------------------------------------------------------//
-
+#ifndef MANIFOLD_REMOVED_TRAILERS
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     bool outgoing_message<SendMsg, RecvMsg>::end(const char*const data, std::size_t data_sz, const header_block& trailers)
@@ -114,7 +114,39 @@ namespace manifold
       return this->end(nullptr, 0, trailers);
     }
     //----------------------------------------------------------------//
+#else
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    bool outgoing_message<SendMsg, RecvMsg>::end(const char*const data, std::size_t data_sz)
+    {
+      bool ret = true;
 
+      if (this->connection_)
+      {
+        if (!this->headers_sent_)
+          ret = this->send_headers();
+
+
+        if (ret && !this->ended_)
+        {
+          this->connection_->send_data(this->stream_id_, data, data_sz, true);
+          // TODO: Check content length against amount sent;
+          this->ended_ = true;
+        }
+      }
+
+      return ret;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    bool outgoing_message<SendMsg, RecvMsg>::end()
+    {
+      return this->end(nullptr, 0);
+    }
+    //----------------------------------------------------------------//
+#endif
     //----------------------------------------------------------------//
     template class outgoing_message<response_head, request_head>;
     template class outgoing_message<request_head, response_head>;

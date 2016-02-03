@@ -14,6 +14,7 @@ namespace manifold
     incoming_message<SendMsg, RecvMsg>::incoming_message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::int32_t stream_id)
       : message<SendMsg, RecvMsg>(conn, stream_id)
     {
+#ifndef MANIFOLD_REMOVED_TRAILERS
       if (this->connection_)
       {
         this->connection_->on_trailers(this->stream_id_, [this](header_block&& trailers)
@@ -21,6 +22,7 @@ namespace manifold
           this->trailers_ = std::move(trailers);
         });
       }
+#endif
     }
     //----------------------------------------------------------------//
 
@@ -29,6 +31,7 @@ namespace manifold
     incoming_message<SendMsg, RecvMsg>::incoming_message(incoming_message&& source)
       : message<SendMsg, RecvMsg>(std::move(source)), trailers_(std::move(source.trailers_))
     {
+#ifndef MANIFOLD_REMOVED_TRAILERS
       if (this->connection_)
       {
         this->connection_->on_trailers(this->stream_id_, [this](header_block&& trailers)
@@ -36,6 +39,7 @@ namespace manifold
           this->trailers_ = std::move(trailers);
         });
       }
+#endif
     }
     //----------------------------------------------------------------//
 
@@ -43,8 +47,10 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     incoming_message<SendMsg, RecvMsg>::~incoming_message()
     {
+#ifndef MANIFOLD_REMOVED_TRAILERS
       if (this->connection_)
         this->connection_->on_trailers(this->stream_id_, nullptr);
+#endif
     }
     //----------------------------------------------------------------//
 
