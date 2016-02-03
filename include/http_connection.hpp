@@ -36,7 +36,7 @@ namespace manifold
         std::cout << "~connection()" << std::endl;
       }
       //----------------------------------------------------------------//
-      virtual void run() = 0;
+      //virtual void run() = 0;
       virtual void close(const std::error_code& ec) = 0;
       virtual bool is_closed() const = 0;
       //----------------------------------------------------------------//

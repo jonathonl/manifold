@@ -844,7 +844,38 @@ namespace manifold
     {
       if (incoming_settings_frame.has_ack_flag())
       {
-        // TODO: may need to add a pending queue for settings.
+        if (this->pending_local_settings_.empty())
+        {
+          this->close(errc::protocol_error);
+        }
+        else
+        {
+          auto& settings_list = this->pending_local_settings_.front();
+          for (auto it = settings_list.begin(); it != settings_list.end(); ++it)
+          {
+            switch (it->first)
+            {
+              case (std::uint16_t)setting_code::header_table_size:
+                this->peer_settings_[setting_code::header_table_size] = it->second;
+                break;
+              case (std::uint16_t)setting_code::enable_push:
+                this->peer_settings_[setting_code::enable_push] = it->second;
+                break;
+              case (std::uint16_t)setting_code::max_concurrent_streams:
+                this->peer_settings_[setting_code::max_concurrent_streams] = it->second;
+                break;
+              case (std::uint16_t)setting_code::initial_window_size:
+                this->peer_settings_[setting_code::initial_window_size] = it->second;
+                break;
+              case (std::uint16_t)setting_code::max_frame_size:
+                this->peer_settings_[setting_code::max_frame_size] = it->second;
+                break;
+              case (std::uint16_t)setting_code::max_header_list_size:
+                this->peer_settings_[setting_code::max_header_list_size] = it->second;
+                break;
+            }
+          }
+        }
       }
       else
       {
@@ -1322,12 +1353,12 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::run()
+    void v2_connection<SendMsg, RecvMsg>::run(const std::list<std::pair<setting_code, std::uint32_t>>& custom_settings)
     {
       if (!this->started_)
       {
         std::list<std::pair<std::uint16_t,std::uint32_t>> settings;
-        for (auto it = this->local_settings_.begin(); it != this->local_settings_.end(); ++it)
+        for (auto it = custom_settings.begin(); it != custom_settings.end(); ++it)
         {
           if ( (it->first == setting_code::header_table_size && it->second != default_header_table_size)
             || (it->first == setting_code::enable_push && it->second != default_enable_push )
@@ -1664,6 +1695,7 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::send_settings(const std::list<std::pair<std::uint16_t,std::uint32_t>>& settings)
     {
+      this->pending_local_settings_.push(settings);
       this->outgoing_frames_.push(http::frame(http::settings_frame(settings.begin(), settings.end()), 0x0));
       this->run_send_loop();
     }

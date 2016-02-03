@@ -366,11 +366,12 @@ namespace manifold
           }
           else
           {
-            auto it = self->connections_.emplace(std::make_shared<v1_connection<response_head, request_head>>(std::move(*sock)));
-            if (it.second)
+            auto c = std::make_shared<v1_connection<response_head, request_head>>(std::move(*sock));
+            auto res = self->connections_.emplace(c);
+            if (res.second)
             {
-              self->manage_connection(*it.first);
-              (*it.first)->run();
+              self->manage_connection(c);
+              c->run();
             }
           }
 
@@ -434,11 +435,12 @@ namespace manifold
                     }
                     else
                     {
-                      auto it = self->connections_.emplace(std::make_shared<v2_connection<response_head, request_head>>(std::move(*sock)));
-                      if (it.second)
+                      auto c = std::make_shared<v2_connection<response_head, request_head>>(std::move(*sock));
+                      auto res = self->connections_.emplace(c);
+                      if (res.second)
                       {
-                        self->manage_connection(*it.first);
-                        (*it.first)->run();
+                        self->manage_connection(c);
+                        c->run({});
                       }
                     }
                   }
@@ -448,11 +450,12 @@ namespace manifold
   #endif //MANIFOLD_DISABLE_HTTP2
               else
               {
-                auto res = self->connections_.emplace(std::make_shared<v1_connection<response_head, request_head>>(std::move(*sock)));
+                auto c = std::make_shared<v1_connection<response_head, request_head>>(std::move(*sock));
+                auto res = self->connections_.emplace(c);
                 if (res.second)
                 {
-                  self->manage_connection(*res.first);
-                  (*res.first)->run();
+                  self->manage_connection(c);
+                  c->run();
                 }
               }
             });

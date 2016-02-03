@@ -290,6 +290,7 @@ namespace manifold
       //----------------------------------------------------------------//
       std::map<std::uint32_t,stream> streams_;
       std::map<setting_code,std::uint32_t> local_settings_;
+      std::queue<std::list<std::pair<std::uint16_t,std::uint32_t>>> pending_local_settings_;
       stream* create_stream_object(std::uint32_t stream_id);
       std::uint32_t get_next_stream_id();
       //----------------------------------------------------------------//
@@ -375,7 +376,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void run();
+      void run(const std::list<std::pair<setting_code, std::uint32_t>>& custom_settings);
       void close(const std::error_code& ec);
       bool is_closed() const;
       void cancelAllStreams();

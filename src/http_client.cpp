@@ -329,9 +329,10 @@ namespace manifold
               }
               else
               {
-                self->conn_ = std::make_shared<v1_connection<request_head, response_head>>(std::move(self->sock_));
-                self->conn_->on_close(std::bind(&session_base::close, self, std::placeholders::_1));
-                self->conn_->run();
+                auto c = std::make_shared<v1_connection<request_head, response_head>>(std::move(self->sock_));
+                self->conn_ = c;
+                c->on_close(std::bind(&session_base::close, self, std::placeholders::_1));
+                c->run();
                 self->process_deferred_requests(std::error_code());
               }
             }
@@ -413,9 +414,10 @@ namespace manifold
                         }
                         else if (!self->closed_)
                         {
-                          self->conn_ = std::make_shared<v2_connection<request_head, response_head>>(std::move(self->sock_));
-                          self->conn_->on_close(std::bind(&session_base::close, self, std::placeholders::_1));
-                          self->conn_->run();
+                          auto c = std::make_shared<v2_connection<request_head, response_head>>(std::move(self->sock_));
+                          self->conn_ = c;
+                          c->on_close(std::bind(&session_base::close, self, std::placeholders::_1));
+                          c->run({});
                           self->process_deferred_requests(std::error_code());
                         }
                       });
@@ -423,9 +425,10 @@ namespace manifold
 #endif //MANIFOLD_DISABLE_HTTP2
                     else
                     {
-                      self->conn_ = std::make_shared<v1_connection<request_head, response_head>>(std::move(self->sock_));
-                      self->conn_->on_close(std::bind(&session_base::close, self, std::placeholders::_1));
-                      self->conn_->run();
+                      auto c = std::make_shared<v1_connection<request_head, response_head>>(std::move(self->sock_));
+                      self->conn_ = c;
+                      c->on_close(std::bind(&session_base::close, self, std::placeholders::_1));
+                      c->run();
                       self->process_deferred_requests(std::error_code());
                     }
                   }
