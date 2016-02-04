@@ -126,8 +126,8 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::response::response(response_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id, const std::string& request_method)
-      : outgoing_message<response_head, request_head>(conn, stream_id), request_method_(request_method)
+    server::response::response(response_head&& head, const std::shared_ptr<http::connection<response_head, request_head>>& conn, std::int32_t stream_id, const std::string& request_method, const std::string& request_authority)
+      : outgoing_message<response_head, request_head>(conn, stream_id), request_method_(request_method), request_authority_(request_authority)
     {
       this->head_ = std::move(head);
     }
@@ -135,7 +135,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     server::response::response(server::response&& source)
-      : outgoing_message(std::move(source)), head_(std::move(source.head_)), request_method_(std::move(source.request_method_))
+      : outgoing_message(std::move(source)), head_(std::move(source.head_)), request_method_(std::move(source.request_method_)), request_authority_(std::move(source.request_authority_))
     {
     }
     //----------------------------------------------------------------//
@@ -177,7 +177,9 @@ namespace manifold
         std::uint32_t promised_stream_id = this->connection_->send_push_promise(this->stream_id_, push_promise_headers);
         if (promised_stream_id)
         {
-          ret = push_promise(server::request(std::move(push_promise_headers), this->connection_, promised_stream_id), server::response(response_head(200, {{"server", this->head().header("server")}}), this->connection_, promised_stream_id, method));
+          if (push_promise_headers.authority().empty())
+            push_promise_headers.authority(this->request_authority_);
+          ret = push_promise(server::request(std::move(push_promise_headers), this->connection_, promised_stream_id), server::response(response_head(200, {{"server", this->head().header("server")}}), this->connection_, promised_stream_id, method, this->request_authority_));
         }
       }
 
@@ -475,7 +477,8 @@ namespace manifold
         conn->on_headers(stream_id, [conn, stream_id, this](request_head&& headers)
         {
           std::string method = headers.method();
-          this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(response_head(), conn, stream_id, method)) : void();
+          std::string authority = headers.authority();
+          this->request_handler_ ? this->request_handler_(server::request(std::move(headers), conn, stream_id), server::response(response_head(), conn, stream_id, method, authority)) : void();
         });
 
         conn->on_push_promise(stream_id, [stream_id, conn](response_head&& head, std::uint32_t promised_stream_id)

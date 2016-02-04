@@ -1597,7 +1597,7 @@ namespace manifold
 #endif
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::send_headers(std::uint32_t stream_id, const v2_header_block& head, bool end_headers, bool end_stream)
+    bool v2_connection<SendMsg, RecvMsg>::send_headers(std::uint32_t stream_id, v2_header_block&& head, bool end_headers, bool end_stream)
     {
       bool ret = false;
 
@@ -1626,7 +1626,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream)
+    bool v2_connection<SendMsg, RecvMsg>::send_headers(std::uint32_t stream_id, v2_header_block&& head, priority_options priority, bool end_headers, bool end_stream)
     {
       bool ret = false;
 #ifndef MANIFOLD_REMOVED_PRIORITY
@@ -1770,8 +1770,24 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
+    template <>
+    std::uint32_t v2_connection<request_head, response_head>::send_push_promise(std::uint32_t stream_id, const response_head& head)
+    {
+      return 0;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <>
+    std::uint32_t v2_connection<response_head, request_head>::send_push_promise(std::uint32_t stream_id, const request_head& head)
+    {
+      return this->send_push_promise(stream_id, v2_request_head(head));
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    std::uint32_t v2_connection<SendMsg, RecvMsg>::send_push_promise(std::uint32_t stream_id, const RecvMsg& head)
+    std::uint32_t v2_connection<SendMsg, RecvMsg>::send_push_promise(std::uint32_t stream_id, v2_header_block&& head)
     {
       std::uint32_t promised_stream_id = 0;
 
@@ -1794,9 +1810,8 @@ namespace manifold
           else
           {
             auto promised_stream = this->streams_.find(promised_stream_id);
-            v2_header_block v2_head(head);
 
-            if(!it->second.send_push_promise_frame(v2_head, promised_stream->second, this->hpack_encoder_, this->peer_settings_[setting_code::max_frame_size]))
+            if(!it->second.send_push_promise_frame(head, promised_stream->second, this->hpack_encoder_, this->peer_settings_[setting_code::max_frame_size]))
             {
               promised_stream_id = 0;
               this->streams_.erase(promised_stream);

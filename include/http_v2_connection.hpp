@@ -413,12 +413,13 @@ namespace manifold
 #ifndef MANIFOLD_REMOVED_TRAILERS
       bool send_trailers(std::uint32_t stream_id, const header_block& head, bool end_headers, bool end_stream);
 #endif
-      bool send_headers(std::uint32_t stream_id, const v2_header_block& head, bool end_headers, bool end_stream);
-      bool send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream);
+      bool send_headers(std::uint32_t stream_id, v2_header_block&& head, bool end_headers, bool end_stream);
+      bool send_headers(std::uint32_t stream_id, v2_header_block&& head, priority_options priority, bool end_headers, bool end_stream);
       bool send_priority(std::uint32_t stream_id, priority_options options);
       bool send_reset_stream(std::uint32_t stream_id, http::errc error_code);
       void send_settings(const std::list<std::pair<std::uint16_t,std::uint32_t>>& settings);
       std::uint32_t send_push_promise(std::uint32_t stream_id, const RecvMsg& head);
+      std::uint32_t send_push_promise(std::uint32_t stream_id, v2_header_block&& head);
       void send_ping(std::uint64_t opaque_data);
       void send_goaway(http::errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0);
       bool send_window_update(std::uint32_t stream_id, std::uint32_t amount);
