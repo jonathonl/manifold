@@ -18,8 +18,21 @@ namespace manifold
   namespace http
   {
     //**********************************************************************//
-    // custom error conditions enum type:
-    enum class errc : std::uint32_t
+    enum class errc
+    {
+      connect_timeout = 0x1,
+      data_transfer_timeout,
+      idle_connection_timeout,
+      invalid_headers,
+      unwarranted_response,
+      connection_closed_before_request_was_processed,
+      chunked_encoding_corrupt,
+      should_never_happen // TODO: This is a stupid error
+    };
+    //**********************************************************************//
+
+    //**********************************************************************//
+    enum class v2_errc : std::uint32_t
     {
       no_error            = 0x0,
       protocol_error      = 0x1,
@@ -36,15 +49,16 @@ namespace manifold
       inadequate_security = 0xc,
       http_1_1_required   = 0xd
     };
-    //**********************************************************************//
 
-    errc int_to_errc(std::uint32_t error_code);
+    v2_errc int_to_v2_errc(std::uint32_t error_code);
+    //**********************************************************************//
   }
 }
 
 namespace std
 {
   template<> struct is_error_code_enum<manifold::http::errc> : public true_type {};
+  template<> struct is_error_code_enum<manifold::http::v2_errc> : public true_type {};
   //template<> struct is_error_condition_enum<manifold::http::errc> : public true_type {};
 }
 
@@ -53,24 +67,34 @@ namespace manifold
   namespace http
   {
     //**********************************************************************//
-    // custom category:
     class error_category_impl : public std::error_category
     {
     public:
       error_category_impl();
       ~error_category_impl();
-      //----------------------------------------------------------------------//
       const char* name() const noexcept;
       //std::error_condition default_error_condition (int ev) const noexcept;
       //bool equivalent (const std::error_code& code, int condition) const noexcept;
       std::string message(int ev) const;
-      //----------------------------------------------------------------------//
     };
-    //**********************************************************************//
-    const error_category_impl error_category_object;
-    //const error_category_t& error_category();
 
     std::error_code make_error_code(manifold::http::errc e);
+    //**********************************************************************//
+
+    //**********************************************************************//
+    class v2_error_category_impl : public std::error_category
+    {
+    public:
+      v2_error_category_impl();
+      ~v2_error_category_impl();
+      const char* name() const noexcept;
+      //std::error_condition default_error_condition (int ev) const noexcept;
+      //bool equivalent (const std::error_code& code, int condition) const noexcept;
+      std::string message(int ev) const;
+    };
+
+    std::error_code make_error_code(manifold::http::v2_errc e);
+    //**********************************************************************//
   }
 }
 

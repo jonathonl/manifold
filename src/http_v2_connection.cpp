@@ -190,12 +190,12 @@ namespace manifold
         this->closed_ = true;
 
         //TODO: This needs to be fixed.
-        this->send_goaway(errc::internal_error);
+        this->send_goaway(v2_errc::internal_error);
         for (auto it = this->streams_.begin(); it != this->streams_.end(); ++it)
         {
           if (it->second.state() != stream_state::closed)
           {
-            it->second.send_rst_stream_frame(errc::internal_error); // Frame will never actually be sent. This is just being called to change state and call callback.
+            it->second.send_rst_stream_frame(v2_errc::internal_error); // Frame will never actually be sent. This is just being called to change state and call callback.
           }
         }
 
@@ -373,7 +373,7 @@ namespace manifold
         {
           if (ec)
           {
-            self->close(errc::internal_error);
+            self->close(v2_errc::internal_error);
           }
           else if (!self->is_closed())
           {
@@ -390,7 +390,7 @@ namespace manifold
                   self->last_newly_accepted_stream_id_ = incoming_stream_id;
                   if (!self->create_stream(0, incoming_stream_id))
                   {
-                    self->close(errc::internal_error);
+                    self->close(v2_errc::internal_error);
                   }
                   else
                   {
@@ -401,7 +401,7 @@ namespace manifold
                 }
                 else
                 {
-                  self->close(errc::protocol_error);
+                  self->close(v2_errc::protocol_error);
                 }
               }
 
@@ -427,7 +427,7 @@ namespace manifold
                   }
                   else
                   {
-                    errc handle_frame_conn_error = errc::no_error;
+                    v2_errc handle_frame_conn_error = v2_errc::no_error;
                     if (self->incoming_header_block_fragments_.front().type() == frame_type::headers)
                     {
                       headers_frame h_frame(std::move(self->incoming_header_block_fragments_.front().headers_frame()));
@@ -458,14 +458,14 @@ namespace manifold
 
                       if (pp_frame.promised_stream_id() <= self->last_newly_accepted_stream_id_)
                       {
-                        self->close(errc::protocol_error);
+                        self->close(v2_errc::protocol_error);
                       }
                       else
                       {
                         self->last_newly_accepted_stream_id_ = pp_frame.promised_stream_id();
                         if (!self->create_stream(current_stream_it->second.id(), pp_frame.promised_stream_id()))
                         {
-                          self->close(errc::internal_error);
+                          self->close(v2_errc::internal_error);
                         }
                         else
                         {
@@ -490,16 +490,16 @@ namespace manifold
                       self->incoming_header_block_fragments_.push(std::move(self->incoming_frame_));
                     else if (incoming_frame_type == frame_type::headers)
                     {
-                      errc handle_frame_conn_error = errc::no_error;
+                      v2_errc handle_frame_conn_error = v2_errc::no_error;
                       current_stream_it->second.handle_incoming_frame(self->incoming_frame_.headers_frame(), {}, self->hpack_decoder_, handle_frame_conn_error);
-                      if (handle_frame_conn_error != errc::no_error)
+                      if (handle_frame_conn_error != v2_errc::no_error)
                         self->close(handle_frame_conn_error);
                     }
                     else
                     {
                       if (self->incoming_frame_.push_promise_frame().promised_stream_id() <= self->last_newly_accepted_stream_id_)
                       {
-                        self->close(errc::protocol_error);
+                        self->close(v2_errc::protocol_error);
                       }
                       else
                       {
@@ -510,10 +510,10 @@ namespace manifold
                         }
                         else
                         {
-                          errc handle_frame_conn_error = errc::no_error;
+                          v2_errc handle_frame_conn_error = v2_errc::no_error;
                           auto promised_stream_it = self->streams_.find(self->incoming_frame_.push_promise_frame().promised_stream_id());
                           current_stream_it->second.handle_incoming_frame(self->incoming_frame_.push_promise_frame(), {}, self->hpack_decoder_, promised_stream_it->second, handle_frame_conn_error);
-                          if (handle_frame_conn_error != errc::no_error)
+                          if (handle_frame_conn_error != v2_errc::no_error)
                             self->close(handle_frame_conn_error);
                         }
                       }
@@ -522,7 +522,7 @@ namespace manifold
                 }
                 else
                 {
-                  errc handle_frame_conn_error = errc::no_error;
+                  v2_errc handle_frame_conn_error = v2_errc::no_error;
                   switch (incoming_frame_type)
                   {
                     case frame_type::data:
@@ -543,7 +543,7 @@ namespace manifold
                     }
                   }
 
-                  if (handle_frame_conn_error != errc::no_error)
+                  if (handle_frame_conn_error != v2_errc::no_error)
                     self->close(handle_frame_conn_error);
                 }
               }
@@ -657,7 +657,7 @@ namespace manifold
     void v2_connection<SendMsg, RecvMsg>::stream::on_close(const std::function<void(const std::error_code&)>& fn)
     {
       if (this->state_ == stream_state::closed)
-        fn ? fn(errc::no_error) : void(); // TODO: pass error if there is one.
+        fn ? fn(v2_errc::no_error) : void(); // TODO: pass error if there is one.
       else
         this->on_close_ = fn;
     }
@@ -709,7 +709,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const data_frame& incoming_data_frame, errc& connection_error)
+    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const data_frame& incoming_data_frame, v2_errc& connection_error)
     {
       switch (this->state_)
       {
@@ -732,7 +732,7 @@ namespace manifold
           {
             this->state_= stream_state::closed;
             this->on_end_ ? this->on_end_() : void();
-            this->on_close_ ? this->on_close_(errc::no_error) : void();
+            this->on_close_ ? this->on_close_(v2_errc::no_error) : void();
           }
           break;
         }
@@ -746,7 +746,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, errc& connection_error)
+    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, v2_errc& connection_error)
     {
       switch (this->state_)
       {
@@ -773,7 +773,7 @@ namespace manifold
 
           v2_header_block headers;
           if (!v2_header_block::deserialize(dec, serialized_header_block, headers))
-            connection_error = errc::compression_error;
+            connection_error = v2_errc::compression_error;
           else
           {
             if (this->state_ == stream_state::reserved_remote)
@@ -804,7 +804,7 @@ namespace manifold
             if (this->state_ == stream_state::closed)
             {
               this->on_end_ ? this->on_end_() : void();
-              this->on_close_ ? this->on_close_(errc::no_error) : void();
+              this->on_close_ ? this->on_close_(v2_errc::no_error) : void();
             }
             else if (this->state_ == stream_state::half_closed_remote)
             {
@@ -823,7 +823,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const priority_frame& incoming_priority_frame, errc& connection_error)
+    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const priority_frame& incoming_priority_frame, v2_errc& connection_error)
     {
       // TODO: implement.
     }
@@ -831,14 +831,14 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const rst_stream_frame& incoming_rst_stream_frame, errc& connection_error)
+    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const rst_stream_frame& incoming_rst_stream_frame, v2_errc& connection_error)
     {
       if (this->state_ != stream_state::closed)
       {
         std::queue<frame> rmv;
         this->outgoing_data_frames.swap(rmv);
         this->state_= stream_state::closed;
-        this->on_close_ ? this->on_close_(int_to_errc(incoming_rst_stream_frame.error_code())) : void();
+        this->on_close_ ? this->on_close_(int_to_v2_errc(incoming_rst_stream_frame.error_code())) : void();
       }
     }
     //----------------------------------------------------------------//
@@ -851,7 +851,7 @@ namespace manifold
       {
         if (this->pending_local_settings_.empty())
         {
-          this->close(errc::protocol_error);
+          this->close(v2_errc::protocol_error);
         }
         else
         {
@@ -888,7 +888,6 @@ namespace manifold
         std::cout << settings_list.size() << std::endl;
         for (auto it = settings_list.begin(); it != settings_list.end(); ++it)
         {
-          std::cout << it->first << ":" << it->second << std::endl;
           switch (it->first)
           {
             case (std::uint16_t)setting_code::header_table_size:
@@ -921,7 +920,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const push_promise_frame& incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, stream& idle_promised_stream, errc& connection_error)
+    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const push_promise_frame& incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, stream& idle_promised_stream, v2_errc& connection_error)
     {
       switch (this->state_)
       {
@@ -944,7 +943,7 @@ namespace manifold
 
           v2_header_block headers;
           if (!v2_header_block::deserialize(dec, serialized_header_block, headers))
-            connection_error = errc::compression_error;
+            connection_error = v2_errc::compression_error;
           else
           {
             idle_promised_stream.state_ = stream_state::reserved_remote;
@@ -965,7 +964,7 @@ namespace manifold
               //              auto it = this->parent_connection_.streams_.find(this->parent_connection_.last_newly_accepted_stream_id_);
               //              assert(it != this->parent_connection_.streams_.end());
               idle_promised_stream.state_ = stream_state::reserved_remote;
-              idle_promised_stream.send_rst_stream_frame(errc::refused_stream);
+              idle_promised_stream.send_rst_stream_frame(v2_errc::refused_stream);
               //this->parent_connection_.send_reset_stream(this->parent_connection_.last_newly_accepted_stream_id_, errc::refused_stream);
             }
             else
@@ -1014,7 +1013,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const window_update_frame& incoming_window_update_frame, errc& connection_error)
+    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const window_update_frame& incoming_window_update_frame, v2_errc& connection_error)
     {
       this->outgoing_window_size += incoming_window_update_frame.window_size_increment();
     }
@@ -1037,7 +1036,7 @@ namespace manifold
           if (end_stream)
           {
             this->state_ = stream_state::closed;
-            this->on_close_ ? this->on_close_(errc::no_error) : void();
+            this->on_close_ ? this->on_close_(v2_errc::no_error) : void();
           }
           return true;
         case stream_state::reserved_remote:
@@ -1093,7 +1092,7 @@ namespace manifold
               if (end_stream)
               {
                 this->state_ = stream_state::closed;
-                this->on_close_ ? this->on_close_(errc::no_error) : void();
+                this->on_close_ ? this->on_close_(v2_errc::no_error) : void();
               }
               break;
           }
@@ -1124,7 +1123,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::stream::send_rst_stream_frame(errc ec)
+    bool v2_connection<SendMsg, RecvMsg>::stream::send_rst_stream_frame(v2_errc ec)
     {
       switch (this->state_)
       {
@@ -1225,7 +1224,7 @@ namespace manifold
 //          return true;
 //        case stream_state::half_closed_remote:
 //          this->state_ = stream_state::closed;
-//          this->on_close_ ? this->on_close_(errc::no_error) : void();
+//          this->on_close_ ? this->on_close_(v2_errc::no_error) : void();
 //          return true;
 //        case stream_state::reserved_remote:
 //        case stream_state::idle:
@@ -1342,7 +1341,7 @@ namespace manifold
               self->send_loop_running_ = false;
               if (ec)
               {
-                self->close(errc::internal_error);
+                self->close(v2_errc::internal_error);
                 std::cout << "ERROR " << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
               }
               else
@@ -1680,7 +1679,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::send_reset_stream(std::uint32_t stream_id, http::errc error_code)
+    bool v2_connection<SendMsg, RecvMsg>::send_reset_stream(std::uint32_t stream_id, http::v2_errc error_code)
     {
       bool ret = false;
 
@@ -1848,7 +1847,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::send_goaway(http::errc error_code, const char *const data, std::uint32_t data_sz)
+    void v2_connection<SendMsg, RecvMsg>::send_goaway(http::v2_errc error_code, const char *const data, std::uint32_t data_sz)
     {
       this->outgoing_frames_.push(http::frame(http::goaway_frame(this->last_newly_accepted_stream_id_, error_code, data, data_sz), 0x0));
       this->run_send_loop();

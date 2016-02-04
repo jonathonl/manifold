@@ -141,7 +141,6 @@ namespace manifold
       ret << std::setw(4) << (0xFFFF & tmp[1] >> 48);
       ret << "-";
       ret << std::setw(12) << (0xFFFFFFFFFFFF & tmp[1]);
-      std::cout << ret.str() << std::endl;
       return ret.str();
     }
     //================================================================//

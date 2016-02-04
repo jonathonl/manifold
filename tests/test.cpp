@@ -274,7 +274,7 @@ int main()
 
   http::server srv(ioservice, server_ssl_ctx, 8080);
   srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
-  ioservice.run();
+
   //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
   //ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
   //----------------------------------------------------------------//
@@ -316,17 +316,21 @@ int main()
       }
     });
 
-    file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/uploaded_file.txt"), "./").on_complete([](const std::error_code& ec, const std::string& file_path)
+    for (size_t i = 0; i < 20; ++i)
     {
-      if (ec)
+      file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/readme.md"), "./").on_complete([i](const std::error_code& ec, const std::string& file_path)
       {
-        std::cout << ec.message() << std::endl;
-      }
-      else
-      {
-        std::cout << "GET SUCCEEDED" << std::endl;
-      }
-    });
+        if (ec)
+        {
+          std::cout << ec.message() << std::endl;
+        }
+        else
+        {
+          std::cout << "GET " << std::setfill('0') << std::setw(2) << i;
+          std::cout << " SUCCEEDED" << std::endl;
+        }
+      });
+    }
 
     ioservice.run();
 

@@ -347,7 +347,7 @@ namespace manifold
         std::set<std::shared_ptr<http::connection<response_head, request_head>>> tmp;
         tmp.swap(this->connections_);
         for (auto it = tmp.begin(); it != tmp.end(); ++it)
-          (*it)->close(errc::cancel);
+          (*it)->close(v2_errc::cancel);
         tmp.clear();
       }
     }
@@ -483,7 +483,7 @@ namespace manifold
 
         conn->on_push_promise(stream_id, [stream_id, conn](response_head&& head, std::uint32_t promised_stream_id)
         {
-          conn->send_goaway(errc::protocol_error, "Clients Cannot Push!");
+          conn->send_goaway(v2_errc::protocol_error, "Clients Cannot Push!");
         });
       });
 

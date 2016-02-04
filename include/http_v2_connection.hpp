@@ -139,7 +139,7 @@ namespace manifold
         std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)> on_push_promise_;
         std::function<void()> on_end_;
         std::function<void()> on_drain_;
-        std::function<void(errc error_code)> on_close_;
+        std::function<void(v2_errc error_code)> on_close_;
 
         static bool incoming_header_is_informational(const RecvMsg &head);
       public:
@@ -207,19 +207,19 @@ namespace manifold
         ~stream() {}
 
         //----------------------------------------------------------------//
-        void handle_incoming_frame(const data_frame& incoming_data_frame, errc& connection_error);
-        void handle_incoming_frame(const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, errc& connection_error);
-        void handle_incoming_frame(const priority_frame& incoming_priority_frame, errc& connection_error);
-        void handle_incoming_frame(const rst_stream_frame& incoming_rst_stream_frame, errc& connection_error);
-        void handle_incoming_frame(const push_promise_frame& incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, stream& idle_promised_stream, errc& connection_error);
-        void handle_incoming_frame(const window_update_frame& incoming_window_update_frame, errc& connection_error);
+        void handle_incoming_frame(const data_frame& incoming_data_frame, v2_errc& connection_error);
+        void handle_incoming_frame(const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, v2_errc& connection_error);
+        void handle_incoming_frame(const priority_frame& incoming_priority_frame, v2_errc& connection_error);
+        void handle_incoming_frame(const rst_stream_frame& incoming_rst_stream_frame, v2_errc& connection_error);
+        void handle_incoming_frame(const push_promise_frame& incoming_push_promise_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, stream& idle_promised_stream, v2_errc& connection_error);
+        void handle_incoming_frame(const window_update_frame& incoming_window_update_frame, v2_errc& connection_error);
         //----------------------------------------------------------------//
 
         //----------------------------------------------------------------//
         bool send_data_frame(const char*const data, std::uint32_t data_sz, bool end_stream, std::uint32_t max_frame_size);
         bool send_headers_frame(const v2_header_block& headers, bool end_stream, hpack::encoder& enc, std::uint32_t max_frame_size);
         bool handle_outgoing_priority_frame_state_change();
-        bool send_rst_stream_frame(errc ec);
+        bool send_rst_stream_frame(v2_errc ec);
         bool send_push_promise_frame(const v2_header_block& headers, stream& promised_stream, hpack::encoder& enc, std::uint32_t max_frame_size);
         bool send_window_update_frame(std::uint32_t amount);
 
@@ -417,12 +417,12 @@ namespace manifold
       bool send_headers(std::uint32_t stream_id, v2_header_block&& head, bool end_headers, bool end_stream);
       bool send_headers(std::uint32_t stream_id, v2_header_block&& head, priority_options priority, bool end_headers, bool end_stream);
       bool send_priority(std::uint32_t stream_id, priority_options options);
-      bool send_reset_stream(std::uint32_t stream_id, http::errc error_code);
+      bool send_reset_stream(std::uint32_t stream_id, http::v2_errc error_code);
       void send_settings(const std::list<std::pair<std::uint16_t,std::uint32_t>>& settings);
       std::uint32_t send_push_promise(std::uint32_t stream_id, const RecvMsg& head);
       std::uint32_t send_push_promise(std::uint32_t stream_id, v2_header_block&& head);
       void send_ping(std::uint64_t opaque_data);
-      void send_goaway(http::errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0);
+      void send_goaway(http::v2_errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0);
       bool send_window_update(std::uint32_t stream_id, std::uint32_t amount);
       //bool send_countinuation(std::uint32_t stream_id, const v2_header_block& head, bool end_headers);
       //----------------------------------------------------------------//

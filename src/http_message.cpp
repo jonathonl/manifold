@@ -44,7 +44,7 @@ namespace manifold
     void message<SendMsg,RecvMsg>::cancel()
     {
       if (this->connection_)
-        this->connection_->send_reset_stream(this->stream_id_, errc::cancel);
+        this->connection_->send_reset_stream(this->stream_id_, v2_errc::cancel);
     }
 
     //----------------------------------------------------------------//

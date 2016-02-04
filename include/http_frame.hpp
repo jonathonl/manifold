@@ -155,7 +155,7 @@ namespace manifold
     class rst_stream_frame : public frame_payload_base
     {
     public:
-      rst_stream_frame(http::errc error_code);
+      rst_stream_frame(http::v2_errc error_code);
       ~rst_stream_frame() {}
 
       std::uint32_t error_code() const;
@@ -222,11 +222,11 @@ namespace manifold
     class goaway_frame : public frame_payload_base
     {
     public:
-      goaway_frame(std::uint32_t last_stream_id, http::errc error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz);
+      goaway_frame(std::uint32_t last_stream_id, http::v2_errc error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz);
       ~goaway_frame() {}
 
       std::uint32_t last_stream_id() const;
-      http::errc error_code() const;
+      http::v2_errc error_code() const;
       const char*const additional_debug_data() const;
       std::uint32_t additional_debug_data_length() const;
     private:

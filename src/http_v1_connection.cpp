@@ -68,7 +68,7 @@ namespace manifold
       if (it != this->transaction_queue_.end())
       {
         if (it->state == transaction_state::closed)
-          fn ? fn(errc::no_error) : void();
+          fn ? fn(std::error_code()) : void();
         else
           it->on_close = fn;
       }
@@ -111,7 +111,7 @@ namespace manifold
       {
         auto self = casted_shared_from_this();
         if (self->activity_deadline_timer_.expires_from_now() <= std::chrono::system_clock::duration(0))
-          this->close(errc::internal_error);
+          this->close(http::errc::data_transfer_timeout); // TODO: check if idle.
         else
           this->activity_deadline_timer_.async_wait(std::bind(&v1_connection::run_timeout_loop, self, std::placeholders::_1));
       }
@@ -242,7 +242,7 @@ namespace manifold
       {
         if (ec)
         {
-          self->close(errc::internal_error);
+          self->close(ec);
         }
         else if (!self->is_closed())
         {
@@ -251,7 +251,7 @@ namespace manifold
           RecvMsg headers;
           if (!v1_connection<SendMsg, RecvMsg>::deserialize_incoming_headers(is, headers))
           {
-            self->close(errc::protocol_error);
+            self->close(errc::invalid_headers);
           }
           else
           {
@@ -263,7 +263,7 @@ namespace manifold
             transaction* current = self->current_recv_transaction();
             if (!current)
             {
-              self->close(errc::protocol_error); //(server sending a response without a request).
+              self->close(errc::unwarranted_response); //(server sending a response without a request).
             }
             else
             {
@@ -279,7 +279,7 @@ namespace manifold
                 if (current->state == transaction_state::closed)
                 {
                   if (current->on_close)
-                    current->on_close(errc::no_error); // : void();
+                    current->on_close(std::error_code()); // : void();
                   self->garbage_collect_transactions();
                 }
 
@@ -307,7 +307,7 @@ namespace manifold
       {
         if (ec)
         {
-          self->close(errc::internal_error);
+          self->close(ec);
         }
         else if (!self->is_closed())
         {
@@ -316,7 +316,7 @@ namespace manifold
           if (!current)
           {
             assert(!"Should never happen.");
-            self->close(errc::internal_error);
+            self->close(errc::should_never_happen);
           }
           else
           {
@@ -337,7 +337,7 @@ namespace manifold
               current->on_end ? current->on_end() : void();
               if (current->state == transaction_state::closed)
               {
-                current->on_close ? current->on_close(errc::no_error) : void();
+                current->on_close ? current->on_close(std::error_code()) : void();
                 self->garbage_collect_transactions();
               }
 
@@ -357,7 +357,7 @@ namespace manifold
       {
         if (ec)
         {
-          self->close(errc::internal_error);
+          self->close(ec);
         }
         else if (!self->is_closed())
         {
@@ -372,7 +372,7 @@ namespace manifold
           unsigned long chunk_size = strtoul(chunk_size_str.c_str(), &not_converted, 16);
           if (*not_converted != '\0')
           {
-            self->close(errc::internal_error);
+            self->close(errc::chunked_encoding_corrupt);
           }
           else
           {
@@ -397,7 +397,7 @@ namespace manifold
       {
         if (ec)
         {
-          self->close(errc::internal_error);
+          self->close(ec);
         }
         else if (!self->is_closed())
         {
@@ -406,7 +406,7 @@ namespace manifold
           if (!current)
           {
             assert(!"Should never happen.");
-            self->close(errc::internal_error);
+            self->close(errc::should_never_happen);
           }
           else
           {
@@ -420,7 +420,7 @@ namespace manifold
               {
                 if (ec)
                 {
-                  self->close(errc::internal_error);
+                  self->close(ec);
                 }
                 else if (!self->is_closed())
                 {
@@ -446,7 +446,7 @@ namespace manifold
         if (!current)
         {
           assert(!"Should never happen.");
-          this->close(errc::internal_error);
+          this->close(errc::should_never_happen);
         }
         else
         {
@@ -454,7 +454,7 @@ namespace manifold
           current->on_end ? current->on_end() : void();
           if (current->state == transaction_state::closed)
           {
-            current->on_close ? current->on_close(errc::no_error) : void();
+            current->on_close ? current->on_close(std::error_code()) : void();
             this->garbage_collect_transactions();
           }
 
@@ -473,7 +473,7 @@ namespace manifold
         {
           if (ec)
           {
-            self->close(errc::internal_error);
+            self->close(ec);
           }
           else if (!self->is_closed())
           {
@@ -481,7 +481,7 @@ namespace manifold
             if (!current)
             {
               assert(!"Should never happen.");
-              self->close(errc::internal_error);
+              self->close(errc::should_never_happen);
             }
             else
             {
@@ -516,7 +516,7 @@ namespace manifold
               {
                 if (ec)
                 {
-                  self->close(errc::internal_error);
+                  self->close(ec);
                 }
                 else if (!self->is_closed())
                 {
@@ -537,7 +537,7 @@ namespace manifold
             {
               if (ec)
               {
-                self->close(errc::internal_error);
+                self->close(ec);
               }
               else if (!self->is_closed())
               {
@@ -560,14 +560,14 @@ namespace manifold
               {
                 if (ec)
                 {
-                  self->close(errc::internal_error);
+                  self->close(ec);
                 }
                 else if (!self->is_closed())
                 {
                   current->state = (current->state == transaction_state::half_closed_remote ? transaction_state::closed : transaction_state::half_closed_local);
                   if (current->state == transaction_state::closed)
                   {
-                    current->on_close ? current->on_close(errc::no_error) : void();
+                    current->on_close ? current->on_close(std::error_code()) : void();
                     self->garbage_collect_transactions();
                   }
 
@@ -581,7 +581,7 @@ namespace manifold
               current->state = (current->state == transaction_state::half_closed_remote ? transaction_state::closed : transaction_state::half_closed_local);
               if (current->state == transaction_state::closed)
               {
-                current->on_close ? current->on_close(errc::no_error) : void();
+                current->on_close ? current->on_close(std::error_code()) : void();
                 auto self = casted_shared_from_this();
                 this->socket_->io_service().post([self]()
                 {
