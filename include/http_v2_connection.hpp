@@ -332,6 +332,7 @@ namespace manifold
       bool receiving_push_promise_is_allowed();
       bool sending_push_promise_is_allowed();
       typename std::map<std::uint32_t, stream>::iterator find_stream_with_data();
+      static bool i_am_server();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
