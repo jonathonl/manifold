@@ -39,7 +39,7 @@ namespace manifold
       if (ret.size() && ret.front() == '.')
       {
         std::string tmp = ret.substr(1);
-        ret = "." +  tmp.substr(0, tmp.find_last_of("."));
+        ret = "." + tmp.substr(0, tmp.find_last_of("."));
       }
       else
       {
@@ -81,14 +81,14 @@ namespace manifold
     //================================================================//
     static const std::map<std::string, std::string> content_type_index =
       {
-        {".json"  , "application/json"},
-        {".js"    , "application/javascript"},
-        {".html"  , "text/html"},
-        {".htm"   , "text/html"},
-        {".css"   , "text/css"},
-        {".xml"   , "text/xml"},
-        {".txt"   , "text/plain"},
-        {".md"    , "text/markdown"}
+        {".json", "application/json"},
+        {".js",   "application/javascript"},
+        {".html", "text/html"},
+        {".htm",  "text/html"},
+        {".css",  "text/css"},
+        {".xml",  "text/xml"},
+        {".txt",  "text/plain"},
+        {".md",   "text/markdown"}
       };
 
     std::string content_type_from_extension(const std::string& extension)
@@ -112,7 +112,7 @@ namespace manifold
     {
       std::array<std::uint64_t, 2> ret;
 
-      std::uint32_t r32 = (std::uint32_t)rng();
+      std::uint32_t r32 = (std::uint32_t) rng();
 
       std::uint64_t r64_1 = rng();
       r64_1 = r64_1 << 32;
@@ -149,7 +149,7 @@ namespace manifold
     document_root::document_root(const std::string& path)
       : path_to_root_(path)
     {
-      std::seed_seq seed = {(long)(this), (long)std::chrono::high_resolution_clock::now().time_since_epoch().count()};
+      std::seed_seq seed = {(long) (this), (long) std::chrono::high_resolution_clock::now().time_since_epoch().count()};
       this->rng_.seed(seed);
     }
 
@@ -213,7 +213,7 @@ namespace manifold
           std::size_t pos;
           while ((pos = path_suffix.find("..")) != std::string::npos)
           {
-            path_suffix.replace(pos, 2,"");
+            path_suffix.replace(pos, 2, "");
           }
 
           std::string file_path = this->path_to_root_ + path_suffix;
@@ -295,7 +295,7 @@ namespace manifold
           if (!ifs->good())
           {
             if (bytes_in_buf > 0)
-              res_ptr->end(buf.data(), (std::size_t)bytes_in_buf);
+              res_ptr->end(buf.data(), (std::size_t) bytes_in_buf);
             else
               res_ptr->end();
           }
@@ -306,12 +306,12 @@ namespace manifold
               std::array<char, 4096> buf;
               long bytes_in_buf = ifs->read(buf.data(), buf.size()).gcount();
               if (bytes_in_buf > 0)
-                res_ptr->send(buf.data(), (std::size_t)bytes_in_buf);
+                res_ptr->send(buf.data(), (std::size_t) bytes_in_buf);
 
               if (!ifs->good())
                 res_ptr->end();
             });
-            res_ptr->send(buf.data(), (std::size_t)bytes_in_buf);
+            res_ptr->send(buf.data(), (std::size_t) bytes_in_buf);
           }
 
           res_ptr->on_close([ifs](const std::error_code& ec)
@@ -341,7 +341,7 @@ namespace manifold
         auto res_ptr = std::make_shared<server::response>(std::move(res));
 
 
-        req.on_data([ofs](const char*const data, std::size_t data_sz)
+        req.on_data([ofs](const char* const data, std::size_t data_sz)
         {
           ofs->write(data, data_sz);
         });
@@ -379,6 +379,24 @@ namespace manifold
           std::remove(tmp_file_path.c_str());
         });
       }
+    }
+    //================================================================//
+
+    //================================================================//
+    const char* file_transfer_error_category_impl::name() const noexcept
+    {
+      return "Manifold HTTP File Transfer";
+    }
+
+    std::string file_transfer_error_category_impl::message(int ev) const
+    {
+      return "Unknown Error";
+    }
+
+    const manifold::http::file_transfer_error_category_impl file_transfer_error_category_object;
+    std::error_code make_error_code (manifold::http::file_transfer_errc e)
+    {
+      return std::error_code(static_cast<int>(e), file_transfer_error_category_object);
     }
     //================================================================//
 
@@ -531,7 +549,7 @@ namespace manifold
     {
       //std::random_device rd;
       auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-      std::uint32_t arr[3] = {(std::uint32_t)(0xFFFFFFFF & (millis >> 32)), (std::uint32_t)std::clock(), (std::uint32_t)(0xFFFFFFFF & millis)};
+      std::uint32_t arr[3] = {(std::uint32_t) (0xFFFFFFFF & (millis >> 32)), (std::uint32_t) std::clock(), (std::uint32_t) (0xFFFFFFFF & millis)};
       std::seed_seq seq(std::begin(arr), std::end(arr));
       this->rng_.seed(seq);
     }
@@ -577,6 +595,8 @@ namespace manifold
         dl_prom->on_cancel(std::bind(&stream_client::promise::cancel, req_prom));
         req_prom->on_complete([dl_prom, dest_ofs, local_destination, tmp_file_path, remote_source, ops](const std::error_code& ec, const response_head& headers)
         {
+          dest_ofs->close();
+
           if (ec)
           {
             dl_prom->fulfill(ec, "");
@@ -613,17 +633,16 @@ namespace manifold
             std::string destination_file_path = local_file_path;
 
 
-
-            if(!ops.replace_existing_file)
+            if (!ops.replace_existing_file)
             {
-              for(std::size_t i = 1; path_exists(destination_file_path); ++i)
+              for (std::size_t i = 1; path_exists(destination_file_path); ++i)
               {
                 std::stringstream ss;
                 ss << directory(local_file_path) << basename_sans_extension(local_file_path) << "_" << i << extension(local_file_path);
                 destination_file_path = ss.str();
               }
             }
-            else if(is_regular_file(destination_file_path))
+            else if (is_regular_file(destination_file_path))
             {
               std::remove(destination_file_path.c_str());
             }
@@ -720,6 +739,8 @@ namespace manifold
       return ret;
     }
     //================================================================//
+  }
+}
 
 
 //    //================================================================//
@@ -886,5 +907,3 @@ namespace manifold
 //      this->c_->close();
 //    }
 //    //================================================================//
-  }
-}
