@@ -141,6 +141,13 @@ namespace manifold
         std::function<void()> on_drain_;
         std::function<void(v2_errc error_code)> on_close_;
 
+        std::queue<data_frame> outgoing_data_frames_;
+        std::uint32_t incoming_window_size_ = 65535;
+        std::uint32_t outgoing_window_size_ = 65535;
+        std::uint32_t stream_dependency_id_ = 0;
+        std::uint8_t weight_ = 16;
+        bool end_stream_frame_received_ = false;
+
         static bool incoming_header_is_informational(const RecvMsg &head);
       public:
         //const std::function<void(const char* const buf, std::size_t buf_size)>& on_data() const { return this->on_data_; }
@@ -167,18 +174,9 @@ namespace manifold
         bool has_sendable_data_frame();
         frame pop_data_frame(std::uint32_t connection_window_size);
 
-        std::queue<v2_header_block> incoming_message_heads;
         //std::queue<frame> outgoing_non_data_frames;
-        std::queue<frame> outgoing_data_frames;
-
-        std::uint32_t incoming_window_size = 65535;
-        std::uint32_t outgoing_window_size = 65535;
-        std::uint32_t stream_dependency_id = 0;
-        std::uint8_t weight = 16;
-
-        bool end_stream_frame_received = false;
         stream(std::uint32_t stream_id, std::queue<frame>& connection_outgoing_queue, uint32_t initial_window_size, uint32_t initial_peer_window_size)
-          : id_(stream_id), outgoing_non_data_frames_(connection_outgoing_queue), incoming_window_size(initial_window_size), outgoing_window_size(initial_peer_window_size) {}
+          : id_(stream_id), outgoing_non_data_frames_(connection_outgoing_queue), incoming_window_size_(initial_window_size), outgoing_window_size_(initial_peer_window_size) {}
         stream(stream&& source)
           : id_(std::move(source.id_)),
             outgoing_non_data_frames_(source.outgoing_non_data_frames_),
@@ -193,15 +191,14 @@ namespace manifold
             on_end_(std::move(source.on_end_)),
             on_drain_(std::move(source.on_drain_)),
             on_close_(std::move(source.on_close_)),
-            incoming_message_heads(std::move(source.incoming_message_heads)),
             //incoming_data_frames(std::move(source.incoming_data_frames)),
             //outgoing_non_data_frames(std::move(source.outgoing_non_data_frames)),
-            outgoing_data_frames(std::move(source.outgoing_data_frames)),
-            incoming_window_size(std::move(source.incoming_window_size)),
-            outgoing_window_size(std::move(source.outgoing_window_size)),
-            stream_dependency_id(std::move(source.stream_dependency_id)),
-            weight(std::move(source.weight)),
-            end_stream_frame_received(std::move(source.end_stream_frame_received))
+            outgoing_data_frames_(std::move(source.outgoing_data_frames_)),
+            incoming_window_size_(std::move(source.incoming_window_size_)),
+            outgoing_window_size_(std::move(source.outgoing_window_size_)),
+            stream_dependency_id_(std::move(source.stream_dependency_id_)),
+            weight_(std::move(source.weight_)),
+            end_stream_frame_received_(std::move(source.end_stream_frame_received_))
         {
         }
         ~stream() {}

@@ -673,7 +673,7 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     bool v2_connection<SendMsg, RecvMsg>::stream::has_data_frame()
     {
-      return !this->outgoing_data_frames.empty();
+      return !this->outgoing_data_frames_.empty();
     }
     //----------------------------------------------------------------//
 
@@ -681,8 +681,15 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     bool v2_connection<SendMsg, RecvMsg>::stream::has_sendable_data_frame()
     {
-      return ((this->outgoing_data_frames.size() && this->outgoing_window_size > 0)
-        || (this->outgoing_data_frames.size() && this->outgoing_data_frames.front().payload_length() == 0));
+      bool ret = false;
+
+      if (this->outgoing_data_frames_.size())
+      {
+        if (this->outgoing_window_size_ > 0 || this->outgoing_data_frames_.front().data_length() == 0)
+          ret = true;
+      }
+
+      return ret;
     }
     //----------------------------------------------------------------//
 
@@ -692,20 +699,20 @@ namespace manifold
     {
       frame ret;
 
-      if (this->outgoing_data_frames.size() && this->outgoing_window_size > 0 && connection_window_size > 0)
+      if (this->outgoing_data_frames_.size() && this->outgoing_window_size_ > 0 && connection_window_size > 0)
       {
-        if (connection_window_size > this->outgoing_window_size)
-          connection_window_size = this->outgoing_window_size;
-        if (this->outgoing_data_frames.front().data_frame().data_length() > connection_window_size)
-          ret = frame(this->outgoing_data_frames.front().data_frame().split(connection_window_size), this->id_);
+        if (connection_window_size > this->outgoing_window_size_)
+          connection_window_size = this->outgoing_window_size_;
+        if (this->outgoing_data_frames_.front().data_length() > connection_window_size)
+          ret = frame(this->outgoing_data_frames_.front().split(connection_window_size), this->id_);
         else
         {
-          ret = std::move(this->outgoing_data_frames.front());
-          this->outgoing_data_frames.pop();
+          ret = frame(std::move(this->outgoing_data_frames_.front()), this->id_);
+          this->outgoing_data_frames_.pop();
         }
-        this->outgoing_window_size -= ret.data_frame().data_length();
+        this->outgoing_window_size_ -= ret.data_frame().data_length();
 
-        if (this->outgoing_data_frames.empty() && this->on_drain_)
+        if (this->outgoing_data_frames_.empty() && this->on_drain_)
           this->on_drain_();
       }
 
@@ -841,8 +848,8 @@ namespace manifold
     {
       if (this->state_ != stream_state::closed)
       {
-        std::queue<frame> rmv;
-        this->outgoing_data_frames.swap(rmv);
+        std::queue<data_frame> rmv;
+        this->outgoing_data_frames_.swap(rmv);
         this->state_= stream_state::closed;
         this->on_close_ ? this->on_close_(int_to_v2_errc(incoming_rst_stream_frame.error_code())) : void();
       }
@@ -1021,7 +1028,7 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const window_update_frame& incoming_window_update_frame, v2_errc& connection_error)
     {
-      this->outgoing_window_size += incoming_window_update_frame.window_size_increment();
+      this->outgoing_window_size_ += incoming_window_update_frame.window_size_increment();
     }
     //----------------------------------------------------------------//
 
@@ -1033,12 +1040,12 @@ namespace manifold
       switch (this->state_)
       {
         case stream_state::open:
-          this->outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), this->id_));
+          this->outgoing_data_frames_.push(http::data_frame(data, data_sz, end_stream));
           if (end_stream)
             this->state_ = stream_state::half_closed_local;
           return true;
         case stream_state::half_closed_remote:
-          this->outgoing_data_frames.push(http::frame(http::data_frame(data, data_sz, end_stream), this->id_));
+          this->outgoing_data_frames_.push(http::data_frame(data, data_sz, end_stream));
           if (end_stream)
           {
             this->state_ = stream_state::closed;
@@ -1138,8 +1145,8 @@ namespace manifold
           return false;
         default:
           this->outgoing_non_data_frames_.push(http::frame(http::rst_stream_frame(ec), this->id_));
-          std::queue<frame> rmv;
-          this->outgoing_data_frames.swap(rmv);
+          std::queue<data_frame> rmv;
+          this->outgoing_data_frames_.swap(rmv);
           this->state_ = stream_state::closed;
           this->on_close_ ? this->on_close_(ec) : void();
           return true;
