@@ -383,7 +383,7 @@ namespace manifold
             {
               auto current_stream_it = self->streams_.find(incoming_stream_id);
 
-              if (current_stream_it == self->streams_.end())
+              if (current_stream_it == self->streams_.end() && i_am_server() && (incoming_stream_id % 2) != 0)
               {
                 if (incoming_stream_id > self->last_newly_accepted_stream_id_)
                 {
@@ -399,15 +399,12 @@ namespace manifold
                   }
                   assert(current_stream_it != self->streams_.end());
                 }
-                else
-                {
-                  self->close(errc::protocol_error);
-                }
               }
 
               if (current_stream_it == self->streams_.end())
               {
                 // TODO: Handle Error.
+                //self->close(errc::protocol_error); //Ignoring for now. Sending frame resets leaves the possibility for streams to be closed while frames are in flight.
               }
               else
               {
@@ -583,6 +580,11 @@ namespace manifold
     //----------------------------------------------------------------//
     template<> bool v2_connection<request_head, response_head>::stream::incoming_header_is_informational(const response_head& head) { return head.has_informational_status(); }
     template<> bool v2_connection<response_head, request_head>::stream::incoming_header_is_informational(const request_head& head) { return false; }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template<> bool v2_connection<request_head, response_head>::i_am_server() { return false; }
+    template<> bool v2_connection<response_head, request_head>::i_am_server() { return true; }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
