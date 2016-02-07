@@ -40,6 +40,35 @@ namespace manifold
       void handle_put(server::request&& req, server::response&& res, const std::string& file_path);
     };
 
+
+    enum class file_transfer_errc
+    {
+
+    };
+
+    std::error_code make_error_code(manifold::http::file_transfer_errc e);
+  }
+}
+
+namespace std
+{
+  template<> struct is_error_code_enum<manifold::http::file_transfer_errc> : public true_type {};
+}
+
+namespace manifold
+{
+  namespace http
+  {
+    class file_transfer_error_category_impl : public std::error_category
+    {
+    public:
+      file_transfer_error_category_impl() {}
+      ~file_transfer_error_category_impl() {}
+      const char* name() const noexcept;
+      std::string message(int ev) const;
+    };
+
+
     class file_transfer_client
     {
     public:

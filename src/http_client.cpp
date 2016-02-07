@@ -91,7 +91,7 @@ namespace manifold
       {
         conn->on_push_promise(stream_id, [conn](request_head&& req, std::uint32_t promised_stream_id)
         {
-          conn->send_reset_stream(promised_stream_id, errc::refused_stream);
+          conn->send_reset_stream(promised_stream_id, v2_errc::refused_stream);
         });
       }
     }
@@ -225,7 +225,7 @@ namespace manifold
           this->process_deferred_requests(ec);
 
           if (this->conn_)
-            this->conn_->close(errc::cancel); // TODO: switch to error_code.
+            this->conn_->close(v2_errc::cancel); // TODO: switch to error_code.
           else
             this->close_socket();
 

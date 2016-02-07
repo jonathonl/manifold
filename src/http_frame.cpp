@@ -330,7 +330,7 @@ namespace manifold
     //****************************************************************//
     // rst_stream_frame
     //----------------------------------------------------------------//
-    rst_stream_frame::rst_stream_frame(http::errc error_code) : frame_payload_base(0x0)
+    rst_stream_frame::rst_stream_frame(http::v2_errc error_code) : frame_payload_base(0x0)
     {
       this->buf_.resize(4);
       std::uint32_t error_code_nbo = htonl((std::uint32_t)error_code);
@@ -489,7 +489,7 @@ namespace manifold
     //****************************************************************//
     // goaway_frame
     //----------------------------------------------------------------//
-    goaway_frame::goaway_frame(std::uint32_t last_stream_id, http::errc error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz) : frame_payload_base(0)
+    goaway_frame::goaway_frame(std::uint32_t last_stream_id, http::v2_errc error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz) : frame_payload_base(0)
     {
       this->buf_.resize(8 + addl_error_data_sz);
       std::uint32_t tmp_nbo = htonl(0x7FFFFFFF & last_stream_id);
@@ -510,11 +510,11 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    http::errc goaway_frame::error_code() const
+    http::v2_errc goaway_frame::error_code() const
     {
       std::uint32_t tmp;
       memcpy(&tmp, this->buf_.data() + 4, 4);
-      return int_to_errc(ntohl(tmp));
+      return int_to_v2_errc(ntohl(tmp));
     }
     //----------------------------------------------------------------//
 

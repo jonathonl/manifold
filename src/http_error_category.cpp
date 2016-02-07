@@ -9,30 +9,6 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------------//
-    errc int_to_errc(std::uint32_t error_code)
-    {
-      switch (error_code)
-      {
-        case (std::uint32_t)errc::no_error:            return errc::no_error;
-        case (std::uint32_t)errc::protocol_error:      return errc::protocol_error;
-        case (std::uint32_t)errc::internal_error:      return errc::internal_error;
-        case (std::uint32_t)errc::flow_control_error:  return errc::flow_control_error;
-        case (std::uint32_t)errc::settings_timeout:    return errc::settings_timeout;
-        case (std::uint32_t)errc::stream_closed:       return errc::stream_closed;
-        case (std::uint32_t)errc::frame_size_error:    return errc::frame_size_error;
-        case (std::uint32_t)errc::refused_stream:      return errc::refused_stream;
-        case (std::uint32_t)errc::cancel:              return errc::cancel;
-        case (std::uint32_t)errc::compression_error:   return errc::compression_error;
-        case (std::uint32_t)errc::connect_error:       return errc::connect_error;
-        case (std::uint32_t)errc::enhance_your_calm:   return errc::enhance_your_calm;
-        case (std::uint32_t)errc::inadequate_security: return errc::inadequate_security;
-        case (std::uint32_t)errc::http_1_1_required:   return errc::http_1_1_required;
-        default: return errc::protocol_error;
-      }
-    }
-    //----------------------------------------------------------------------//
-
-    //----------------------------------------------------------------------//
     error_category_impl::error_category_impl(): std::error_category()
     {
     }
@@ -47,7 +23,76 @@ namespace manifold
     //----------------------------------------------------------------------//
     const char* error_category_impl::name() const noexcept
     {
-      return "http";
+      return "Manifold HTTP";
+    }
+    //----------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------//
+    std::string error_category_impl::message(int ev) const
+    {
+      switch (ev)
+      {
+        case (int)errc::connect_timeout:                                return "Connect Timeout";
+        case (int)errc::data_transfer_timeout:                          return "Data Transfer Timeout";
+        case (int)errc::idle_connection_timeout:                        return "Idle Connection Timeout";
+        case (int)errc::invalid_headers:                                return "Received Invalid Headers";
+        case (int)errc::unwarranted_response:                           return "Received Response Headers Without Associated Request";
+        case (int)errc::connection_closed_before_request_was_processed: return "Connection Closed Before Request Was Processed";
+        case (int)errc::chunked_encoding_corrupt:                       return "Chunked Encoding Corrupt";
+        case (int)errc::should_never_happen:                            return "This Should Never Happen";
+        default: return "Unknown Error";
+      }
+    }
+    //----------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------//
+    const error_category_impl error_category_object;
+    std::error_code make_error_code (manifold::http::errc e)
+    {
+      return std::error_code(static_cast<int>(e), error_category_object);
+    }
+    //----------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------//
+    v2_errc int_to_v2_errc(std::uint32_t error_code)
+    {
+      switch (error_code)
+      {
+        case (std::uint32_t)v2_errc::no_error:            return v2_errc::no_error;
+        case (std::uint32_t)v2_errc::protocol_error:      return v2_errc::protocol_error;
+        case (std::uint32_t)v2_errc::internal_error:      return v2_errc::internal_error;
+        case (std::uint32_t)v2_errc::flow_control_error:  return v2_errc::flow_control_error;
+        case (std::uint32_t)v2_errc::settings_timeout:    return v2_errc::settings_timeout;
+        case (std::uint32_t)v2_errc::stream_closed:       return v2_errc::stream_closed;
+        case (std::uint32_t)v2_errc::frame_size_error:    return v2_errc::frame_size_error;
+        case (std::uint32_t)v2_errc::refused_stream:      return v2_errc::refused_stream;
+        case (std::uint32_t)v2_errc::cancel:              return v2_errc::cancel;
+        case (std::uint32_t)v2_errc::compression_error:   return v2_errc::compression_error;
+        case (std::uint32_t)v2_errc::connect_error:       return v2_errc::connect_error;
+        case (std::uint32_t)v2_errc::enhance_your_calm:   return v2_errc::enhance_your_calm;
+        case (std::uint32_t)v2_errc::inadequate_security: return v2_errc::inadequate_security;
+        case (std::uint32_t)v2_errc::http_1_1_required:   return v2_errc::http_1_1_required;
+        default: return v2_errc::protocol_error;
+      }
+    }
+    //----------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------//
+    v2_error_category_impl::v2_error_category_impl(): std::error_category()
+    {
+    }
+    //----------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------//
+    v2_error_category_impl::~v2_error_category_impl()
+    {
+    }
+    //----------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------//
+    const char* v2_error_category_impl::name() const noexcept
+    {
+      return "Manifold HTTP/2";
     }
     //----------------------------------------------------------------------//
 
@@ -79,7 +124,7 @@ namespace manifold
 //    //----------------------------------------------------------------------//
 
     //----------------------------------------------------------------------//
-    std::string error_category_impl::message(int ev) const
+    std::string v2_error_category_impl::message(int ev) const
     {
       switch (ev)
       {
@@ -102,9 +147,10 @@ namespace manifold
     }
     //----------------------------------------------------------------------//
 
-    std::error_code make_error_code (manifold::http::errc e)
+    const v2_error_category_impl v2_error_category_object;
+    std::error_code make_error_code (manifold::http::v2_errc e)
     {
-      return std::error_code(static_cast<int>(e), manifold::http::error_category_object);
+      return std::error_code(static_cast<int>(e), v2_error_category_object);
     }
   }
   //**********************************************************************//

@@ -17,8 +17,8 @@ namespace manifold
       if ( (48 <= dec && dec <= 57) || //0-9
            (65 <= dec && dec <= 90) || //ABC...XYZ
            (97 <= dec && dec <= 122) || //abc...xyz
-           (data[i]=='_' || data[i]=='-' || data[i]=='.' || data[i]=='~' || data[i]=='!' || data[i]=='*' || data[i]=='(' || data[i]==')' || data[i]=='\'') ||
-           (data[i]==';' || data[i]==',' || data[i]=='/' || data[i]=='?' || data[i]==':' || data[i]=='@' || data[i]=='&' || data[i]=='=' || data[i]=='+' || data[i]=='$') // Reserved Characters
+           (data[i]=='_' || data[i]=='-' || data[i]=='.' || data[i]=='~' || data[i]=='!' || data[i]=='*' || data[i]=='(' || data[i]==')' || data[i]=='\'') || // Unescaped characters
+           (data[i]==';' || data[i]==',' || data[i]=='/' || data[i]=='?' || data[i]==':' || data[i]=='@' || data[i]=='&' || data[i]=='=' || data[i]=='+' || data[i]=='$' || data[i]=='#' || data[i]=='[' || data[i]==']') // Reserved Characters
         )
       {
         ss << data[i];
@@ -41,7 +41,7 @@ namespace manifold
       if ( (48 <= dec && dec <= 57) || //0-9
            (65 <= dec && dec <= 90) || //ABC...XYZ
            (97 <= dec && dec <= 122) || //abc...xyz
-           (data[i]=='_' || data[i]=='-' || data[i]=='.' || data[i]=='~' || data[i]=='!' || data[i]=='*' || data[i]=='(' || data[i]==')' || data[i]=='\'')
+           (data[i]=='_' || data[i]=='-' || data[i]=='.' || data[i]=='~' || data[i]=='!' || data[i]=='*' || data[i]=='(' || data[i]==')' || data[i]=='\'') // Unescaped characters
         )
       {
         ss << data[i];
