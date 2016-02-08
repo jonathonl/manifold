@@ -98,9 +98,11 @@ namespace manifold
     }
 
     template <typename SendMsg, typename RecvMsg>
-    void v1_connection<SendMsg, RecvMsg>::run()
+    void v1_connection<SendMsg, RecvMsg>::run(std::chrono::system_clock::duration timeout)
     {
-      this->run_timeout_loop();
+      this->activity_timeout_ = timeout;
+      this->activity_deadline_timer_.expires_from_now(this->activity_timeout_);
+      this->run_timeout_loop(); // TODO: Test performance hit.
       this->run_recv_loop();
     }
 

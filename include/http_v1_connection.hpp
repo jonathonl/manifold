@@ -26,8 +26,7 @@ namespace manifold
           //recv_buffer_(8192),
           next_transaction_id_(1),
           send_loop_running_(false),
-          activity_timeout_(std::chrono::seconds(15)), //std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::seconds(15))), //std::chrono::system_clock::duration::max()),
-          activity_deadline_timer_(socket_->io_service(), activity_timeout_)
+          activity_deadline_timer_(socket_->io_service())
 
       {}
       v1_connection(tls_socket&& sock)
@@ -36,8 +35,7 @@ namespace manifold
           //recv_buffer_(8192),
           next_transaction_id_(1),
           send_loop_running_(false),
-          activity_timeout_(std::chrono::system_clock::duration::max()),
-          activity_deadline_timer_(socket_->io_service(), activity_timeout_)
+          activity_deadline_timer_(socket_->io_service())
       {}
       virtual ~v1_connection()
       {
@@ -45,11 +43,9 @@ namespace manifold
         this->socket_->close();
       }
 
-      void run();
-      void run_timeout_loop(const std::error_code& ec = std::error_code());
+      void run(std::chrono::system_clock::duration timeout);
       void close(const std::error_code& ec);
       bool is_closed() const;
-
 
       void on_close(const std::function<void(const std::error_code& ec)>& fn);
       void on_new_stream(const std::function<void(std::uint32_t transaction_id)>& fn);
@@ -140,13 +136,15 @@ namespace manifold
       void garbage_collect_transactions();
       transaction* current_send_transaction();
       transaction* current_recv_transaction();
+
+      void run_timeout_loop(const std::error_code& ec = std::error_code());
+      void run_send_loop();
       void run_recv_loop();
       void recv_headers();
       void recv_chunk_encoded_body();
       void recv_chunk_data(std::size_t chunk_size);
       void recv_trailers();
       void recv_known_length_body(std::uint64_t content_length);
-      void run_send_loop();
     };
   }
 }

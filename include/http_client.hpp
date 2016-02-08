@@ -124,6 +124,8 @@ namespace manifold
       client(asio::io_service& ioservice, asio::ssl::context& ctx);
       ~client();
 
+      void reset_timeout(std::chrono::system_clock::duration value = std::chrono::system_clock::duration::max());
+
       void shutdown();
       void make_request(const std::string& host, std::uint16_t port, const std::function<void(const std::error_code& connect_error, request&& req)>& cb);
       void make_secure_request(const std::string& host, std::uint16_t port, const std::function<void(const std::error_code& connect_error, request&& req)>& cb);
@@ -133,6 +135,7 @@ namespace manifold
       asio::ip::tcp::resolver tcp_resolver_;
       std::unordered_multimap<endpoint,std::shared_ptr<non_tls_session>> non_tls_sessions_;
       std::unordered_multimap<endpoint,std::shared_ptr<tls_session>> tls_sessions_;
+      std::chrono::system_clock::duration timeout_;
 
       void handle_non_tls_session_close(const std::error_code& ec, const std::shared_ptr<non_tls_session>& sess);
       void handle_tls_session_close(const std::error_code& ec, const std::shared_ptr<tls_session>& sess);

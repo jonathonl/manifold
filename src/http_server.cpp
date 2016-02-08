@@ -373,7 +373,7 @@ namespace manifold
             if (res.second)
             {
               self->manage_connection(c);
-              c->run();
+              c->run(std::chrono::system_clock::duration::max()); //TODO: allow to configure.
             }
           }
 
@@ -457,7 +457,7 @@ namespace manifold
                 if (res.second)
                 {
                   self->manage_connection(c);
-                  c->run();
+                  c->run(std::chrono::system_clock::duration::max()); // TODO: Allow to configure
                 }
               }
             });

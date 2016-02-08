@@ -203,8 +203,9 @@ namespace manifold
     class session_base
     {
     public:
-      session_base(const endpoint& ep)
-        : ep_(ep) { }
+      session_base(const endpoint& ep, std::chrono::system_clock::duration timeout)
+        : ep_(ep), timeout_(timeout) { }
+
       virtual ~session_base()
       {
       }
@@ -280,6 +281,7 @@ namespace manifold
       const endpoint& ep() const { return this->ep_; }
     protected:
       endpoint ep_;
+      std::chrono::system_clock::duration timeout_;
       std::shared_ptr<http::connection<request_head, response_head>> conn_;
       std::queue<std::function<void(const std::error_code& connect_error, client::request&& req)>> deferred_requests_;
       bool deferred_requests_processed_ = false;
@@ -292,8 +294,8 @@ namespace manifold
     class non_tls_session : public session_base, public std::enable_shared_from_this<non_tls_session>
     {
     public:
-      non_tls_session(asio::io_service& ioservice, const endpoint& ep)
-        : session_base(ep), sock_(ioservice)
+      non_tls_session(asio::io_service& ioservice, const endpoint& ep, std::chrono::system_clock::duration timeout)
+        : session_base(ep, timeout), sock_(ioservice)
       {
       }
 
@@ -332,7 +334,7 @@ namespace manifold
                 auto c = std::make_shared<v1_connection<request_head, response_head>>(std::move(self->sock_));
                 self->conn_ = c;
                 c->on_close(std::bind(&session_base::close, self, std::placeholders::_1));
-                c->run();
+                c->run(self->timeout_);
                 self->process_deferred_requests(std::error_code());
               }
             }
@@ -353,8 +355,8 @@ namespace manifold
     class tls_session : public session_base, public std::enable_shared_from_this<tls_session>
     {
     public:
-      tls_session(asio::io_service& ioservice, asio::ssl::context& ctx, const endpoint& ep)
-        : session_base(ep), sock_(ioservice, ctx)
+      tls_session(asio::io_service& ioservice, asio::ssl::context& ctx, const endpoint& ep, std::chrono::system_clock::duration timeout)
+        : session_base(ep, timeout), sock_(ioservice, ctx)
       {
       }
 
@@ -428,7 +430,7 @@ namespace manifold
                       auto c = std::make_shared<v1_connection<request_head, response_head>>(std::move(self->sock_));
                       self->conn_ = c;
                       c->on_close(std::bind(&session_base::close, self, std::placeholders::_1));
-                      c->run();
+                      c->run(self->timeout_);
                       self->process_deferred_requests(std::error_code());
                     }
                   }
@@ -452,6 +454,7 @@ namespace manifold
     client::client(asio::io_service& ioservice, asio::ssl::context& ctx)
       : io_service_(ioservice), ssl_ctx_(ctx), tcp_resolver_(ioservice)
     {
+      this->reset_timeout();
       std::vector<unsigned char> proto_list(::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS));
       std::copy_n(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS, ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS), proto_list.begin());
       ::SSL_CTX_set_alpn_protos(this->ssl_ctx_.impl(), proto_list.data(), proto_list.size());
@@ -462,6 +465,13 @@ namespace manifold
     client::~client()
     {
       this->shutdown();
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    void client::reset_timeout(std::chrono::system_clock::duration value)
+    {
+      this->timeout_ = value;
     }
     //----------------------------------------------------------------//
 
@@ -501,7 +511,7 @@ namespace manifold
       }
       else
       {
-        auto sess = (this->non_tls_sessions_.emplace(ep, std::make_shared<non_tls_session>(this->io_service_, ep)))->second;
+        auto sess = (this->non_tls_sessions_.emplace(ep, std::make_shared<non_tls_session>(this->io_service_, ep, this->timeout_)))->second;
         sess->on_close(std::bind(&client::handle_non_tls_session_close, this, std::placeholders::_1, sess));
         sess->push_request(cb);
 
@@ -531,7 +541,7 @@ namespace manifold
       }
       else
       {
-        auto sess = (this->tls_sessions_.emplace(ep, std::make_shared<tls_session>(this->io_service_, this->ssl_ctx_, ep)))->second;
+        auto sess = (this->tls_sessions_.emplace(ep, std::make_shared<tls_session>(this->io_service_, this->ssl_ctx_, ep, this->timeout_)))->second;
         sess->on_close(std::bind(&client::handle_tls_session_close, this, std::placeholders::_1, sess));
         sess->push_request(cb);
 
