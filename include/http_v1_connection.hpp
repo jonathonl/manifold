@@ -19,24 +19,28 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     class v1_connection : public connection<SendMsg, RecvMsg>
     {
-    public:
-      v1_connection(non_tls_socket&& sock)
-        : socket_(new non_tls_socket(std::move(sock))),
+    private:
+      v1_connection(socket* new_sock)
+        : socket_(new_sock),
           closed_(false),
-          //recv_buffer_(8192),
+        //recv_buffer_(8192),
           next_transaction_id_(1),
           send_loop_running_(false),
           activity_deadline_timer_(socket_->io_service())
 
-      {}
+      {
+      }
+    public:
+      v1_connection(non_tls_socket&& sock)
+        : v1_connection(new non_tls_socket(std::move(sock)))
+      {
+      }
+
       v1_connection(tls_socket&& sock)
-        : socket_(new tls_socket(std::move(sock))),
-          closed_(false),
-          //recv_buffer_(8192),
-          next_transaction_id_(1),
-          send_loop_running_(false),
-          activity_deadline_timer_(socket_->io_service())
-      {}
+        : v1_connection(new tls_socket(std::move(sock)))
+      {
+      }
+
       virtual ~v1_connection()
       {
         std::cout << "~v1_connection()" << std::endl;

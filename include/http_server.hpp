@@ -117,6 +117,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
+      void reset_timeout(std::chrono::system_clock::duration value = std::chrono::system_clock::duration::max());
       void listen(const std::function<void(server::request&& req, server::response&& res)>& handler);
       void listen(const std::function<void(server::request&& req, server::response&& res)>& handler, std::error_code& ec);
       void close();

@@ -14,6 +14,7 @@ namespace manifold
     enum class log_dir { outgoing = 1, incoming };
     void log(const frame& f, log_dir direction)
     {
+#if 0
       std::cout << (direction == log_dir::outgoing ? "--- OUT ---" : "--- IN ---") << std::endl;
       std::cout << "Stream ID: " << f.stream_id() << std::endl;
       std::cout << "Payload Length: " << f.payload_length() << std::endl;
@@ -35,6 +36,7 @@ namespace manifold
       }
       std::cout << "Frame Type: " << str_type << std::endl;
       std::cout << std::endl;
+#endif
     }
     //****************************************************************//
     // frame_payload_base

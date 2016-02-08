@@ -99,10 +99,11 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    v2_connection<SendMsg, RecvMsg>::v2_connection(non_tls_socket&& sock)
-      : socket_(new non_tls_socket(std::move(sock))),
+    v2_connection<SendMsg, RecvMsg>::v2_connection(socket* new_sock)
+      : socket_(new_sock),
         hpack_encoder_(4096),
         hpack_decoder_(4096),
+        data_transfer_deadline_timer_(socket_->io_service()),
         last_newly_accepted_stream_id_(0),
         next_stream_id_(initial_stream_id),
         outgoing_window_size_(default_initial_window_size),
@@ -131,44 +132,23 @@ namespace manifold
       this->closed_ = false;
       this->send_loop_running_ = false;
 
-    };
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    v2_connection<SendMsg, RecvMsg>::v2_connection(non_tls_socket&& sock)
+      : v2_connection(new non_tls_socket(std::move(sock)))
+    {
+    }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     v2_connection<SendMsg, RecvMsg>::v2_connection(tls_socket&& sock)
-      : socket_(new tls_socket(std::move(sock))),
-        hpack_encoder_(4096),
-        hpack_decoder_(4096),
-        last_newly_accepted_stream_id_(0),
-        next_stream_id_(initial_stream_id),
-        outgoing_window_size_(default_initial_window_size),
-        incoming_window_size_(default_initial_window_size)
+      : v2_connection(new tls_socket(std::move(sock)))
     {
-      std::seed_seq seed({static_cast<std::uint32_t>((std::uint64_t)this)}); // Entropy is not important here, since rng is for priority distribution.
-      this->rng_.seed(seed);
-
-      // header_table_size      = 0x1, // 4096
-      // enable_push            = 0x2, // 1
-      // max_concurrent_streams = 0x3, // (infinite)
-      // initial_window_size    = 0x4, // 65535
-      // max_frame_size         = 0x5, // 16384
-      // max_header_list_size   = 0x6  // (infinite)
-      this->local_settings_ =
-        {
-          { setting_code::header_table_size,   default_header_table_size },
-          { setting_code::enable_push,         default_enable_push },
-          { setting_code::initial_window_size, default_initial_window_size },
-          { setting_code::max_frame_size,      default_max_frame_size }
-        };
-
-      this->peer_settings_ = this->local_settings_;
-
-      this->started_ = false;
-      this->closed_ = false;
-      this->send_loop_running_ = false;
-
-    };
+    }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
@@ -200,6 +180,8 @@ namespace manifold
         }
 
         this->on_close_ ? this->on_close_(ec) : void();
+
+        this->data_transfer_deadline_timer_.cancel();
       }
     }
     //----------------------------------------------------------------//
@@ -363,10 +345,27 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
+    void v2_connection<SendMsg, RecvMsg>::run_timeout_loop(const std::error_code& ec)
+    {
+      if (!this->is_closed())
+      {
+        auto self = casted_shared_from_this();
+        if (self->data_transfer_deadline_timer_.expires_from_now() <= std::chrono::system_clock::duration(0))
+          this->close(http::errc::data_transfer_timeout); // TODO: check if idle.
+        else
+          this->data_transfer_deadline_timer_.async_wait(std::bind(&v2_connection::run_timeout_loop, self, std::placeholders::_1));
+      }
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::run_recv_loop()
     {
       if (!this->closed_)
       {
+        this->data_transfer_deadline_timer_.expires_from_now(this->data_transfer_timeout_);
+
         std::shared_ptr<v2_connection> self = casted_shared_from_this();
         this->incoming_frame_ = frame(); // reset incoming frame
         frame::recv_frame(*this->socket_, this->incoming_frame_, [self](const std::error_code& ec)
@@ -1105,8 +1104,10 @@ namespace manifold
               if (end_stream)
               {
                 this->state_ = stream_state::closed;
-                this->on_close_ ? this->on_close_(v2_errc::no_error) : void();
+                this->on_close_ ? this->on_close_(std::error_code()) : void();
               }
+              break;
+            default:
               break;
           }
 
@@ -1348,6 +1349,7 @@ namespace manifold
 
           if (outgoing_frame_set)
           {
+            this->data_transfer_deadline_timer_.expires_from_now(this->data_transfer_timeout_);
             frame::send_frame(*this->socket_, this->outgoing_frame_, [self](const std::error_code& ec)
             {
               self->garbage_collect_streams();
@@ -1376,10 +1378,14 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::run(const std::list<std::pair<setting_code, std::uint32_t>>& custom_settings)
+    void v2_connection<SendMsg, RecvMsg>::run(std::chrono::system_clock::duration timeout, const std::list<std::pair<setting_code, std::uint32_t>>& custom_settings)
     {
       if (!this->started_)
       {
+        this->data_transfer_timeout_ = timeout;
+        this->data_transfer_deadline_timer_.expires_from_now(this->data_transfer_timeout_);
+        this->run_timeout_loop();
+
         std::list<std::pair<std::uint16_t,std::uint32_t>> settings;
         for (auto it = custom_settings.begin(); it != custom_settings.end(); ++it)
         {
@@ -1622,7 +1628,7 @@ namespace manifold
       {
         if (!it->second.send_headers_frame(head, end_stream, this->hpack_encoder_, this->peer_settings_[setting_code::max_frame_size]))
         {
-          assert(!"Stream state change not allowed.");
+          //assert(!"Stream state change not allowed.");
         }
         else
         {
@@ -1706,7 +1712,7 @@ namespace manifold
         }
         else
         {
-          assert(!"Stream state_ change not allowed.");
+          //assert(!"Stream state_ change not allowed.");
         }
       }
 
@@ -1773,7 +1779,7 @@ namespace manifold
         }
         else
         {
-          assert(!"Stream state change not allowed.");
+          //assert(!"Stream state change not allowed.");
         }
       }
 

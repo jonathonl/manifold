@@ -139,7 +139,7 @@ namespace manifold
         std::function<void(SendMsg&& headers, std::uint32_t promised_stream_id)> on_push_promise_;
         std::function<void()> on_end_;
         std::function<void()> on_drain_;
-        std::function<void(v2_errc error_code)> on_close_;
+        std::function<void(const std::error_code& error_code)> on_close_;
 
         std::queue<data_frame> outgoing_data_frames_;
         std::uint32_t incoming_window_size_ = 65535;
@@ -302,6 +302,8 @@ namespace manifold
       bool started_;
       bool closed_;
       bool send_loop_running_;
+      std::chrono::system_clock::duration data_transfer_timeout_;
+      asio::basic_waitable_timer<std::chrono::system_clock> data_transfer_deadline_timer_;
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -338,6 +340,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
+      void run_timeout_loop(const std::error_code& ec = std::error_code());
       void run_recv_loop();
       void run_send_loop();
       //----------------------------------------------------------------//
@@ -354,6 +357,10 @@ namespace manifold
       {
         return std::dynamic_pointer_cast<v2_connection<SendMsg, RecvMsg>>(connection<SendMsg, RecvMsg>::shared_from_this());
       }
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
+      v2_connection(socket*);
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
@@ -374,7 +381,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void run(const std::list<std::pair<setting_code, std::uint32_t>>& custom_settings);
+      void run(std::chrono::system_clock::duration timeout, const std::list<std::pair<setting_code, std::uint32_t>>& custom_settings);
       void close(const std::error_code& ec);
       bool is_closed() const;
       void cancelAllStreams();

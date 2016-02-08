@@ -273,6 +273,7 @@ int main()
   server_ssl_ctx.use_tmp_dh(asio::buffer(dhparam.data(), dhparam.size()));
 
   http::server srv(ioservice, server_ssl_ctx, 8080);
+  srv.reset_timeout(std::chrono::seconds(15));
   srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
 
   //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
@@ -289,34 +290,25 @@ int main()
     http::stream_client stream_agnt(agnt);
     http::file_transfer_client file_transfer_agnt(stream_agnt);
 
+    agnt.reset_timeout(std::chrono::seconds(5));
 
     http::file_transfer_client::options ops;
     ops.replace_existing_file = true;
-    file_transfer_agnt.upload_file("./my_local_file.txt", uri("https://user:password@localhost:8080/files/uploaded_file.txt")).on_complete([&file_transfer_agnt](const std::error_code& ec)
-    {
-      if (ec)
-      {
-        std::cout << ec.message() << std::endl;
-      }
-      else
-      {
-        std::cout << "PUT SUCCEEDED" << std::endl;
-      }
-    });
+    auto t = std::chrono::system_clock::now().time_since_epoch();
+//    file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/test_cmp.rfcmp"), "./").on_complete([t](const std::error_code& ec, const std::string& file_path)
+//    {
+//      if (ec)
+//      {
+//        std::cout << ec.message() << std::endl;
+//      }
+//      else
+//      {
+//        std::cout << "DL SUCCEEDED" << std::endl;
+//        std::cout << "SECONDS: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch() - t).count() << std::endl;
+//      }
+//    });
 
-    file_transfer_agnt.stat_remote_file(uri("https://user:password@localhost:8080/files/uploaded_file.txt")).on_complete([&file_transfer_agnt](const std::error_code& ec, const http::file_transfer_client::statistics& stats)
-    {
-      if (ec)
-      {
-        std::cout << ec.message() << std::endl;
-      }
-      else
-      {
-        std::cout << "HEAD SUCCEEDED" << std::endl;
-      }
-    });
-
-    for (size_t i = 0; i < 20; ++i)
+    for (size_t i = 0; i < 0; ++i)
     {
       file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/readme.md"), "./").on_complete([i](const std::error_code& ec, const std::string& file_path)
       {

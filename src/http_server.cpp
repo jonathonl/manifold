@@ -50,6 +50,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
+      void timeout(std::chrono::system_clock::duration value);
       void listen(const std::function<void(server::request&& req, server::response&& res)>& handler, std::error_code& ec);
       void close();
       //void register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler);
@@ -66,6 +67,7 @@ namespace manifold
       std::set<std::shared_ptr<http::connection<response_head, request_head>>> connections_;
       std::function<void(server::request&& req, server::response&& res)> request_handler_;
       std::string default_server_header_ = "Manifold";
+      std::chrono::system_clock::duration timeout_;
       //std::list<std::pair<std::regex,std::function<void(server::request&& req, server::response&& res)>>> stream_handlers_;
       //----------------------------------------------------------------//
 
@@ -312,6 +314,11 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
+    void server_impl::timeout(std::chrono::system_clock::duration value)
+    {
+      this->timeout_ = value;
+    }
+
     //----------------------------------------------------------------//
     void server_impl::listen(const std::function<void(server::request&& req, server::response&& res)>& handler, std::error_code& ec)
     {
@@ -373,7 +380,7 @@ namespace manifold
             if (res.second)
             {
               self->manage_connection(c);
-              c->run(std::chrono::system_clock::duration::max()); //TODO: allow to configure.
+              c->run(self->timeout_); //TODO: allow to configure.
             }
           }
 
@@ -442,7 +449,7 @@ namespace manifold
                       if (res.second)
                       {
                         self->manage_connection(c);
-                        c->run({});
+                        c->run(self->timeout_, {});
                       }
                     }
                   }
@@ -457,7 +464,7 @@ namespace manifold
                 if (res.second)
                 {
                   self->manage_connection(c);
-                  c->run(std::chrono::system_clock::duration::max()); // TODO: Allow to configure
+                  c->run(self->timeout_); // TODO: Allow to configure
                 }
               }
             });
@@ -505,6 +512,7 @@ namespace manifold
     server::server(asio::io_service& ioservice, unsigned short port, const std::string& host)
       : impl_(std::make_shared<server_impl>(ioservice, port, host))
     {
+      this->reset_timeout();
     }
     //----------------------------------------------------------------//
 
@@ -512,6 +520,7 @@ namespace manifold
     server::server(asio::io_service& ioservice, asio::ssl::context& ctx, unsigned short port, const std::string& host)
       : impl_(std::make_shared<server_impl>(ioservice, ctx, port, host))
     {
+      this->reset_timeout();
     }
     //----------------------------------------------------------------//
 
@@ -521,6 +530,11 @@ namespace manifold
       this->impl_->close();
     }
     //----------------------------------------------------------------//
+
+    void server::reset_timeout(std::chrono::system_clock::duration value)
+    {
+      this->impl_->timeout(value);
+    }
 
     //----------------------------------------------------------------//
     void server::listen(const std::function<void(server::request&& req, server::response&& res)>& handler)
