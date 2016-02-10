@@ -101,8 +101,8 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     v2_connection<SendMsg, RecvMsg>::v2_connection(socket* new_sock)
       : socket_(new_sock),
-        hpack_encoder_(4096),
-        hpack_decoder_(4096),
+        hpack_encoder_(default_header_table_size),
+        hpack_decoder_(default_header_table_size),
         data_transfer_deadline_timer_(socket_->io_service()),
         last_newly_accepted_stream_id_(0),
         next_stream_id_(initial_stream_id),
@@ -290,11 +290,13 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
+    //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    typename std::map<std::uint32_t, typename v2_connection<SendMsg, RecvMsg>::stream>::iterator v2_connection<SendMsg, RecvMsg>::find_stream_with_data()
+    typename std::unordered_map<std::uint32_t, typename v2_connection<SendMsg, RecvMsg>::stream>::iterator v2_connection<SendMsg, RecvMsg>::find_stream_with_data()
     {
       if (this->streams_.empty())
         return this->streams_.end();
+      //return this->streams_.begin()->second.has_sendable_data_frame() ? this->streams_.begin() : this->streams_.end(); // TEMP
 
       auto random_stream_it = this->streams_.begin();
       std::advance(random_stream_it, this->rng_() % this->streams_.size());
@@ -314,6 +316,7 @@ namespace manifold
 
       return this->streams_.end();
     }
+    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     template<> bool v2_connection<request_head, response_head>::receiving_push_promise_is_allowed()
@@ -526,7 +529,11 @@ namespace manifold
                   switch (incoming_frame_type)
                   {
                     case frame_type::data:
-                      current_stream_it->second.handle_incoming_frame(self->incoming_frame_.data_frame(), handle_frame_conn_error);
+                      self->incoming_window_size_ -= self->incoming_frame_.data_frame().data_length();
+                      if (self->incoming_window_size_ < self->local_settings_[setting_code::initial_window_size] / 2)
+                        self->send_connection_level_window_update(self->local_settings_[setting_code::initial_window_size] - self->incoming_window_size_);
+
+                      current_stream_it->second.handle_incoming_frame(self->incoming_frame_.data_frame(), self->local_settings_[setting_code::initial_window_size], handle_frame_conn_error);
                       break;
                     case frame_type::priority:
                       current_stream_it->second.handle_incoming_frame(self->incoming_frame_.priority_frame(), handle_frame_conn_error);
@@ -687,7 +694,12 @@ namespace manifold
         if (this->outgoing_window_size_ > 0 || this->outgoing_data_frames_.front().data_length() == 0)
           ret = true;
       }
-
+      if (this->outgoing_window_size_ < 4096)
+      {
+        std::cout << "low" << std::endl;
+        if (this->outgoing_window_size_ == 0)
+          std::cout << "empty" << std::endl;
+      }
       return ret;
     }
     //----------------------------------------------------------------//
@@ -721,12 +733,40 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const data_frame& incoming_data_frame, v2_errc& connection_error)
+    bool v2_connection<SendMsg, RecvMsg>::stream::adjust_local_window_size(std::int32_t amount)
+    {
+      if (amount > 0 && (amount + this->incoming_window_size_) < this->incoming_window_size_)
+        return false; // overflow
+
+      this->incoming_window_size_ = (amount + this->incoming_window_size_);
+      return true;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    bool v2_connection<SendMsg, RecvMsg>::stream::adjust_peer_window_size(std::int32_t amount)
+    {
+      if (amount > 0 && (amount + this->outgoing_window_size_) < this->outgoing_window_size_)
+        return false; // overflow
+
+      this->outgoing_window_size_ = (amount + this->outgoing_window_size_);
+      return true;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename SendMsg, typename RecvMsg>
+    void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const data_frame& incoming_data_frame, std::int32_t local_initial_window_size, v2_errc& connection_error)
     {
       switch (this->state_)
       {
         case stream_state::open:
         {
+          this->incoming_window_size_ -= incoming_data_frame.data_length();
+          if (this->incoming_window_size_ < local_initial_window_size / 2)
+            this->send_window_update_frame(local_initial_window_size - this->incoming_window_size_);
+
           this->on_data_ ? this->on_data_(incoming_data_frame.data(), incoming_data_frame.data_length()) : void();
 
           if (incoming_data_frame.has_end_stream_flag())
@@ -738,6 +778,10 @@ namespace manifold
         }
         case stream_state::half_closed_local:
         {
+          this->incoming_window_size_ -= incoming_data_frame.data_length();
+          if (this->incoming_window_size_ < local_initial_window_size / 2)
+            this->send_window_update_frame(local_initial_window_size - this->incoming_window_size_);
+
           this->on_data_ ? this->on_data_(incoming_data_frame.data(), incoming_data_frame.data_length()) : void();
 
           if (incoming_data_frame.has_end_stream_flag())
@@ -882,6 +926,21 @@ namespace manifold
                 this->local_settings_[setting_code::max_concurrent_streams] = it->second;
                 break;
               case (std::uint16_t)setting_code::initial_window_size:
+                if (it->second > 0x7FFFFFFF)
+                {
+                  this->close(v2_errc::flow_control_error);
+                }
+                else
+                {
+                  for (auto s = this->streams_.begin(); s != this->streams_.end(); ++s)
+                  {
+                    if (!s->second.adjust_local_window_size(static_cast<std::int32_t>(it->second) - static_cast<std::int32_t>(this->local_settings_[setting_code::initial_window_size])))
+                    {
+                      this->close(v2_errc::flow_control_error);
+                      break;
+                    }
+                  }
+                }
                 this->local_settings_[setting_code::initial_window_size] = it->second;
                 break;
               case (std::uint16_t)setting_code::max_frame_size:
@@ -916,6 +975,21 @@ namespace manifold
               this->peer_settings_[setting_code::max_concurrent_streams] = it->second;
               break;
             case (std::uint16_t)setting_code::initial_window_size:
+              if (it->second > 0x7FFFFFFF)
+              {
+                this->close(v2_errc::flow_control_error);
+              }
+              else
+              {
+                for (auto s = this->streams_.begin(); s != this->streams_.end(); ++s)
+                {
+                  if (!s->second.adjust_peer_window_size(static_cast<std::int32_t>(it->second) - static_cast<std::int32_t>(this->peer_settings_[setting_code::initial_window_size])))
+                  {
+                    this->close(v2_errc::flow_control_error);
+                    break;
+                  }
+                }
+              }
               this->peer_settings_[setting_code::initial_window_size] = it->second;
               break;
             case (std::uint16_t)setting_code::max_frame_size:
@@ -1019,7 +1093,11 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::handle_incoming_frame(const window_update_frame& incoming_window_update_frame)
     {
-      this->outgoing_window_size_ += incoming_window_update_frame.window_size_increment();
+      std::int32_t amount = static_cast<std::int32_t>(incoming_window_update_frame.window_size_increment());
+      if (amount > 0 && (amount + this->outgoing_window_size_) < this->outgoing_window_size_)
+        this->close(v2_errc::flow_control_error);
+      else
+        this->outgoing_window_size_ = (amount + this->outgoing_window_size_);
     }
     //----------------------------------------------------------------//
 
@@ -1027,7 +1105,8 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::stream::handle_incoming_frame(const window_update_frame& incoming_window_update_frame, v2_errc& connection_error)
     {
-      this->outgoing_window_size_ += incoming_window_update_frame.window_size_increment();
+      if (!this->adjust_peer_window_size(incoming_window_update_frame.window_size_increment()))
+        this->send_rst_stream_frame(v2_errc::flow_control_error);
     }
     //----------------------------------------------------------------//
 
@@ -1189,7 +1268,7 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::stream::send_window_update_frame(std::uint32_t amount)
+    bool v2_connection<SendMsg, RecvMsg>::stream::send_window_update_frame(std::int32_t amount)
     {
       switch (this->state_)
       {
@@ -1198,7 +1277,9 @@ namespace manifold
         case stream_state::reserved_local:
           return false;
         default:
-          this->outgoing_non_data_frames_.push(http::frame(http::window_update_frame(amount), this->id_)); // TODO: increment count.
+          std::cout << "stream_wu:" << amount << std::endl;
+          this->outgoing_non_data_frames_.push(http::frame(http::window_update_frame(amount), this->id_));
+          this->incoming_window_size_ += amount;
           return true;
       }
     }
@@ -1319,6 +1400,13 @@ namespace manifold
         }
         else
         {
+          if (this->outgoing_window_size_ < 4096)
+          {
+            std::cout << "clow" << std::endl;
+            if (this->outgoing_window_size_ == 0)
+              std::cout << "cempty" << std::endl;
+          }
+
           if (this->outgoing_frames_.size())
           {
             this->outgoing_frame_ = std::move(this->outgoing_frames_.front());
@@ -1397,6 +1485,7 @@ namespace manifold
             settings.emplace_back(static_cast<std::uint16_t>(it->first), it->second);
           }
         }
+
         this->send_settings(settings);
         this->run_recv_loop();
 
@@ -1897,8 +1986,9 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     void v2_connection<SendMsg, RecvMsg>::send_connection_level_window_update(std::uint32_t amount)
     {
-      this->outgoing_frames_.push(http::frame(http::window_update_frame(amount), 0x0)); // TODO: increment count
-      this->run_send_loop();
+      std::cout << "conn_wu:" << amount << std::endl;
+      this->outgoing_frames_.push(http::frame(http::window_update_frame(amount), 0x0));
+      this->incoming_window_size_ += amount;
     }
     //----------------------------------------------------------------//
 

@@ -94,7 +94,7 @@ namespace manifold
     template <typename SendMsg, typename RecvMsg>
     class v2_connection : public connection<SendMsg, RecvMsg>
     {
-    protected:
+    public:
       //================================================================//
       enum class setting_code
       {
@@ -106,7 +106,7 @@ namespace manifold
         max_header_list_size   = 0x6  // (infinite)
       };
       //================================================================//
-
+    protected:
       static const std::uint32_t default_header_table_size      ; //= 4096;
       static const std::uint32_t default_enable_push            ; //= 1;
       static const std::uint32_t default_initial_window_size    ; //= 65535;
@@ -142,8 +142,8 @@ namespace manifold
         std::function<void(const std::error_code& error_code)> on_close_;
 
         std::queue<data_frame> outgoing_data_frames_;
-        std::uint32_t incoming_window_size_ = 65535;
-        std::uint32_t outgoing_window_size_ = 65535;
+        std::int32_t incoming_window_size_ = 65535;
+        std::int32_t outgoing_window_size_ = 65535;
         std::uint32_t stream_dependency_id_ = 0;
         std::uint8_t weight_ = 16;
         bool end_stream_frame_received_ = false;
@@ -173,6 +173,8 @@ namespace manifold
         bool has_data_frame();
         bool has_sendable_data_frame();
         frame pop_data_frame(std::uint32_t connection_window_size);
+        bool adjust_local_window_size(std::int32_t amount);
+        bool adjust_peer_window_size(std::int32_t amount);
 
         //std::queue<frame> outgoing_non_data_frames;
         stream(std::uint32_t stream_id, std::queue<frame>& connection_outgoing_queue, uint32_t initial_window_size, uint32_t initial_peer_window_size)
@@ -204,7 +206,7 @@ namespace manifold
         ~stream() {}
 
         //----------------------------------------------------------------//
-        void handle_incoming_frame(const data_frame& incoming_data_frame, v2_errc& connection_error);
+        void handle_incoming_frame(const data_frame& incoming_data_frame, std::int32_t local_initial_window_size, v2_errc& connection_error);
         void handle_incoming_frame(const headers_frame& incoming_headers_frame, const std::vector<continuation_frame>& continuation_frames, hpack::decoder& dec, v2_errc& connection_error);
         void handle_incoming_frame(const priority_frame& incoming_priority_frame, v2_errc& connection_error);
         void handle_incoming_frame(const rst_stream_frame& incoming_rst_stream_frame, v2_errc& connection_error);
@@ -218,7 +220,7 @@ namespace manifold
         bool handle_outgoing_priority_frame_state_change();
         bool send_rst_stream_frame(v2_errc ec);
         bool send_push_promise_frame(const v2_header_block& headers, stream& promised_stream, hpack::encoder& enc, std::uint32_t max_frame_size);
-        bool send_window_update_frame(std::uint32_t amount);
+        bool send_window_update_frame(std::int32_t amount);
 
 //        bool handle_outgoing_headers_state_change();
 //        bool handle_outgoing_end_stream_state_change();
@@ -285,7 +287,7 @@ namespace manifold
 #endif
 
       //----------------------------------------------------------------//
-      std::map<std::uint32_t,stream> streams_;
+      std::unordered_map<std::uint32_t,stream> streams_;
       std::map<setting_code,std::uint32_t> local_settings_;
       std::queue<std::list<std::pair<std::uint16_t,std::uint32_t>>> pending_local_settings_;
       stream* create_stream_object(std::uint32_t stream_id);
@@ -315,8 +317,8 @@ namespace manifold
       //----------------------------------------------------------------//
       std::uint32_t last_newly_accepted_stream_id_;
       std::uint32_t next_stream_id_;
-      std::uint32_t outgoing_window_size_;
-      std::uint32_t incoming_window_size_;
+      std::int32_t outgoing_window_size_;
+      std::int32_t incoming_window_size_;
 
       http::frame incoming_frame_;
       std::queue<http::frame> incoming_header_block_fragments_;
@@ -325,12 +327,12 @@ namespace manifold
 #ifndef MANIFOLD_REMOVED_PRIORITY
       stream_dependency_tree stream_dependency_tree_;
 #endif
-      std::uint32_t connection_level_outgoing_window_size() const { return this->outgoing_window_size_; }
-      std::uint32_t connection_level_incoming_window_size() const { return this->incoming_window_size_; }
+      std::int32_t connection_level_outgoing_window_size() const { return this->outgoing_window_size_; }
+      std::int32_t connection_level_incoming_window_size() const { return this->incoming_window_size_; }
       void garbage_collect_streams();
       bool receiving_push_promise_is_allowed();
       bool sending_push_promise_is_allowed();
-      typename std::map<std::uint32_t, stream>::iterator find_stream_with_data();
+      typename std::unordered_map<std::uint32_t, stream>::iterator find_stream_with_data();
       static bool i_am_server();
       //----------------------------------------------------------------//
 

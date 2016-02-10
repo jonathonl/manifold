@@ -297,7 +297,7 @@ namespace manifold
           req_entity->clear();
           req_entity->seekg(0, std::ios::beg);
 
-          std::array<char, 4096> buf;
+          std::array<char, 32768> buf;
           long bytes_in_buf = req_entity->read(buf.data(), buf.size()).gcount();
           if (!req_entity->good())
           {
@@ -310,7 +310,7 @@ namespace manifold
           {
             req->on_drain([req_entity, req]()
             {
-              std::array<char, 4096> buf;
+              std::array<char, 32768> buf;
               long bytes_in_buf = req_entity->read(buf.data(), buf.size()).gcount();
               if (bytes_in_buf > 0)
                 req->send(buf.data(), (std::size_t)bytes_in_buf);

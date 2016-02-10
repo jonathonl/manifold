@@ -56,8 +56,19 @@ namespace manifold
       std::vector<char> buf_;
       std::uint8_t flags_;
     public:
+      frame_payload_base(frame_payload_base&& source)
+        : buf_(std::move(source.buf_)), flags_(source.flags_) {}
       frame_payload_base(std::uint8_t flags) : flags_(flags) {}
       virtual ~frame_payload_base() {}
+      frame_payload_base& operator=(frame_payload_base&& source)
+      {
+        if (&source != this)
+        {
+          this->buf_ = std::move(source.buf_);
+          this->flags_ = source.flags_;
+        }
+        return *this;
+      }
 
       std::uint8_t flags() const;
       std::uint32_t serialized_length() const;
@@ -73,6 +84,12 @@ namespace manifold
     {
     public:
       data_frame(const char*const data, std::uint32_t datasz, bool end_stream = false, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
+      data_frame(data_frame&& source) : frame_payload_base(std::move(source)) {}
+      data_frame& operator=(data_frame&& source)
+      {
+        frame_payload_base::operator=(std::move(source));
+        return *this;
+      }
       ~data_frame() {}
 
       data_frame split(std::uint32_t num_bytes);
@@ -115,6 +132,12 @@ namespace manifold
     public:
       headers_frame(const char*const header_block, std::uint32_t header_block_sz, bool end_headers, bool end_stream, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
       headers_frame(const char*const header_block, std::uint32_t header_block_sz, bool end_headers, bool end_stream, priority_options priority_ops, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
+      headers_frame(headers_frame&& source) : frame_payload_base(std::move(source)) {}
+      headers_frame& operator=(headers_frame&& source)
+      {
+        frame_payload_base::operator=(std::move(source));
+        return *this;
+      }
       ~headers_frame() {}
 
       const char*const header_block_fragment() const;
@@ -140,6 +163,12 @@ namespace manifold
     {
     public:
       priority_frame(priority_options options);
+      priority_frame(priority_frame&& source) : frame_payload_base(std::move(source)) {}
+      priority_frame& operator=(priority_frame&& source)
+      {
+        frame_payload_base::operator=(std::move(source));
+        return *this;
+      }
       ~priority_frame() {}
 
       std::uint8_t weight() const;
@@ -156,6 +185,12 @@ namespace manifold
     {
     public:
       rst_stream_frame(http::v2_errc error_code);
+      rst_stream_frame(rst_stream_frame&& source) : frame_payload_base(std::move(source)) {}
+      rst_stream_frame& operator=(rst_stream_frame&& source)
+      {
+        frame_payload_base::operator=(std::move(source));
+        return *this;
+      }
       ~rst_stream_frame() {}
 
       std::uint32_t error_code() const;
@@ -173,6 +208,12 @@ namespace manifold
     public:
       settings_frame(ack_flag) : frame_payload_base(0x1) {}
       settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end);
+      settings_frame(settings_frame&& source) : frame_payload_base(std::move(source)) {}
+      settings_frame& operator=(settings_frame&& source)
+      {
+        frame_payload_base::operator=(std::move(source));
+        return *this;
+      }
       ~settings_frame() {}
 
 
@@ -189,6 +230,12 @@ namespace manifold
     {
     public:
       push_promise_frame(const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id, bool end_headers, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
+      push_promise_frame(push_promise_frame&& source) : frame_payload_base(std::move(source)) {}
+      push_promise_frame& operator=(push_promise_frame&& source)
+      {
+        frame_payload_base::operator=(std::move(source));
+        return *this;
+      }
       ~push_promise_frame() {}
 
       const char*const header_block_fragment() const;
@@ -208,6 +255,12 @@ namespace manifold
     {
     public:
       ping_frame(std::uint64_t ping_data, bool ack = false);
+      ping_frame(ping_frame&& source) : frame_payload_base(std::move(source)) {}
+      ping_frame& operator=(ping_frame&& source)
+      {
+        frame_payload_base::operator=(std::move(source));
+        return *this;
+      }
       ~ping_frame() {}
 
       bool is_ack() const { return (bool)(this->flags_ & 0x1); }
@@ -223,6 +276,12 @@ namespace manifold
     {
     public:
       goaway_frame(std::uint32_t last_stream_id, http::v2_errc error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz);
+      goaway_frame(goaway_frame&& source) : frame_payload_base(std::move(source)) {}
+      goaway_frame& operator=(goaway_frame&& source)
+      {
+        frame_payload_base::operator=(std::move(source));
+        return *this;
+      }
       ~goaway_frame() {}
 
       std::uint32_t last_stream_id() const;
@@ -240,6 +299,12 @@ namespace manifold
     {
     public:
       window_update_frame(std::uint32_t window_size_increment);
+      window_update_frame(window_update_frame&& source) : frame_payload_base(std::move(source)) {}
+      window_update_frame& operator=(window_update_frame&& source)
+      {
+        frame_payload_base::operator=(std::move(source));
+        return *this;
+      }
       ~window_update_frame() {}
 
       std::uint32_t window_size_increment() const;
@@ -254,6 +319,12 @@ namespace manifold
     {
     public:
       continuation_frame(const char*const header_data, std::uint32_t header_data_sz, bool end_headers);
+      continuation_frame(continuation_frame&& source) : frame_payload_base(std::move(source)) {}
+      continuation_frame& operator=(continuation_frame&& source)
+      {
+        frame_payload_base::operator=(std::move(source));
+        return *this;
+      }
       ~continuation_frame() {}
 
       const char*const header_block_fragment() const;
@@ -337,6 +408,8 @@ namespace manifold
       void destroy_union();
       void init_meta(frame_type t, std::uint32_t payload_length, std::uint32_t stream_id, std::uint8_t flags);
       std::uint8_t flags() const;
+      frame(const frame&) = delete;
+      frame& operator=(const frame&) = delete;
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//

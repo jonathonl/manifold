@@ -116,7 +116,7 @@ namespace manifold
 
 
       data_frame ret(this->data(), num_bytes);
-      operator=(data_frame(this->data() + num_bytes, this->data_length() - num_bytes, this->flags_ & frame_flag::end_stream, this->padding(), this->pad_length()));
+      data_frame::operator=(data_frame(this->data() + num_bytes, this->data_length() - num_bytes, this->flags_ & frame_flag::end_stream, this->padding(), this->pad_length()));
       return ret;
     }
     //----------------------------------------------------------------//

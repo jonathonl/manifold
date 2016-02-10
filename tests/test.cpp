@@ -285,7 +285,7 @@ int main()
     //----------------------------------------------------------------//
     // Client to Local Server Test
     //
-
+    asio::io_service client_ioservice;
     http::client agnt(ioservice, client_ssl_ctx);
     http::stream_client stream_agnt(agnt);
     http::file_transfer_client file_transfer_agnt(stream_agnt);
@@ -295,18 +295,18 @@ int main()
     http::file_transfer_client::options ops;
     ops.replace_existing_file = true;
     auto t = std::chrono::system_clock::now().time_since_epoch();
-//    file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/test_cmp.rfcmp"), "./").on_complete([t](const std::error_code& ec, const std::string& file_path)
-//    {
-//      if (ec)
-//      {
-//        std::cout << ec.message() << std::endl;
-//      }
-//      else
-//      {
-//        std::cout << "DL SUCCEEDED" << std::endl;
-//        std::cout << "SECONDS: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch() - t).count() << std::endl;
-//      }
-//    });
+    file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/test_cmp.rfcmp"), "./").on_complete([t](const std::error_code& ec, const std::string& file_path)
+    {
+      if (ec)
+      {
+        std::cout << ec.message() << std::endl;
+      }
+      else
+      {
+        std::cout << "DL SUCCEEDED" << std::endl;
+        std::cout << "SECONDS: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch() - t).count() << std::endl;
+      }
+    });
 
     for (size_t i = 0; i < 0; ++i)
     {
@@ -324,6 +324,11 @@ int main()
       });
     }
 
+//    std::thread([&client_ioservice]()
+//    {
+//      client_ioservice.run();
+//      auto a = 0;
+//    }).detach();
     ioservice.run();
 
     auto post_data = std::make_shared<std::stringstream>("name=value&foo=bar");

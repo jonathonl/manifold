@@ -419,7 +419,7 @@ namespace manifold
                           auto c = std::make_shared<v2_connection<request_head, response_head>>(std::move(self->sock_));
                           self->conn_ = c;
                           c->on_close(std::bind(&session_base::close, self, std::placeholders::_1));
-                          c->run(self->timeout_, {});
+                          c->run(self->timeout_, {{v2_connection<request_head, response_head>::setting_code::initial_window_size, 0x7FFFFFFF}});
                           self->process_deferred_requests(std::error_code());
                         }
                       });
