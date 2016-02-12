@@ -7,6 +7,8 @@ In progress.
 
 ```C++
 asio::io_service ioservice;
+asio::ssl::context ssl_ctx(asio::ssl::context::tlsv12);
+// Add certs to context...
 
 http::router app;
 app.register_handler(std::regex("^/(.*)$"), [&app](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
@@ -29,10 +31,10 @@ app.register_handler(std::regex("^/(.*)$"), [&app](http::server::request&& req, 
   });
 });
 
-http::server srv(ioservice, 8080, "0.0.0.0");
+http::server srv(ioservice, 80, "0.0.0.0");
 srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
 
-http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
+http::server ssl_srv(ioservice, ssl_ctx, 443, "0.0.0.0");
 ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
 
 ioservice.run();
@@ -42,32 +44,38 @@ ioservice.run();
 
 ```C++
 asio::io_service ioservice;
+asio::ssl::context ssl_ctx(asio::ssl::context::tlsv12);
 
-http::client conn(ioservice, "www.example.com", http::client::ssl_options());
-conn.on_connect([&conn]()
+http::client user_agent(ioservice, ssl_ctx);
+user_agent.make_secure_request("www.example.com", 443, [](const std::error_code& ec, client::request&& req)
 {
-  auto req = conn.make_request();
-
-  req.on_response([](http::client::response&& resp)
+  if (ec)
   {
-    if (!resp.head().is_successful_status())
-      resp.close();
-    else
+    // Handle connect error...
+  }
+  else
+  {
+    req.on_response([](http::client::response&& resp)
     {
-      resp.on_data([](const char *const data, std::size_t datasz)
+      if (!resp.head().has_successful_status())
+        resp.cancel();
+      else
       {
-        // ...
-      });
+        resp.on_data([](const char *const data, std::size_t datasz)
+        {
+          // ...
+        });
 
-      resp.on_end([]()
-      {
-        // ...
-      });
-    }
-  });
+        resp.on_end([]()
+        {
+          // ...
+        });
+      }
+    });
 
-  req.head() = http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}});
-  req.end("name=value&name2=value2");
+    req.head() = http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}});
+    req.end("name=value&name2=value2");
+  }
 });
 
 ioservice.run();
