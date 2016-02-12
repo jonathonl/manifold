@@ -699,12 +699,7 @@ namespace manifold
         if (this->outgoing_window_size_ > 0 || this->outgoing_data_frames_.front().data_length() == 0)
           ret = true;
       }
-      if (this->outgoing_window_size_ < 4096)
-      {
-        std::cout << "low" << std::endl;
-        if (this->outgoing_window_size_ == 0)
-          std::cout << "empty" << std::endl;
-      }
+
       return ret;
     }
     //----------------------------------------------------------------//
@@ -1405,13 +1400,6 @@ namespace manifold
         }
         else
         {
-          if (this->outgoing_window_size_ < 4096)
-          {
-            std::cout << "clow" << std::endl;
-            if (this->outgoing_window_size_ == 0)
-              std::cout << "cempty" << std::endl;
-          }
-
           if (this->outgoing_frames_.size())
           {
             this->outgoing_frame_ = std::move(this->outgoing_frames_.front());
