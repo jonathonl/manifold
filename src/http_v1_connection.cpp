@@ -126,22 +126,23 @@ namespace manifold
       {
         this->closed_ = true;
 
-        this->socket_->close();
-        for (auto it = this->transaction_queue_.begin(); it != this->transaction_queue_.end(); ++it)
-        {
-          if (it->state != transaction_state::closed)
-          {
-            it->state = transaction_state::closed;
-            it->on_close ? it->on_close(ec) : void();
-          }
-        }
-
-        this->on_close_ ? this->on_close_(ec) : void();
-
-        this->activity_deadline_timer_.cancel();
         auto self = casted_shared_from_this();
-        this->socket_->io_service().post([self]()
+        this->socket_->io_service().post([self, ec]()
         {
+          self->socket_->close();
+          for (auto it = self->transaction_queue_.begin(); it != self->transaction_queue_.end(); ++it)
+          {
+            if (it->state != transaction_state::closed)
+            {
+              it->state = transaction_state::closed;
+              it->on_close ? it->on_close(ec) : void();
+            }
+          }
+
+          self->on_close_ ? self->on_close_(ec) : void();
+
+          self->activity_deadline_timer_.cancel();
+
           self->garbage_collect_transactions();
           self->on_close_ = nullptr;
           self->on_new_stream_ = nullptr;

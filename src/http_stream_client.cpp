@@ -118,6 +118,16 @@ namespace manifold
     //================================================================//
 
     //================================================================//
+    void stream_client::promise_impl::update_send_progress(std::uint64_t bytes_transferred, std::uint64_t bytes_total)
+    {
+      this->on_send_progress_ ? this->on_send_progress_(bytes_transferred, bytes_total) : void();
+    }
+
+    void stream_client::promise_impl::update_recv_progress(std::uint64_t bytes_transferred, std::uint64_t bytes_total)
+    {
+      this->on_recv_progress_ ? this->on_recv_progress_(bytes_transferred, bytes_total) : void();
+    }
+
     void stream_client::promise_impl::fulfill(const std::error_code& ec, const response_head& headers)
     {
       if (!fulfilled_)
@@ -129,6 +139,9 @@ namespace manifold
 
         on_complete_ ? on_complete_(ec_, headers_) : void();
         on_complete_ = nullptr;
+        on_cancel_ = nullptr;
+        on_send_progress_ = nullptr;
+        on_recv_progress_ = nullptr;
       }
     }
 
@@ -139,9 +152,21 @@ namespace manifold
         cancelled_ = true;
 
         on_cancel_ ? on_cancel_() : void();
-        on_cancel_ = nullptr;
       }
     }
+
+    void stream_client::promise_impl::on_send_progress(const progress_callback& prog_fn)
+    {
+      if (!cancelled_ && !fulfilled_)
+        this->on_send_progress_ = prog_fn;
+    }
+
+    void stream_client::promise_impl::on_recv_progress(const progress_callback& prog_fn)
+    {
+      if (!cancelled_ && !fulfilled_)
+        this->on_recv_progress_ = prog_fn;
+    }
+
 
     void stream_client::promise_impl::on_complete(const std::function<void(const std::error_code& ec, const response_head& headers)>& fn)
     {
@@ -155,7 +180,7 @@ namespace manifold
     {
       if (cancelled_)
         fn ? fn() : void();
-      else
+      else if (!fulfilled_)
         on_cancel_ = fn;
     }
     //================================================================//
@@ -164,6 +189,16 @@ namespace manifold
     stream_client::promise::promise(const std::shared_ptr<promise_impl>& impl)
       : impl_(impl)
     {
+    }
+
+    void stream_client::promise::on_send_progress(const progress_callback& prog_fn)
+    {
+      impl_->on_send_progress(prog_fn);
+    }
+
+    void stream_client::promise::on_recv_progress(const progress_callback& prog_fn)
+    {
+      impl_->on_recv_progress(prog_fn);
     }
 
     void stream_client::promise::on_complete(const std::function<void(const std::error_code& ec, const response_head& res_head)>& fn)
@@ -196,7 +231,7 @@ namespace manifold
 
     stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, std::ostream& res_entity)
     {
-      return send_request(method, request_url, res_entity, max_redirects_);
+      return send_request(method, request_url, {}, res_entity, max_redirects_);
     }
 
     stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::ostream& res_entity)
@@ -206,7 +241,7 @@ namespace manifold
 
     stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, std::istream& req_entity, std::ostream& res_entity)
     {
-      return send_request(method, request_url, req_entity, res_entity, max_redirects_);
+      return send_request(method, request_url, {}, req_entity, res_entity, max_redirects_);
     }
 
     stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::istream& req_entity, std::ostream& res_entity)
@@ -240,9 +275,15 @@ namespace manifold
           {
             if (resp_entity)
             {
-              resp.on_data([resp_entity](const char*const data, std::size_t sz)
+              std::uint64_t content_length = 0;
+              std::stringstream ss_content_length(resp.head().header("content-length"));
+              ss_content_length >> content_length;
+              auto total_bytes_received = std::make_shared<std::uint64_t>(0);
+              resp.on_data([resp_entity, total_bytes_received, content_length, prom](const char*const data, std::size_t sz)
               {
                 resp_entity->write(data, sz);
+                (*total_bytes_received) += sz;
+                prom->update_recv_progress(*total_bytes_received, content_length);
               });
             }
 
@@ -297,6 +338,11 @@ namespace manifold
           req_entity->clear();
           req_entity->seekg(0, std::ios::beg);
 
+          std::uint64_t content_length = 0;
+          std::stringstream ss_content_length(req->head().header("content-length"));
+          ss_content_length >> content_length;
+          auto total_bytes_sent = std::make_shared<std::uint64_t>(0);
+
           std::array<char, 32768> buf;
           long bytes_in_buf = req_entity->read(buf.data(), buf.size()).gcount();
           if (!req_entity->good())
@@ -308,25 +354,26 @@ namespace manifold
           }
           else
           {
-            req->on_drain([req_entity, req]()
+            req->on_drain([req_entity, req, total_bytes_sent, content_length, prom]()
             {
               std::array<char, 32768> buf;
               long bytes_in_buf = req_entity->read(buf.data(), buf.size()).gcount();
               if (bytes_in_buf > 0)
+              {
                 req->send(buf.data(), (std::size_t)bytes_in_buf);
+                (*total_bytes_sent) += (std::size_t)bytes_in_buf;
+                prom->update_send_progress(*total_bytes_sent, content_length);
+              }
 
               if (!req_entity->good())
                 req->end();
             });
             req->send(buf.data(), (std::size_t)bytes_in_buf);
+            (*total_bytes_sent) += (std::size_t)bytes_in_buf;
+            prom->update_send_progress(*total_bytes_sent, content_length);
           }
         }
       }
-    }
-
-    stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, std::ostream& resp_entity, std::uint8_t max_redirects)
-    {
-      return this->send_request(method, request_url, {}, resp_entity, max_redirects);
     }
 
     stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::ostream& resp_entity, std::uint8_t max_redirects)
@@ -340,11 +387,6 @@ namespace manifold
         this->client_.make_request(request_url.host(), request_url.port(), std::bind(&stream_client::handle_request, this, std::placeholders::_1, std::placeholders::_2, method, request_url, header_list, nullptr, &resp_entity, max_redirects, prom));
 
       return ret;
-    }
-
-    stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, std::istream& req_entity, std::ostream& res_entity, std::uint8_t max_redirects)
-    {
-      return this->send_request(method, request_url, {}, req_entity, res_entity, max_redirects);
     }
 
     stream_client::promise stream_client::send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::istream& req_entity, std::ostream& resp_entity, std::uint8_t max_redirects)

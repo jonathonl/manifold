@@ -85,10 +85,13 @@ namespace manifold
       {
       public:
         void cancel();
-        void on_cancel(const std::function<void()>& fn);
-      private:
+        void on_cancel(const std::function<void()>&);
+        void update_progress(std::uint64_t, std::uint64_t);
+        void on_progress(const stream_client::progress_callback&);
+      protected:
         bool cancelled_ = false;
         std::function<void()> on_cancel_;
+        stream_client::progress_callback on_progress_;
       };
 
       class download_promise_impl : public base_promise_impl
@@ -132,7 +135,8 @@ namespace manifold
       {
       public:
         download_promise(const std::shared_ptr<download_promise_impl>& impl);
-        void on_complete(const std::function<void(const std::error_code& ec, const std::string& local_file_path)>& fn);
+        download_promise& on_progress(const std::function<void(std::uint64_t bytes_transferred, std::uint64_t bytes_total)>& fn);
+        download_promise& on_complete(const std::function<void(const std::error_code& ec, const std::string& local_file_path)>& fn);
         void cancel();
       private:
         std::shared_ptr<download_promise_impl> impl_;

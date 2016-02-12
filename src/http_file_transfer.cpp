@@ -401,6 +401,16 @@ namespace manifold
     //================================================================//
 
     //================================================================//
+    void file_transfer_client::base_promise_impl::update_progress(std::uint64_t bytes_transferred, std::uint64_t bytes_total)
+    {
+      on_progress_ ? on_progress_(bytes_transferred, bytes_total) : void();
+    }
+
+    void file_transfer_client::base_promise_impl::on_progress(const stream_client::progress_callback& fn)
+    {
+      on_progress_ = fn;
+    }
+
     void file_transfer_client::base_promise_impl::cancel()
     {
       if (!cancelled_)
@@ -408,7 +418,6 @@ namespace manifold
         cancelled_ = true;
 
         on_cancel_ ? on_cancel_() : void();
-        on_cancel_ = nullptr;
       }
     }
 
@@ -433,6 +442,8 @@ namespace manifold
 
         on_complete_ ? on_complete_(ec_, local_file_path_) : void();
         on_complete_ = nullptr;
+        on_cancel_ = nullptr;
+        on_progress_ = nullptr;
       }
     }
 
@@ -456,6 +467,8 @@ namespace manifold
 
         on_complete_ ? on_complete_(ec_) : void();
         on_complete_ = nullptr;
+        on_cancel_ = nullptr;
+        on_progress_ = nullptr;
       }
     }
 
@@ -480,6 +493,8 @@ namespace manifold
 
         on_complete_ ? on_complete_(ec_, stats_) : void();
         on_complete_ = nullptr;
+        on_cancel_ = nullptr;
+        on_progress_ = nullptr;
       }
     }
 
@@ -498,9 +513,16 @@ namespace manifold
     {
     }
 
-    void file_transfer_client::download_promise::on_complete(const std::function<void(const std::error_code&, const std::string&)>& fn)
+    file_transfer_client::download_promise& file_transfer_client::download_promise::on_progress(const std::function<void(std::uint64_t, std::uint64_t)>& fn)
+    {
+      this->impl_->on_progress(fn);
+      return *this;
+    }
+
+    file_transfer_client::download_promise& file_transfer_client::download_promise::on_complete(const std::function<void(const std::error_code&, const std::string&)>& fn)
     {
       this->impl_->on_complete(fn);
+      return *this;
     }
 
     void file_transfer_client::download_promise::cancel()
@@ -593,12 +615,14 @@ namespace manifold
 
         auto req_prom = std::make_shared<stream_client::promise>(stream_client_.send_request("GET", remote_source, headers, *dest_ofs));
         dl_prom->on_cancel(std::bind(&stream_client::promise::cancel, req_prom));
+        req_prom->on_recv_progress(std::bind(&download_promise_impl::update_progress, dl_prom, std::placeholders::_1, std::placeholders::_2));
         req_prom->on_complete([dl_prom, dest_ofs, local_destination, tmp_file_path, remote_source, ops](const std::error_code& ec, const response_head& headers)
         {
           dest_ofs->close();
 
           if (ec)
           {
+            std::remove(tmp_file_path.c_str());
             dl_prom->fulfill(ec, "");
           }
           else
@@ -691,6 +715,7 @@ namespace manifold
         auto resp_entity = std::make_shared<std::stringstream>();
         auto req_prom = std::make_shared<stream_client::promise>(stream_client_.send_request("PUT", remote_destination, headers, *src_ifs, *resp_entity));
         ul_prom->on_cancel(std::bind(&stream_client::promise::cancel, req_prom));
+        req_prom->on_send_progress(std::bind(&upload_promise_impl::update_progress, ul_prom, std::placeholders::_1, std::placeholders::_2));
         req_prom->on_complete([ul_prom, src_ifs, resp_entity](const std::error_code& ec, const response_head& headers)
         {
           src_ifs->close();

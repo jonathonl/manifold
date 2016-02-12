@@ -74,7 +74,7 @@ namespace manifold
 #endif
       //bool send_headers(std::uint32_t stream_id, const v2_header_block& head, priority_options priority, bool end_headers, bool end_stream);
       //bool send_priority(std::uint32_t stream_id, priority_options options);
-      bool send_reset_stream(std::uint32_t stream_id, http::v2_errc error_code)  { this->close(error_code); return true; }
+      void send_reset_stream(std::uint32_t stream_id, http::v2_errc error_code)  { this->close(error_code); }
       std::uint32_t send_push_promise(std::uint32_t stream_id, const RecvMsg& head) { return 0; }
       void send_goaway(http::v2_errc error_code, const char *const data = nullptr, std::uint32_t data_sz = 0) { this->close(error_code); }
 

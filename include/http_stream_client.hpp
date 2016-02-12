@@ -78,19 +78,27 @@ namespace manifold
 
     class stream_client
     {
+    public:
+      typedef std::function<void(std::uint64_t, std::uint64_t)> progress_callback;
     private:
       class promise_impl
       {
       public:
-        void fulfill(const std::error_code& ec, const response_head& headers);
+        void update_send_progress(std::uint64_t, std::uint64_t);
+        void update_recv_progress(std::uint64_t, std::uint64_t);
+        void fulfill(const std::error_code&, const response_head&);
         void cancel();
-        void on_complete(const std::function<void(const std::error_code& ec, const response_head& headers)>& fn);
-        void on_cancel(const std::function<void()>& fn);
+        void on_send_progress(const progress_callback&);
+        void on_recv_progress(const progress_callback&);
+        void on_complete(const std::function<void(const std::error_code&, const response_head&)>& fn);
+        void on_cancel(const std::function<void()>&);
       private:
         bool fulfilled_ = false;
         bool cancelled_ = false;
         std::function<void(const std::error_code& ec, const response_head& headers)> on_complete_;
         std::function<void()> on_cancel_;
+        progress_callback on_send_progress_;
+        progress_callback on_recv_progress_;
         std::error_code ec_;
         response_head headers_;
       };
@@ -99,6 +107,8 @@ namespace manifold
       {
       public:
         promise(const std::shared_ptr<promise_impl>& impl);
+        void on_send_progress(const std::function<void(std::uint64_t bytes_transferred, std::uint64_t bytes_total)>& send_progress_cb);
+        void on_recv_progress(const std::function<void(std::uint64_t bytes_transferred, std::uint64_t bytes_total)>& recv_progress_cb);
         void on_complete(const std::function<void(const std::error_code& ec, const response_head& res_head)>& fn);
         void cancel();
       private:
@@ -118,9 +128,7 @@ namespace manifold
       client& client_;
       std::uint8_t max_redirects_;
 
-      promise send_request(const std::string& method, const uri& request_url, std::ostream& res_entity, std::uint8_t max_redirects);
       promise send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::ostream& res_entity, std::uint8_t max_redirects);
-      promise send_request(const std::string& method, const uri& request_url, std::istream& req_entity, std::ostream& res_entity, std::uint8_t max_redirects);
       promise send_request(const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::istream& req_entity, std::ostream& res_entity, std::uint8_t max_redirects);
 
       void handle_request(const std::error_code& ec, client::request&& req, const std::string& method, const uri& request_url, const std::list<std::pair<std::string,std::string>>& header_list, std::istream* req_entity, std::ostream* resp_entity, std::uint8_t max_redirects, const std::shared_ptr<promise_impl>& prom);

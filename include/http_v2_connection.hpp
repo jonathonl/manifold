@@ -423,7 +423,7 @@ namespace manifold
       bool send_headers(std::uint32_t stream_id, v2_header_block&& head, bool end_headers, bool end_stream);
       bool send_headers(std::uint32_t stream_id, v2_header_block&& head, priority_options priority, bool end_headers, bool end_stream);
       bool send_priority(std::uint32_t stream_id, priority_options options);
-      bool send_reset_stream(std::uint32_t stream_id, http::v2_errc error_code);
+      void send_reset_stream(std::uint32_t stream_id, http::v2_errc error_code);
       void send_settings(const std::list<std::pair<std::uint16_t,std::uint32_t>>& settings);
       std::uint32_t send_push_promise(std::uint32_t stream_id, const RecvMsg& head);
       std::uint32_t send_push_promise(std::uint32_t stream_id, v2_header_block&& head);

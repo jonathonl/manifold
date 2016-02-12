@@ -285,7 +285,6 @@ int main()
     //----------------------------------------------------------------//
     // Client to Local Server Test
     //
-    asio::io_service client_ioservice;
     http::client agnt(ioservice, client_ssl_ctx);
     http::stream_client stream_agnt(agnt);
     http::file_transfer_client file_transfer_agnt(stream_agnt);
@@ -295,18 +294,38 @@ int main()
     http::file_transfer_client::options ops;
     ops.replace_existing_file = true;
     auto t = std::chrono::system_clock::now().time_since_epoch();
-    file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/test_cmp.rfcmp"), "./").on_complete([t](const std::error_code& ec, const std::string& file_path)
+    std::cout << "Starting Download ..." << std::endl;
+    auto last_percent = std::make_shared<std::uint64_t>(0);
+
     {
-      if (ec)
+      auto p = file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/test_cmp.rfcmp"), "./")
+      .on_progress([last_percent](std::uint64_t transferred, std::uint64_t total)
       {
-        std::cout << ec.message() << std::endl;
-      }
-      else
+        if (total)
+        {
+          std::uint64_t percent = (static_cast<double>(transferred) / static_cast<double>(total)) * 100;
+          if (percent > *last_percent)
+          {
+            *last_percent = percent;
+            std::cout << "\r" << percent << "%" << std::flush;
+          }
+        }
+      }).on_complete([t](const std::error_code& ec, const std::string& file_path)
       {
-        std::cout << "DL SUCCEEDED" << std::endl;
-        std::cout << "SECONDS: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch() - t).count() << std::endl;
-      }
-    });
+        std::cout << std::endl;
+        if (ec)
+        {
+          std::cout << ec.message() << std::endl;
+        }
+        else
+        {
+          std::cout << "DL SUCCEEDED" << std::endl;
+          std::cout << "SECONDS: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch() - t).count() << std::endl;
+        }
+      });
+    }
+
+
 
     for (size_t i = 0; i < 0; ++i)
     {
@@ -330,6 +349,7 @@ int main()
 //      auto a = 0;
 //    }).detach();
     ioservice.run();
+    return 0;
 
     auto post_data = std::make_shared<std::stringstream>("name=value&foo=bar");
     auto post_resp_entity = std::make_shared<std::stringstream>();

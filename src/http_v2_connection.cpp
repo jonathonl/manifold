@@ -171,17 +171,22 @@ namespace manifold
 
         //TODO: This needs to be fixed.
         this->send_goaway(v2_errc::internal_error);
-        for (auto it = this->streams_.begin(); it != this->streams_.end(); ++it)
+
+        auto self = casted_shared_from_this();
+        this->socket_->io_service().post([self, ec]()
         {
-          if (it->second.state() != stream_state::closed)
+          for (auto it = self->streams_.begin(); it != self->streams_.end(); ++it)
           {
-            it->second.send_rst_stream_frame(v2_errc::internal_error); // Frame will never actually be sent. This is just being called to change state and call callback.
+            if (it->second.state() != stream_state::closed)
+            {
+              it->second.send_rst_stream_frame(v2_errc::internal_error); // Frame will never actually be sent. This is just being called to change state and call callback.
+            }
           }
-        }
 
-        this->on_close_ ? this->on_close_(ec) : void();
+          self->on_close_ ? self->on_close_(ec) : void();
 
-        this->data_transfer_deadline_timer_.cancel();
+          self->data_transfer_deadline_timer_.cancel();
+        });
       }
     }
     //----------------------------------------------------------------//
@@ -1787,25 +1792,24 @@ namespace manifold
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
-    bool v2_connection<SendMsg, RecvMsg>::send_reset_stream(std::uint32_t stream_id, http::v2_errc error_code)
+    void v2_connection<SendMsg, RecvMsg>::send_reset_stream(std::uint32_t stream_id, http::v2_errc error_code)
     {
-      bool ret = false;
-
-      auto it = this->streams_.find(stream_id);
-      if (it != this->streams_.end())
+      auto self = casted_shared_from_this();
+      this->socket_->io_service().post([self, stream_id, error_code]()
       {
-        if (it->second.send_rst_stream_frame(error_code))
+        auto it = self->streams_.find(stream_id);
+        if (it != self->streams_.end())
         {
-          this->run_send_loop();
-          ret = true;
+          if (it->second.send_rst_stream_frame(error_code))
+          {
+            self->run_send_loop();
+          }
+          else
+          {
+            //assert(!"Stream state_ change not allowed.");
+          }
         }
-        else
-        {
-          //assert(!"Stream state_ change not allowed.");
-        }
-      }
-
-      return ret;
+      });
     }
     //----------------------------------------------------------------//
 
