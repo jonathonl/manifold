@@ -285,19 +285,13 @@ namespace manifold
       };
       //================================================================//
 #endif
-
-      //----------------------------------------------------------------//
-      std::unordered_map<std::uint32_t,stream> streams_;
-      std::map<setting_code,std::uint32_t> local_settings_;
-      std::queue<std::list<std::pair<std::uint16_t,std::uint32_t>>> pending_local_settings_;
-      stream* create_stream_object(std::uint32_t stream_id);
-      std::uint32_t get_next_stream_id();
-      //----------------------------------------------------------------//
     private:
       //----------------------------------------------------------------//
       std::unique_ptr<socket> socket_;
-      // TODO: Make settings class.
+      std::unordered_map<std::uint32_t,stream> streams_;
       std::map<setting_code,std::uint32_t> peer_settings_;
+      std::map<setting_code,std::uint32_t> local_settings_;
+      std::queue<std::list<std::pair<std::uint16_t,std::uint32_t>>> pending_local_settings_;
       hpack::encoder hpack_encoder_;
       hpack::decoder hpack_decoder_;
       std::minstd_rand rng_;
@@ -306,6 +300,20 @@ namespace manifold
       bool send_loop_running_;
       std::chrono::system_clock::duration data_transfer_timeout_;
       asio::basic_waitable_timer<std::chrono::system_clock> data_transfer_deadline_timer_;
+      std::uint32_t last_newly_accepted_stream_id_;
+      std::uint32_t next_stream_id_;
+      std::int32_t outgoing_window_size_;
+      std::int32_t incoming_window_size_;
+      http::frame incoming_frame_;
+      std::queue<http::frame> incoming_header_block_fragments_;
+      http::frame outgoing_frame_;
+      std::queue<frame> outgoing_frames_;
+#ifndef MANIFOLD_REMOVED_PRIORITY
+      stream_dependency_tree stream_dependency_tree_;
+#endif
+      //----------------------------------------------------------------//
+
+      //----------------------------------------------------------------//
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
@@ -315,18 +323,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      std::uint32_t last_newly_accepted_stream_id_;
-      std::uint32_t next_stream_id_;
-      std::int32_t outgoing_window_size_;
-      std::int32_t incoming_window_size_;
-
-      http::frame incoming_frame_;
-      std::queue<http::frame> incoming_header_block_fragments_;
-      http::frame outgoing_frame_;
-      std::queue<frame> outgoing_frames_;
-#ifndef MANIFOLD_REMOVED_PRIORITY
-      stream_dependency_tree stream_dependency_tree_;
-#endif
+      std::uint32_t get_next_stream_id();
       std::int32_t connection_level_outgoing_window_size() const { return this->outgoing_window_size_; }
       std::int32_t connection_level_incoming_window_size() const { return this->incoming_window_size_; }
       void garbage_collect_streams();
@@ -387,7 +384,6 @@ namespace manifold
       void run(std::chrono::system_clock::duration timeout, const std::list<std::pair<setting_code, std::uint32_t>>& custom_settings);
       void close(const std::error_code& ec);
       bool is_closed() const;
-      void cancelAllStreams();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//

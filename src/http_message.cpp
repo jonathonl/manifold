@@ -40,6 +40,7 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
+    //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     ::manifold::http::version message<SendMsg,RecvMsg>::http_version() const
     {
@@ -48,13 +49,16 @@ namespace manifold
       else
         return http::version::unknown;
     }
+    //----------------------------------------------------------------//
 
+    //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>
     void message<SendMsg,RecvMsg>::cancel()
     {
       if (this->connection_)
         this->connection_->send_reset_stream(this->stream_id_, v2_errc::cancel);
     }
+    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     template <typename SendMsg, typename RecvMsg>

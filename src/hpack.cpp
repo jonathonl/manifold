@@ -812,6 +812,8 @@ namespace manifold
     //----------------------------------------------------------------//
     void encoder::encode(const std::list<header_field>& headers, std::string& output)
     {
+      // TODO: Estimate output size and reserve contiguous array in output container.
+
       while (this->table_size_updates_.size())
       {
         output.push_back((char)0x20);
