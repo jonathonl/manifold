@@ -24,6 +24,7 @@ namespace manifold
 
       //----------------------------------------------------------------//
       std::uint32_t stream_id() const;
+      ::manifold::http::version http_version() const;
       void cancel();
       void on_close(const std::function<void(const std::error_code& ec)>& cb);
       //----------------------------------------------------------------//

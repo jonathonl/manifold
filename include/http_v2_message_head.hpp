@@ -58,16 +58,6 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-//      const std::string& http_version() const;
-//      void http_version(const std::string& version); // TODO: Make this an enum.
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-//      virtual void start_line(const std::string& value) = 0;
-//      virtual std::string start_line() const = 0;
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
       static void serialize(hpack::encoder& enc, const v2_header_block& source, std::string& destination);
       static bool deserialize(hpack::decoder& dec, const std::string& source, v2_header_block& destination);
       //----------------------------------------------------------------//

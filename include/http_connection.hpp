@@ -26,6 +26,15 @@ namespace manifold
   namespace http
   {
     //================================================================//
+    enum class version
+    {
+      unknown = 0,
+      http1_1,
+      http2
+    };
+    //================================================================//
+
+    //================================================================//
     template <typename SendMsg, typename RecvMsg>
     class connection : public std::enable_shared_from_this<connection<SendMsg, RecvMsg>>
     {
@@ -37,6 +46,7 @@ namespace manifold
       }
       //----------------------------------------------------------------//
       //virtual void run() = 0;
+      virtual ::manifold::http::version version() const = 0;
       virtual void close(const std::error_code& ec) = 0;
       virtual bool is_closed() const = 0;
       //----------------------------------------------------------------//

@@ -383,6 +383,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
+      ::manifold::http::version version() const { return version::http2; }
       void run(std::chrono::system_clock::duration timeout, const std::list<std::pair<setting_code, std::uint32_t>>& custom_settings);
       void close(const std::error_code& ec);
       bool is_closed() const;

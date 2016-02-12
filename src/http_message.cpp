@@ -41,6 +41,15 @@ namespace manifold
     //----------------------------------------------------------------//
 
     template <typename SendMsg, typename RecvMsg>
+    ::manifold::http::version message<SendMsg,RecvMsg>::http_version() const
+    {
+      if (this->connection_)
+        return this->connection_->version();
+      else
+        return http::version::unknown;
+    }
+
+    template <typename SendMsg, typename RecvMsg>
     void message<SendMsg,RecvMsg>::cancel()
     {
       if (this->connection_)

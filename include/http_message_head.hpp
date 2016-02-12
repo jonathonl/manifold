@@ -35,11 +35,6 @@ namespace manifold
       const std::list<std::pair<std::string,std::string>>& raw_headers() const;
       std::size_t size() const;
       //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-//      const std::string& http_version() const;
-//      void http_version(const std::string& version); // TODO: Make this an enum.
-      //----------------------------------------------------------------//
     protected:
       //----------------------------------------------------------------//
       std::list<std::pair<std::string,std::string>> headers_;

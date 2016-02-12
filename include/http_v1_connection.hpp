@@ -47,6 +47,7 @@ namespace manifold
         this->socket_->close();
       }
 
+      ::manifold::http::version version() const { return version::http1_1; }
       void run(std::chrono::system_clock::duration timeout);
       void close(const std::error_code& ec);
       bool is_closed() const;
