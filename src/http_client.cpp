@@ -556,7 +556,10 @@ namespace manifold
       for (auto range = this->non_tls_sessions_.equal_range(sess->ep()); range.first != range.second; ++range.first)
       {
         if (range.first->second == sess)
+        {
           this->non_tls_sessions_.erase(range.first);
+          break;
+        }
       }
     }
     //----------------------------------------------------------------//
@@ -567,7 +570,10 @@ namespace manifold
       for (auto range = this->tls_sessions_.equal_range(sess->ep()); range.first != range.second; ++range.first)
       {
         if (range.first->second == sess)
+        {
           this->tls_sessions_.erase(range.first);
+          break;
+        }
       }
     }
     //----------------------------------------------------------------//
