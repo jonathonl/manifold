@@ -9,7 +9,6 @@
 #include <memory>
 #include <ctime>
 
-#include "asio.hpp"
 #include "http_v2_request_head.hpp"
 #include "http_v2_response_head.hpp"
 #include "http_outgoing_message.hpp"
