@@ -6,112 +6,112 @@ namespace manifold
   namespace http
   {
     //================================================================//
-    stream_client_errc status_code_to_errc(std::uint16_t status_code)
+    response_status_errc status_code_to_errc(std::uint16_t status_code)
     {
       if (status_code >= 300 && status_code < 400)
       {
         switch (status_code)
         {
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_multiple_choices  ): return stream_client_errc::response_status_multiple_choices   ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_moved_permanently ): return stream_client_errc::response_status_moved_permanently  ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_found             ): return stream_client_errc::response_status_found              ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_see_other         ): return stream_client_errc::response_status_see_other          ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_not_modified      ): return stream_client_errc::response_status_not_modified       ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_use_proxy         ): return stream_client_errc::response_status_use_proxy          ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_temporary_redirect): return stream_client_errc::response_status_temporary_redirect ;
-          default: return stream_client_errc::unknown_redirection_response_status;
+          case static_cast<std::uint16_t>(response_status_errc::multiple_choices  ): return response_status_errc::multiple_choices   ;
+          case static_cast<std::uint16_t>(response_status_errc::moved_permanently ): return response_status_errc::moved_permanently  ;
+          case static_cast<std::uint16_t>(response_status_errc::found             ): return response_status_errc::found              ;
+          case static_cast<std::uint16_t>(response_status_errc::see_other         ): return response_status_errc::see_other          ;
+          case static_cast<std::uint16_t>(response_status_errc::not_modified      ): return response_status_errc::not_modified       ;
+          case static_cast<std::uint16_t>(response_status_errc::use_proxy         ): return response_status_errc::use_proxy          ;
+          case static_cast<std::uint16_t>(response_status_errc::temporary_redirect): return response_status_errc::temporary_redirect ;
+          default: return response_status_errc::unknown_redirection_status;
         }
       }
       else if (status_code >= 400 && status_code < 500)
       {
         switch (status_code)
         {
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_bad_request                    ): return stream_client_errc::response_status_bad_request                     ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_unauthorized                   ): return stream_client_errc::response_status_unauthorized                    ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_payment_required               ): return stream_client_errc::response_status_payment_required                ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_forbidden                      ): return stream_client_errc::response_status_forbidden                       ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_not_found                      ): return stream_client_errc::response_status_not_found                       ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_method_not_allowed             ): return stream_client_errc::response_status_method_not_allowed              ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_not_acceptable                 ): return stream_client_errc::response_status_not_acceptable                  ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_proxy_authentication_required  ): return stream_client_errc::response_status_proxy_authentication_required   ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_request_timeout                ): return stream_client_errc::response_status_request_timeout                 ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_conflict                       ): return stream_client_errc::response_status_conflict                        ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_gone                           ): return stream_client_errc::response_status_gone                            ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_length_required                ): return stream_client_errc::response_status_length_required                 ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_precondition_failed            ): return stream_client_errc::response_status_precondition_failed             ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_request_entity_too_large       ): return stream_client_errc::response_status_request_entity_too_large        ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_request_uri_too_long           ): return stream_client_errc::response_status_request_uri_too_long            ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_unsupported_media_type         ): return stream_client_errc::response_status_unsupported_media_type          ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_requested_range_not_satisfiable): return stream_client_errc::response_status_requested_range_not_satisfiable ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_expectation_failed             ): return stream_client_errc::response_status_expectation_failed              ;
-          default: return stream_client_errc::unknown_client_error_response_status;
+          case static_cast<std::uint16_t>(response_status_errc::bad_request                    ): return response_status_errc::bad_request                     ;
+          case static_cast<std::uint16_t>(response_status_errc::unauthorized                   ): return response_status_errc::unauthorized                    ;
+          case static_cast<std::uint16_t>(response_status_errc::payment_required               ): return response_status_errc::payment_required                ;
+          case static_cast<std::uint16_t>(response_status_errc::forbidden                      ): return response_status_errc::forbidden                       ;
+          case static_cast<std::uint16_t>(response_status_errc::not_found                      ): return response_status_errc::not_found                       ;
+          case static_cast<std::uint16_t>(response_status_errc::method_not_allowed             ): return response_status_errc::method_not_allowed              ;
+          case static_cast<std::uint16_t>(response_status_errc::not_acceptable                 ): return response_status_errc::not_acceptable                  ;
+          case static_cast<std::uint16_t>(response_status_errc::proxy_authentication_required  ): return response_status_errc::proxy_authentication_required   ;
+          case static_cast<std::uint16_t>(response_status_errc::request_timeout                ): return response_status_errc::request_timeout                 ;
+          case static_cast<std::uint16_t>(response_status_errc::conflict                       ): return response_status_errc::conflict                        ;
+          case static_cast<std::uint16_t>(response_status_errc::gone                           ): return response_status_errc::gone                            ;
+          case static_cast<std::uint16_t>(response_status_errc::length_required                ): return response_status_errc::length_required                 ;
+          case static_cast<std::uint16_t>(response_status_errc::precondition_failed            ): return response_status_errc::precondition_failed             ;
+          case static_cast<std::uint16_t>(response_status_errc::request_entity_too_large       ): return response_status_errc::request_entity_too_large        ;
+          case static_cast<std::uint16_t>(response_status_errc::request_uri_too_long           ): return response_status_errc::request_uri_too_long            ;
+          case static_cast<std::uint16_t>(response_status_errc::unsupported_media_type         ): return response_status_errc::unsupported_media_type          ;
+          case static_cast<std::uint16_t>(response_status_errc::requested_range_not_satisfiable): return response_status_errc::requested_range_not_satisfiable ;
+          case static_cast<std::uint16_t>(response_status_errc::expectation_failed             ): return response_status_errc::expectation_failed              ;
+          default: return response_status_errc::unknown_client_error;
         }
       }
       else if (status_code >= 500 && status_code < 600)
       {
         switch (status_code)
         {
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_internal_server_error     ): return stream_client_errc::response_status_internal_server_error      ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_not_implemented           ): return stream_client_errc::response_status_not_implemented            ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_bad_gateway               ): return stream_client_errc::response_status_bad_gateway                ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_service_unavailable       ): return stream_client_errc::response_status_service_unavailable        ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_gateway_timeout           ): return stream_client_errc::response_status_gateway_timeout            ;
-          case static_cast<std::uint16_t>(stream_client_errc::response_status_http_version_not_supported): return stream_client_errc::response_status_http_version_not_supported ;
-          default: return stream_client_errc::unknown_server_error_response_status;
+          case static_cast<std::uint16_t>(response_status_errc::internal_server_error     ): return response_status_errc::internal_server_error      ;
+          case static_cast<std::uint16_t>(response_status_errc::not_implemented           ): return response_status_errc::not_implemented            ;
+          case static_cast<std::uint16_t>(response_status_errc::bad_gateway               ): return response_status_errc::bad_gateway                ;
+          case static_cast<std::uint16_t>(response_status_errc::service_unavailable       ): return response_status_errc::service_unavailable        ;
+          case static_cast<std::uint16_t>(response_status_errc::gateway_timeout           ): return response_status_errc::gateway_timeout            ;
+          case static_cast<std::uint16_t>(response_status_errc::http_version_not_supported): return response_status_errc::http_version_not_supported ;
+          default: return response_status_errc::unknown_server_error;
         }
       }
-      return stream_client_errc::unknown_server_error_response_status;
+      return response_status_errc::unknown_server_error;
     }
 
-    const char* stream_client_error_category_impl::name() const noexcept
+    const char* response_status_error_category_impl::name() const noexcept
     {
-      return "Manifold HTTP Stream Clientr";
+      return "Manifold Unsuccessful HTTP Response Status";
     }
 
-    std::string stream_client_error_category_impl::message(int ev) const
+    std::string response_status_error_category_impl::message(int ev) const
     {
       switch (ev)
       {
-        case static_cast<int>(stream_client_errc::unknown_redirection_response_status             ): return "unknown redirection response status";
-        case static_cast<int>(stream_client_errc::unknown_client_error_response_status            ): return "unknown client error response status";
-        case static_cast<int>(stream_client_errc::unknown_server_error_response_status            ): return "unknown server error response status";
-        case static_cast<int>(stream_client_errc::response_status_multiple_choices                ): return "response status multiple choices";
-        case static_cast<int>(stream_client_errc::response_status_moved_permanently               ): return "response status moved permanently";
-        case static_cast<int>(stream_client_errc::response_status_found                           ): return "response status found";
-        case static_cast<int>(stream_client_errc::response_status_see_other                       ): return "response status see other";
-        case static_cast<int>(stream_client_errc::response_status_not_modified                    ): return "response status not modified";
-        case static_cast<int>(stream_client_errc::response_status_use_proxy                       ): return "response status use proxy";
-        case static_cast<int>(stream_client_errc::response_status_temporary_redirect              ): return "response status temporary redirect";
-        case static_cast<int>(stream_client_errc::response_status_bad_request                     ): return "response status bad request";
-        case static_cast<int>(stream_client_errc::response_status_unauthorized                    ): return "response status unauthorized";
-        case static_cast<int>(stream_client_errc::response_status_payment_required                ): return "response status payment required";
-        case static_cast<int>(stream_client_errc::response_status_forbidden                       ): return "response status forbidden";
-        case static_cast<int>(stream_client_errc::response_status_not_found                       ): return "response status not found";
-        case static_cast<int>(stream_client_errc::response_status_method_not_allowed              ): return "response status method not allowed";
-        case static_cast<int>(stream_client_errc::response_status_not_acceptable                  ): return "response status not acceptable";
-        case static_cast<int>(stream_client_errc::response_status_proxy_authentication_required   ): return "response status proxy authentication required";
-        case static_cast<int>(stream_client_errc::response_status_request_timeout                 ): return "response status request timeout";
-        case static_cast<int>(stream_client_errc::response_status_conflict                        ): return "response status conflict";
-        case static_cast<int>(stream_client_errc::response_status_gone                            ): return "response status gone";
-        case static_cast<int>(stream_client_errc::response_status_length_required                 ): return "response status length required";
-        case static_cast<int>(stream_client_errc::response_status_precondition_failed             ): return "response status precondition failed";
-        case static_cast<int>(stream_client_errc::response_status_request_entity_too_large        ): return "response status request entity too large";
-        case static_cast<int>(stream_client_errc::response_status_request_uri_too_long            ): return "response status request uri too long";
-        case static_cast<int>(stream_client_errc::response_status_unsupported_media_type          ): return "response status unsupported media type";
-        case static_cast<int>(stream_client_errc::response_status_requested_range_not_satisfiable ): return "response status requested range not satisfiable";
-        case static_cast<int>(stream_client_errc::response_status_expectation_failed              ): return "response status expectation failed";
-        case static_cast<int>(stream_client_errc::response_status_internal_server_error           ): return "response status internal server error";
-        case static_cast<int>(stream_client_errc::response_status_not_implemented                 ): return "response status not implemented";
-        case static_cast<int>(stream_client_errc::response_status_bad_gateway                     ): return "response status bad gateway";
-        case static_cast<int>(stream_client_errc::response_status_service_unavailable             ): return "response status service unavailable";
-        case static_cast<int>(stream_client_errc::response_status_gateway_timeout                 ): return "response status gateway timeout";
-        case static_cast<int>(stream_client_errc::response_status_http_version_not_supported      ): return "response status http version not supported";
+        case static_cast<int>(response_status_errc::unknown_redirection_status      ): return "unknown redirection status";
+        case static_cast<int>(response_status_errc::unknown_client_error            ): return "unknown client error";
+        case static_cast<int>(response_status_errc::unknown_server_error            ): return "unknown server error";
+        case static_cast<int>(response_status_errc::multiple_choices                ): return "multiple choices";
+        case static_cast<int>(response_status_errc::moved_permanently               ): return "moved permanently";
+        case static_cast<int>(response_status_errc::found                           ): return "found";
+        case static_cast<int>(response_status_errc::see_other                       ): return "see other";
+        case static_cast<int>(response_status_errc::not_modified                    ): return "not modified";
+        case static_cast<int>(response_status_errc::use_proxy                       ): return "use proxy";
+        case static_cast<int>(response_status_errc::temporary_redirect              ): return "temporary redirect";
+        case static_cast<int>(response_status_errc::bad_request                     ): return "bad request";
+        case static_cast<int>(response_status_errc::unauthorized                    ): return "unauthorized";
+        case static_cast<int>(response_status_errc::payment_required                ): return "payment required";
+        case static_cast<int>(response_status_errc::forbidden                       ): return "forbidden";
+        case static_cast<int>(response_status_errc::not_found                       ): return "not found";
+        case static_cast<int>(response_status_errc::method_not_allowed              ): return "method not allowed";
+        case static_cast<int>(response_status_errc::not_acceptable                  ): return "not acceptable";
+        case static_cast<int>(response_status_errc::proxy_authentication_required   ): return "proxy authentication required";
+        case static_cast<int>(response_status_errc::request_timeout                 ): return "request timeout";
+        case static_cast<int>(response_status_errc::conflict                        ): return "conflict";
+        case static_cast<int>(response_status_errc::gone                            ): return "gone";
+        case static_cast<int>(response_status_errc::length_required                 ): return "length required";
+        case static_cast<int>(response_status_errc::precondition_failed             ): return "precondition failed";
+        case static_cast<int>(response_status_errc::request_entity_too_large        ): return "request entity too large";
+        case static_cast<int>(response_status_errc::request_uri_too_long            ): return "request uri too long";
+        case static_cast<int>(response_status_errc::unsupported_media_type          ): return "unsupported media type";
+        case static_cast<int>(response_status_errc::requested_range_not_satisfiable ): return "requested range not satisfiable";
+        case static_cast<int>(response_status_errc::expectation_failed              ): return "expectation failed";
+        case static_cast<int>(response_status_errc::internal_server_error           ): return "internal server error";
+        case static_cast<int>(response_status_errc::not_implemented                 ): return "not implemented";
+        case static_cast<int>(response_status_errc::bad_gateway                     ): return "bad gateway";
+        case static_cast<int>(response_status_errc::service_unavailable             ): return "service unavailable";
+        case static_cast<int>(response_status_errc::gateway_timeout                 ): return "gateway timeout";
+        case static_cast<int>(response_status_errc::http_version_not_supported      ): return "http version not supported";
       };
       return "Unknown Error";
     }
 
-    const manifold::http::stream_client_error_category_impl stream_client_error_category_object;
-    std::error_code make_error_code (manifold::http::stream_client_errc e)
+    const manifold::http::response_status_error_category_impl stream_client_error_category_object;
+    std::error_code make_error_code (manifold::http::response_status_errc e)
     {
       return std::error_code(static_cast<int>(e), stream_client_error_category_object);
     }
@@ -343,7 +343,7 @@ namespace manifold
           ss_content_length >> content_length;
           auto total_bytes_sent = std::make_shared<std::uint64_t>(0);
 
-          std::array<char, 32768> buf;
+          std::array<char, 8192> buf;
           long bytes_in_buf = req_entity->read(buf.data(), buf.size()).gcount();
           if (!req_entity->good())
           {
@@ -356,7 +356,7 @@ namespace manifold
           {
             req->on_drain([req_entity, req, total_bytes_sent, content_length, prom]()
             {
-              std::array<char, 32768> buf;
+              std::array<char, 8192> buf;
               long bytes_in_buf = req_entity->read(buf.data(), buf.size()).gcount();
               if (bytes_in_buf > 0)
               {
