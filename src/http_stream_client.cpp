@@ -297,7 +297,7 @@ namespace manifold
           {
             uri redirect_url = resp.head().header("location");
             if (!redirect_url.is_valid() || max_redirects == 0)
-              prom->fulfill(status_code_to_errc(resp.head().status_code()), resp.head()); // TODO: set custom error.
+              prom->fulfill(status_code_to_errc(resp.head().status_code()), resp.head());
             else
             {
               if (redirect_url.is_relative())
@@ -312,10 +312,20 @@ namespace manifold
               prom->on_cancel(nullptr);
               req->on_close(nullptr);
 
+              std::list<std::pair<std::string,std::string>> redirect_header_list;
+              for (auto it = header_list.begin(); it != header_list.end(); ++it)
+              {
+                if (it->first != "authentication" // TODO: Add option to trust location header
+                    && it->first != "cookie") // TODO: Add cookie manager.
+                {
+                  redirect_header_list.push_back(*it);
+                }
+              }
+
               if (request_url.scheme_name() == "https")
-                this->client_.make_secure_request(request_url.host(), request_url.port(), std::bind(&stream_client::handle_request, this, std::placeholders::_1, std::placeholders::_2, method, redirect_url, header_list, req_entity, resp_entity, max_redirects - 1, prom));
+                this->client_.make_secure_request(request_url.host(), request_url.port(), std::bind(&stream_client::handle_request, this, std::placeholders::_1, std::placeholders::_2, method, redirect_url, redirect_header_list, req_entity, resp_entity, max_redirects - 1, prom));
               else
-                this->client_.make_request(request_url.host(), request_url.port(), std::bind(&stream_client::handle_request, this, std::placeholders::_1, std::placeholders::_2, method, redirect_url, header_list, req_entity, resp_entity, max_redirects - 1, prom));
+                this->client_.make_request(request_url.host(), request_url.port(), std::bind(&stream_client::handle_request, this, std::placeholders::_1, std::placeholders::_2, method, redirect_url, redirect_header_list, req_entity, resp_entity, max_redirects - 1, prom));
             }
           }
           else

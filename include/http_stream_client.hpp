@@ -16,7 +16,7 @@ namespace manifold
       unknown_server_error,
 
       // redirection
-        multiple_choices                = 300,
+      multiple_choices                = 300,
       moved_permanently               = 301,
       found                           = 302,
       see_other                       = 303,
@@ -26,7 +26,7 @@ namespace manifold
       temporary_redirect              = 307,
 
       // client error
-        bad_request                     = 400,
+      bad_request                     = 400,
       unauthorized                    = 401,
       payment_required                = 402,
       forbidden                       = 403,
@@ -46,7 +46,7 @@ namespace manifold
       expectation_failed              = 417,
 
       // server error
-        internal_server_error           = 500,
+      internal_server_error           = 500,
       not_implemented                 = 501,
       bad_gateway                     = 502,
       service_unavailable             = 503,
