@@ -322,10 +322,10 @@ namespace manifold
                 }
               }
 
-              if (request_url.scheme_name() == "https")
-                this->client_.make_secure_request(request_url.host(), request_url.port(), std::bind(&stream_client::handle_request, this, std::placeholders::_1, std::placeholders::_2, method, redirect_url, redirect_header_list, req_entity, resp_entity, max_redirects - 1, prom));
+              if (redirect_url.scheme_name() == "https")
+                this->client_.make_secure_request(redirect_url.host(), redirect_url.port(), std::bind(&stream_client::handle_request, this, std::placeholders::_1, std::placeholders::_2, method, redirect_url, redirect_header_list, req_entity, resp_entity, max_redirects - 1, prom));
               else
-                this->client_.make_request(request_url.host(), request_url.port(), std::bind(&stream_client::handle_request, this, std::placeholders::_1, std::placeholders::_2, method, redirect_url, redirect_header_list, req_entity, resp_entity, max_redirects - 1, prom));
+                this->client_.make_request(redirect_url.host(), redirect_url.port(), std::bind(&stream_client::handle_request, this, std::placeholders::_1, std::placeholders::_2, method, redirect_url, redirect_header_list, req_entity, resp_entity, max_redirects - 1, prom));
             }
           }
           else
