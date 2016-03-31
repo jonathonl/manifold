@@ -65,15 +65,18 @@ set(SOURCE_FILES
     src/http_stream_client.cpp
     src/http_file_transfer.cpp)
 
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_HOME_DIRECTORY}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_HOME_DIRECTORY}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_HOME_DIRECTORY}/bin)
+
 add_library(manifold SHARED ${SOURCE_FILES} ${HEADER_FILES})
-#target_link_libraries(manifold libssl.dylib)
-#target_link_libraries(manifold libcrypto.dylib)
+target_link_libraries(manifold /opt/local/lib/libssl.dylib)
+target_link_libraries(manifold /opt/local/lib/libcrypto.dylib)
 
 add_library(manifold-static STATIC ${SOURCE_FILES} ${HEADER_FILES})
-#target_link_libraries(manifold-static libssl.dylib)
-#target_link_libraries(manifold-static libcrypto.dylib)
 
-add_executable(manifold-test tests/test.cpp ${SOURCE_FILES} ${HEADER_FILES})
+add_executable(manifold-test tests/test.cpp) # ${SOURCE_FILES} ${HEADER_FILES})
+target_link_libraries(manifold-test manifold-static)
 target_link_libraries(manifold-test /opt/local/lib/libssl.dylib)
 target_link_libraries(manifold-test /opt/local/lib/libcrypto.dylib)
 #target_link_libraries(manifold /opt/local/lib/libboost_system-mt.a)
