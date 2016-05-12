@@ -1,4 +1,4 @@
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+//#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 #include <new>
 #include <iostream>

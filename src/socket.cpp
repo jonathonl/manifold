@@ -23,7 +23,7 @@ namespace manifold
 
     std::pair<iterator, bool> operator()(iterator begin, iterator end)
     {
-      if (std::distance(begin, end) > this->buf_size_)
+      if (static_cast<unsigned>(std::distance(begin, end)) > this->buf_size_)
       {
         end = begin + this->buf_size_;
         auto find = std::search(begin, end, delim_.begin(), delim_.end());

@@ -50,12 +50,12 @@ namespace manifold
       {
         if (path_matched)
         {
-          res.head().status_code(status_code::method_not_allowed);
+          res.head().set_status_code(status_code::method_not_allowed);
           res.end();
         }
         else
         {
-          res.head().status_code(status_code::not_found);
+          res.head().set_status_code(status_code::not_found);
           res.end();
         }
       }

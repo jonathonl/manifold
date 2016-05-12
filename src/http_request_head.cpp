@@ -131,19 +131,19 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::string method_enum_to_string(method method)
+    std::string method_enum_to_string(method m)
     {
       std::string ret;
 
-      if (method == method::head)         ret = "HEAD";
-      else if (method == method::get)     ret = "GET";
-      else if (method == method::post)    ret = "POST";
-      else if (method == method::put)     ret = "PUT";
-      else if (method == method::del)     ret = "DELETE";
-      else if (method == method::options) ret = "OPTIONS";
-      else if (method == method::trace)   ret = "TRACE";
-      else if (method == method::connect) ret = "CONNECT";
-      else if (method == method::patch)   ret = "PATCH";
+      if (m == method::head)         ret = "HEAD";
+      else if (m == method::get)     ret = "GET";
+      else if (m == method::post)    ret = "POST";
+      else if (m == method::put)     ret = "PUT";
+      else if (m == method::del)     ret = "DELETE";
+      else if (m == method::options) ret = "OPTIONS";
+      else if (m == method::trace)   ret = "TRACE";
+      else if (m == method::connect) ret = "CONNECT";
+      else if (m == method::patch)   ret = "PATCH";
 
       return ret;
     }

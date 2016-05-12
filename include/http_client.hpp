@@ -10,6 +10,7 @@
 #include <forward_list>
 #include <map>
 #include <iostream>
+#include <cstdint>
 
 #include "http_v1_connection.hpp"
 #include "http_v2_connection.hpp"
@@ -56,7 +57,42 @@ namespace manifold
 {
   namespace http
   {
-    class endpoint;
+    class endpoint
+    {
+    public:
+      endpoint() {}
+//      endpoint(const uri& uri)
+//        : host_(uri.host()), port_(uri.port()), encrypted_(uri.scheme_name() == "https")
+//      {
+//        if (!port_)
+//          port_ = (unsigned short)(encrypted_ ? 443 : 80);
+//      }
+      endpoint(bool encrypted, const std::string& host, std::uint16_t port = 0)
+        : host_(host), port_(port), encrypted_(encrypted)
+      {
+        if (!port_)
+          port_ = (unsigned short)(encrypted_ ? 443 : 80);
+      }
+
+      bool operator==(const endpoint& other) const
+      {
+        return (this->host_ == other.host_ && this->port_ == other.port_ && this->encrypted_ == other.encrypted_);
+      }
+
+      const std::string& host() const { return host_; }
+      unsigned short port() const { return port_; }
+      bool encrypted() const { return encrypted_; }
+      std::string socket_address() const
+      {
+        std::stringstream ret;
+        ret << this->host_ << ":" << this->port_;
+        return ret.str();
+      }
+    private:
+      std::string host_;
+      std::uint16_t port_;
+      bool encrypted_;
+    };
 
     class non_tls_session;
 

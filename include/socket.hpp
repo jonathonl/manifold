@@ -1,5 +1,5 @@
 #pragma once
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+//#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 #ifndef MANIFOLD_SOCKET_HPP
 #define MANIFOLD_SOCKET_HPP

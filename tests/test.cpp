@@ -14,6 +14,8 @@
 #include "hpack.hpp"
 #include "http_file_transfer.hpp"
 
+#include "mysql.hpp"
+
 
 
 
@@ -191,7 +193,7 @@ int main()
 
   app.register_handler(std::regex("^/redirect-url$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
   {
-    res.head().status_code(http::status_code::found);
+    res.head().set_status_code(http::status_code::found);
     res.head().header("location","/new-url");
     res.end();
   });
@@ -362,7 +364,7 @@ int main()
       }
       else
       {
-        std::cout << "status: " << headers.status_code() << std::endl;
+        std::cout << "status: " << headers.get_status_code() << std::endl;
         std::cout << post_resp_entity->str() << std::endl;
       }
     });

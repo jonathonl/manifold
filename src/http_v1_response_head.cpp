@@ -38,7 +38,7 @@ namespace manifold
     //----------------------------------------------------------------//
     v1_response_head::v1_response_head(const response_head& generic_head)
     {
-      this->status_code_ = generic_head.status_code();
+      this->status_code_ = generic_head.get_status_code();
       this->headers_ = generic_head.raw_headers();
     }
     //----------------------------------------------------------------//
@@ -54,7 +54,7 @@ namespace manifold
     //----------------------------------------------------------------//
     v1_response_head::v1_response_head(http::status_code status, std::list<std::pair<std::string,std::string>>&& headers)
     {
-      this->status_code(status);
+      this->set_status_code(status);
       this->headers_ = std::move(headers);
     }
     //----------------------------------------------------------------//
@@ -66,23 +66,23 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    unsigned short v1_response_head::status_code() const
+    unsigned short v1_response_head::get_status_code() const
     {
       return this->status_code_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void v1_response_head::status_code(unsigned short value)
+    void v1_response_head::set_status_code(unsigned short value)
     {
       this->status_code_ = value;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void v1_response_head::status_code(http::status_code value)
+    void v1_response_head::set_status_code(http::status_code value)
     {
-      this->status_code((unsigned short)value);
+      this->set_status_code((unsigned short)value);
     }
     //----------------------------------------------------------------//
   }

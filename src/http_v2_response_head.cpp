@@ -10,7 +10,7 @@ namespace manifold
     //----------------------------------------------------------------//
     v2_response_head::v2_response_head()
     {
-      this->status_code(status_code::ok);
+      this->set_status_code(status_code::ok);
     }
     //----------------------------------------------------------------//
 
@@ -18,7 +18,7 @@ namespace manifold
     v2_response_head::v2_response_head(const response_head& generic_head)
       : v2_header_block(generic_head)
     {
-      this->status_code(generic_head.status_code());
+      this->set_status_code(generic_head.get_status_code());
     }
     //----------------------------------------------------------------//
 
@@ -33,7 +33,7 @@ namespace manifold
     v2_response_head::v2_response_head(unsigned short status, std::list<hpack::header_field>&& headers)
     {
       this->headers_ = std::move(headers);
-      this->status_code(status);
+      this->set_status_code(status);
     }
     //----------------------------------------------------------------//
 
@@ -41,7 +41,7 @@ namespace manifold
     v2_response_head::v2_response_head(http::status_code status, std::list<hpack::header_field>&& headers)
     {
       this->headers_ = std::move(headers);
-      this->status_code(status);
+      this->set_status_code(status);
     }
     //----------------------------------------------------------------//
 
@@ -52,7 +52,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    unsigned short v2_response_head::status_code() const
+    unsigned short v2_response_head::get_status_code() const
     {
       std::stringstream tmp(this->header(":status"));
       unsigned short ret = 0;
@@ -62,14 +62,14 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void v2_response_head::status_code(unsigned short value)
+    void v2_response_head::set_status_code(unsigned short value)
     {
       this->pseudo_header(":status", std::to_string(value));
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void v2_response_head::status_code(http::status_code value)
+    void v2_response_head::set_status_code(http::status_code value)
     {
       this->pseudo_header(":status", std::to_string((unsigned short)value));
     }

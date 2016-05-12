@@ -78,9 +78,9 @@ namespace manifold
       response_head(const class v1_response_head& v1_headers);
       response_head(const class v2_response_head& v2_headers);
       ~response_head();
-      std::uint16_t status_code() const;
-      void status_code(std::uint16_t value);
-      void status_code(http::status_code value);
+      std::uint16_t get_status_code() const;
+      void set_status_code(std::uint16_t value);
+      void set_status_code(http::status_code value);
       bool has_informational_status() const;
       bool has_successful_status() const;
       bool has_redirection_status() const;

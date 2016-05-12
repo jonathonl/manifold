@@ -297,7 +297,7 @@ namespace manifold
           {
             uri redirect_url = resp.head().header("location");
             if (!redirect_url.is_valid() || max_redirects == 0)
-              prom->fulfill(status_code_to_errc(resp.head().status_code()), resp.head());
+              prom->fulfill(status_code_to_errc(resp.head().get_status_code()), resp.head());
             else
             {
               if (redirect_url.is_relative())
@@ -330,7 +330,7 @@ namespace manifold
           }
           else
           {
-            prom->fulfill(status_code_to_errc(resp.head().status_code()), resp.head());
+            prom->fulfill(status_code_to_errc(resp.head().get_status_code()), resp.head());
           }
         });
 

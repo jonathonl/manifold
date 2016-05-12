@@ -25,9 +25,9 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      unsigned short status_code() const;
-      void status_code(unsigned short value);
-      void status_code(http::status_code value);
+      unsigned short get_status_code() const;
+      void set_status_code(unsigned short value);
+      void set_status_code(http::status_code value);
       //----------------------------------------------------------------//
     };
     //================================================================//

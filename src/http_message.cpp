@@ -45,7 +45,7 @@ namespace manifold
     ::manifold::http::version message<SendMsg,RecvMsg>::http_version() const
     {
       if (this->connection_)
-        return this->connection_->version();
+        return this->connection_->get_version();
       else
         return http::version::unknown;
     }

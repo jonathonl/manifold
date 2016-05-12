@@ -15,7 +15,7 @@ namespace manifold
 
     //================================================================//
     enum class method { head = 1, get, post, put, del, options, trace, connect, patch };
-    std::string method_enum_to_string(method method);
+    std::string method_enum_to_string(method m);
     //================================================================//
 
     //================================================================//

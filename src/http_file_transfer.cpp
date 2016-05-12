@@ -203,9 +203,9 @@ namespace manifold
 
         if (!authorized)
         {
-          res.head().status_code(status_code::unauthorized);
+          res.head().set_status_code(status_code::unauthorized);
           res.head().header("WWW-Authenticate", "Basic realm=\"File Transfer\"");
-          res.end(status_code_to_reason_phrase(res.head().status_code()));
+          res.end(status_code_to_reason_phrase(res.head().get_status_code()));
         }
         else
         {
@@ -232,8 +232,8 @@ namespace manifold
           }
           else
           {
-            res.head().status_code(status_code::method_not_allowed);
-            res.end(status_code_to_reason_phrase(res.head().status_code()));
+            res.head().set_status_code(status_code::method_not_allowed);
+            res.end(status_code_to_reason_phrase(res.head().get_status_code()));
           }
         }
       }
@@ -244,7 +244,7 @@ namespace manifold
       struct stat st;
       if (stat(file_path.c_str(), &st) != 0 || (st.st_mode & S_IFREG) == 0)
       {
-        res.head().status_code(status_code::not_found);
+        res.head().set_status_code(status_code::not_found);
         res.end();
       }
       else
@@ -267,16 +267,16 @@ namespace manifold
       struct stat st;
       if (stat(file_path.c_str(), &st) != 0 || (st.st_mode & S_IFREG) == 0)
       {
-        res.head().status_code(status_code::not_found);
-        res.end(status_code_to_reason_phrase(res.head().status_code()));
+        res.head().set_status_code(status_code::not_found);
+        res.end(status_code_to_reason_phrase(res.head().get_status_code()));
       }
       else
       {
         auto ifs = std::make_shared<std::ifstream>(file_path, std::ios::binary);
         if (!ifs->good())
         {
-          res.head().status_code(status_code::internal_server_error);
-          res.end(status_code_to_reason_phrase(res.head().status_code()));
+          res.head().set_status_code(status_code::internal_server_error);
+          res.end(status_code_to_reason_phrase(res.head().get_status_code()));
         }
         else
         {
@@ -331,8 +331,8 @@ namespace manifold
 
       if (!ofs->good())
       {
-        res.head().status_code(status_code::internal_server_error);
-        res.end(status_code_to_reason_phrase(res.head().status_code()));
+        res.head().set_status_code(status_code::internal_server_error);
+        res.end(status_code_to_reason_phrase(res.head().get_status_code()));
       }
       else
       {
@@ -352,8 +352,8 @@ namespace manifold
           {
             ofs->close();
             std::remove(tmp_file_path.c_str());
-            res_ptr->head().status_code(status_code::internal_server_error);
-            res_ptr->end(status_code_to_reason_phrase(res_ptr->head().status_code()));
+            res_ptr->head().set_status_code(status_code::internal_server_error);
+            res_ptr->end(status_code_to_reason_phrase(res_ptr->head().get_status_code()));
           }
           else
           {
@@ -362,8 +362,8 @@ namespace manifold
             if (std::rename(tmp_file_path.c_str(), file_path.c_str()) != 0)
             {
               std::remove(tmp_file_path.c_str());
-              res_ptr->head().status_code(status_code::internal_server_error);
-              res_ptr->end(status_code_to_reason_phrase(res_ptr->head().status_code()));
+              res_ptr->head().set_status_code(status_code::internal_server_error);
+              res_ptr->end(status_code_to_reason_phrase(res_ptr->head().get_status_code()));
             }
             else
             {

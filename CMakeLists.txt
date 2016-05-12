@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 2.8.4)
 project(manifold)
 
-include_directories("include" "/opt/local/include")
+include_directories("include" "/opt/local/include" "/usr/local/mysql/include")
 
 set(CMAKE_MACOSX_RPATH 1)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-local-typedefs -DASIO_STANDALONE -DASIO_HAS_MOVE -std=c++11 -stdlib=libc++")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-local-typedefs -DASIO_STANDALONE -DASIO_HAS_MOVE -std=c++1y")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -DASIO_STANDALONE -std=c++11 -stdlib=libc++")
 
 #set(CMAKE_CXX_COMPILER "/opt/local/bin/g++-mp-4.9")
@@ -36,7 +36,8 @@ set(HEADER_FILES
     include/http_message_head.hpp
     include/http_v1_response_head.hpp
     include/http_stream_client.hpp
-    include/http_file_transfer.hpp)
+    include/http_file_transfer.hpp
+    include/mysql.hpp)
 
 set(SOURCE_FILES
     src/socket.cpp

@@ -8,10 +8,10 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    std::string status_code_to_reason_phrase(unsigned short status_code)
+    std::string status_code_to_reason_phrase(unsigned short s)
     {
       std::string ret;
-      switch(status_code)
+      switch(s)
       {
         case (unsigned short)status_code::continue_status:
           ret = "Continue";
@@ -166,7 +166,7 @@ namespace manifold
     response_head::response_head(const v1_response_head& v1_headers)
       : header_block(v1_headers)
     {
-      this->status_code(v1_headers.status_code());
+      this->set_status_code(v1_headers.get_status_code());
     }
     //----------------------------------------------------------------//
 
@@ -174,7 +174,7 @@ namespace manifold
     response_head::response_head(const v2_response_head& v2_headers)
       : header_block(v2_headers)
     {
-      this->status_code(v2_headers.status_code());
+      this->set_status_code(v2_headers.get_status_code());
     }
     //----------------------------------------------------------------//
 
@@ -185,21 +185,21 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    std::uint16_t response_head::status_code() const
+    std::uint16_t response_head::get_status_code() const
     {
       return this->status_code_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void response_head::status_code(std::uint16_t value)
+    void response_head::set_status_code(std::uint16_t value)
     {
       this->status_code_ = value;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void response_head::status_code(http::status_code value)
+    void response_head::set_status_code(http::status_code value)
     {
       this->status_code_ = (std::uint16_t)value;
     }
@@ -208,7 +208,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool response_head::has_informational_status() const
     {
-      std::uint16_t status = this->status_code();
+      std::uint16_t status = this->get_status_code();
       return (status >= 100 && status < 200);
     }
     //----------------------------------------------------------------//
@@ -216,7 +216,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool response_head::has_successful_status() const
     {
-      std::uint16_t status = this->status_code();
+      std::uint16_t status = this->get_status_code();
       return (status >= 200 && status < 300);
     }
     //----------------------------------------------------------------//
@@ -224,7 +224,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool response_head::has_redirection_status() const
     {
-      std::uint16_t status = this->status_code();
+      std::uint16_t status = this->get_status_code();
       return (status >= 300 && status < 400);
     }
     //----------------------------------------------------------------//
@@ -232,7 +232,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool response_head::has_client_error_status() const
     {
-      std::uint16_t status = this->status_code();
+      std::uint16_t status = this->get_status_code();
       return (status >= 400 && status < 500);
     }
     //----------------------------------------------------------------//
@@ -240,7 +240,7 @@ namespace manifold
     //----------------------------------------------------------------//
     bool response_head::has_server_error_status() const
     {
-      std::uint16_t status = this->status_code();
+      std::uint16_t status = this->get_status_code();
       return (status >= 500 && status < 600);
     }
     //----------------------------------------------------------------//
