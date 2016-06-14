@@ -1,9 +1,30 @@
 cmake_minimum_required(VERSION 2.8.4)
 project(manifold)
 
-include_directories("include" "/opt/local/include" "/usr/local/mysql/include")
+include(ExternalProject)
 
 set(CMAKE_MACOSX_RPATH 1)
+
+find_path(MYSQL_INCLUDE_DIR
+          NAMES "mysql.h"
+          PATHS
+          "/usr/local/mysql/include"
+          "/usr/include/mysql"
+          "/usr/local/include/mysql"
+          "/usr/mysql/include/mysql")
+
+find_library(MYSQL_LIBRARY
+             NAMES "mysqlclient"
+             PATHS
+             "/usr/local/mysql/lib"
+             "/lib/mysql"
+             "/lib64/mysql"
+             "/usr/lib/mysql"
+             "/usr/lib64/mysql"
+             "/usr/local/lib/mysql"
+             "/usr/local/lib64/mysql"
+             "/usr/mysql/lib/mysql"
+             "/usr/mysql/lib64/mysql")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-local-typedefs -DASIO_STANDALONE -DASIO_HAS_MOVE -std=c++1y")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -DASIO_STANDALONE -std=c++11 -stdlib=libc++")
@@ -70,7 +91,21 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_HOME_DIRECTORY}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_HOME_DIRECTORY}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_HOME_DIRECTORY}/bin)
 
+ExternalProject_Add(asio
+                    BUILD_IN_SOURCE 1
+                    GIT_REPOSITORY "https://github.com/chriskohlhoff/asio"
+                    GIT_TAG "asio-1-11-0"
+                    UPDATE_COMMAND ""
+                    CONFIGURE_COMMAND "" #autoconf && ./configure --prefix=<INSTALL_DIR>
+                    BUILD_COMMAND ""
+                    INSTALL_COMMAND "")
+ExternalProject_Get_Property(asio SOURCE_DIR)
+set(ASIO_SRC_DIR ${SOURCE_DIR})
+
+include_directories("include" "${ASIO_SRC_DIR}/asio/include" "/opt/local/include" ${MYSQL_INCLUDE_DIR})
+
 add_library(manifold SHARED ${SOURCE_FILES} ${HEADER_FILES})
+add_dependencies(manifold asio)
 target_link_libraries(manifold /opt/local/lib/libssl.dylib)
 target_link_libraries(manifold /opt/local/lib/libcrypto.dylib)
 
@@ -80,4 +115,5 @@ add_executable(manifold-test tests/test.cpp) # ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(manifold-test manifold-static)
 target_link_libraries(manifold-test /opt/local/lib/libssl.dylib)
 target_link_libraries(manifold-test /opt/local/lib/libcrypto.dylib)
+target_link_libraries(manifold-test ${MYSQL_LIBRARY})
 #target_link_libraries(manifold /opt/local/lib/libboost_system-mt.a)

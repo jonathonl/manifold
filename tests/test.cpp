@@ -15,6 +15,7 @@
 #include "http_file_transfer.hpp"
 
 #include "mysql.hpp"
+#include <experimental/any>
 
 
 
@@ -55,6 +56,8 @@ void handle_push_promise(http::client::request && req, std::uint32_t dependency_
 }
 //================================================================//
 
+using std::experimental::any_cast;
+using std::experimental::any;
 //################################################################//
 int main()
 {
@@ -66,6 +69,57 @@ int main()
   asio::io_service ioservice;
   asio::ssl::context client_ssl_ctx(asio::ssl::context::tlsv12);
   asio::ssl::context server_ssl_ctx(asio::ssl::context::tlsv12);
+
+  std::vector<std::string> v = {"foobar","fooman"};
+  std::string s = "hello world";
+  std::map<std::string, std::string> m;
+  m["hello"] = "world";
+
+  mysql::session_opts my_ops;
+  my_ops.host = "localhost";
+  my_ops.db = "gasp";
+  my_ops.user = "gasp_user";
+  my_ops.password = "foobar";
+  mysql::session my(ioservice, my_ops);
+
+
+
+  my.async_connect([&my](const std::error_code& ec)
+  {
+    if (ec)
+    {
+      std::cout << ec.message() << std::endl;
+    }
+    else
+    {
+      my.async_query("SELECT * FROM jobs", [](const std::error_code& ec, const std::vector<std::map<std::string, std::experimental::any>>& res)
+      {
+
+        if (ec)
+        {
+          std::cout << ec.message() << std::endl;
+        }
+        else
+        {
+          for (std::size_t i = 0; i<res.size(); ++i)
+          {
+            const std::map<std::string, std::experimental::any>& r = res[i];
+            std::cout
+            << any_cast<const std::string&>(res[i].at("id")) << std::endl
+            << any_cast<unsigned int>(res[i].at("user_id")) << std::endl
+            << any_cast<std::string>(res[i].at("name")) << std::endl
+            << any_cast<std::string>(res[i].at("error_message")) << std::endl
+            << any_cast<unsigned int>(res[i].at("status_id")) << std::endl
+            << any_cast<std::string>(res[i].at("creation_date")) << std::endl
+            << any_cast<std::string>(res[i].at("modified_date")) << std::endl << std::endl;
+          }
+        }
+      });
+    }
+  });
+
+  ioservice.run();
+  return 0;
 
 //  http::user_agent ua(ioservice);
 //  auto r = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
@@ -329,7 +383,7 @@ int main()
 
 
 
-    for (size_t i = 0; i < 0; ++i)
+    for (size_t i = 0; i < 3; ++i)
     {
       file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/readme.md"), "./").on_complete([i](const std::error_code& ec, const std::string& file_path)
       {

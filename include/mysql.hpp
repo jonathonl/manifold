@@ -34,51 +34,18 @@ namespace manifold
       std::string db;
     };
 
-    template <typename Service>
-    class basic_session
-      : public asio::basic_io_object<Service>
+     class basic_mysql_service
     {
     public:
-      explicit basic_session(asio::io_service &io_service, session_opts opts)
-        : asio::basic_io_object<Service>(io_service),
-        options_(opts),
-        my_(nullptr, close_mysql_ptr)
+      static basic_mysql_service& inst()
       {
-        my_c_api::mysql_init(my_.get());
+        static basic_mysql_service ret;
+        return ret;
       }
 
-      template <typename Handler>
-      void async_connect(Handler handler)
-      {
-        this->service.async_connect(options_, handler);
-      }
-
-      template <typename Handler>
-      void async_query(const std::string& query, Handler handler)
-      {
-        this->service.async_query(query, handler);
-      }
-
-    private:
-      session_opts options_;
-      std::shared_ptr<my_c_api::MYSQL> my_;
-
-      static void close_mysql_ptr(my_c_api::MYSQL* ptr)
-      {
-        if (ptr)
-          my_c_api::mysql_close(ptr);
-        ptr = nullptr;
-      }
-    };
-
-    class basic_mysql_service
-      : public asio::io_service::service
-    {
-    public:
-      basic_mysql_service(asio::io_service& ioservice)
-        : asio::io_service::service(ioservice),
-        work_(new asio::io_service::work(work_io_service_)),
-        work_thread_(std::bind(static_cast<std::size_t (asio::io_service::*)()>(&asio::io_service::run), &work_io_service_))
+      basic_mysql_service()
+        : work_(new asio::io_service::work(work_io_service_)),
+        work_thread_(new std::thread(std::bind(static_cast<std::size_t (asio::io_service::*)()>(&asio::io_service::run), &work_io_service_)))
       {
       }
 
@@ -86,10 +53,16 @@ namespace manifold
       {
         work_.reset();
         //work_io_service_.stop();
-        work_thread_.join();  // program is blocked here until the second
+        work_thread_->join();  // program is blocked here until the second
         // signal is triggerd
         //work_io_service_.reset();
       }
+
+      typedef basic_mysql_service implementation_type;
+      static asio::detail::service_id<basic_mysql_service> id;
+
+      void destroy(implementation_type& ) {}
+      void shutdown_service() {}
     private:
 
       template <typename Handler>
@@ -97,29 +70,31 @@ namespace manifold
       {
       public:
         connect_operation(asio::io_service& ioservice, const std::shared_ptr<my_c_api::MYSQL>& my, const session_opts& opts, Handler handler)
-          : io_service_(ioservice),
+          : work_(ioservice),
           options_(opts),
           handler_(handler),
           my_(my)
         {
         }
-        void operator()() const
+        void operator()()
         {
-          if (!io_service_.stopped())
+          std::error_code ec;
+          if (!work_.get_io_service().stopped())
           {
-            std::error_code ec;
+
 
             if (my_c_api::mysql_real_connect(my_.get(), options_.host.c_str(), options_.user.c_str(), options_.password.c_str(), options_.db.c_str(), 0, nullptr, 0) == 0)
               ec = std::error_code((int)std::errc::not_connected, std::generic_category()); // TODO: Get MySQL error.
-            this->io_service_.post(std::bind(handler_, ec));
+            this->work_.get_io_service().post(std::bind(handler_, ec));
           }
           else
           {
-            this->io_service_.post(std::bind(handler_, std::errc::operation_canceled));
+            ec = std::error_code((int)std::errc::operation_canceled, std::generic_category());
+            this->work_.get_io_service().post(std::bind(handler_, ec));
           }
         }
       private:
-        asio::io_service& io_service_;
+        asio::io_service::work work_;
         session_opts options_;
         Handler handler_;
         std::shared_ptr<my_c_api::MYSQL> my_;
@@ -130,22 +105,25 @@ namespace manifold
       {
       public:
         query_operation(asio::io_service& ioservice, const std::shared_ptr<my_c_api::MYSQL>& my, const std::string& query, Handler handler)
-          : io_service_(ioservice),
+          : work_(ioservice),
           query_(query),
           handler_(handler),
           my_(my)
         {
         }
-        void operator()() const
+        void operator()()
         {
           std::vector<std::map<std::string, std::experimental::any>> assoc_results;
-          if (!io_service_.stopped())
+          if (!work_.get_io_service().stopped())
           {
             std::error_code ec;
 
 
             if (my_c_api::mysql_query(my_.get(), query_.c_str()) != 0)
-              ec = std::error_code((int)std::errc::not_connected, std::generic_category()); // TODO: Get MySQL error.
+            {
+              std::cout << my_c_api::mysql_error(my_.get()) << std::endl;
+              ec = std::error_code((int) std::errc::not_connected, std::generic_category()); // TODO: Get MySQL error.
+            }
             else
             {
               my_c_api::MYSQL_RES* res = my_c_api::mysql_store_result(my_.get());
@@ -275,37 +253,78 @@ namespace manifold
                 assoc_results.push_back(std::move(tmp_row));
               }
             }
-            this->io_service_.post(std::bind(handler_, ec));
+            this->work_.get_io_service().post(std::bind(handler_, ec, assoc_results));
           }
           else
           {
-            this->io_service_.post(std::bind(handler_, std::errc::operation_canceled));
+            this->work_.get_io_service().post(std::bind(handler_, std::error_code((int)std::errc::operation_canceled, std::generic_category()), assoc_results));
           }
         }
       private:
-        asio::io_service& io_service_;
+        asio::io_service::work work_;
+        std::string query_;
         Handler handler_;
         std::shared_ptr<my_c_api::MYSQL> my_;
-        std::string query_;
       };
 
     public:
       template <typename Handler>
-      void async_connect(const std::shared_ptr<my_c_api::MYSQL>& my, const session_opts& opts, Handler handler)
+      void async_connect(asio::io_service& ioservice, const std::shared_ptr<my_c_api::MYSQL>& my, const session_opts& opts, Handler handler)
       {
-        this->work_io_service_.post(connect_operation<Handler>(this->get_io_service(), my, opts, handler));
+        this->work_io_service_.post(connect_operation<Handler>(ioservice, my, opts, handler));
       }
 
       template <typename Handler>
-      void async_query(const std::shared_ptr<my_c_api::MYSQL>& my, const std::string& query, Handler handler)
+      void async_query(asio::io_service& ioservice, const std::shared_ptr<my_c_api::MYSQL>& my, const std::string& query, Handler handler)
       {
-        this->work_io_service_.post(query_operation<Handler>(this->get_io_service(), my, query, handler));
+        this->work_io_service_.post(query_operation<Handler>(ioservice, my, query, handler));
       }
 
     private:
-      std::unique_ptr<asio::io_service::work> work_;
       asio::io_service work_io_service_;
-      std::thread work_thread_;
+      std::unique_ptr<asio::io_service::work> work_;
+      std::unique_ptr<std::thread> work_thread_;
+    };
+
+
+    template <typename Service>
+    class basic_session
+    {
+    public:
+      explicit basic_session(asio::io_service& ioservice, session_opts opts)
+        : io_service_(ioservice),
+          options_(opts)
+      {
+        my_c_api::MYSQL* tmp = my_c_api::mysql_init(NULL);
+        if (tmp)
+          my_ = std::shared_ptr<my_c_api::MYSQL>(tmp, close_mysql_ptr);
+      }
+
+      template <typename Handler>
+      void async_connect(Handler handler)
+      {
+        Service::inst().async_connect(io_service_, my_, options_, handler);
+      }
+
+      template <typename Handler>
+      void async_query(const std::string& query, Handler handler)
+      {
+        Service::inst().async_query(io_service_, my_, query, handler);
+      }
+
+
+
+    private:
+      asio::io_service& io_service_;
+      session_opts options_;
+      std::shared_ptr<my_c_api::MYSQL> my_;
+
+      static void close_mysql_ptr(my_c_api::MYSQL* ptr)
+      {
+        if (ptr)
+          my_c_api::mysql_close(ptr);
+        ptr = nullptr;
+      }
     };
 
     typedef basic_session<basic_mysql_service> session;

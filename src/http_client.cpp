@@ -420,7 +420,7 @@ namespace manifold
       this->reset_timeout();
       std::vector<unsigned char> proto_list(::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS));
       std::copy_n(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS, ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS), proto_list.begin());
-      ::SSL_CTX_set_alpn_protos(this->ssl_ctx_.impl(), proto_list.data(), proto_list.size());
+      ::SSL_CTX_set_alpn_protos(this->ssl_ctx_.native_handle(), proto_list.data(), proto_list.size());
     }
     //----------------------------------------------------------------//
 
