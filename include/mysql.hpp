@@ -34,37 +34,10 @@ namespace manifold
       std::string db;
     };
 
-     class basic_mysql_service
+    //template <typename Service>
+    class basic_session
     {
-    public:
-      static basic_mysql_service& inst()
-      {
-        static basic_mysql_service ret;
-        return ret;
-      }
-
-      basic_mysql_service()
-        : work_(new asio::io_service::work(work_io_service_)),
-        work_thread_(new std::thread(std::bind(static_cast<std::size_t (asio::io_service::*)()>(&asio::io_service::run), &work_io_service_)))
-      {
-      }
-
-      ~basic_mysql_service()
-      {
-        work_.reset();
-        //work_io_service_.stop();
-        work_thread_->join();  // program is blocked here until the second
-        // signal is triggerd
-        //work_io_service_.reset();
-      }
-
-      typedef basic_mysql_service implementation_type;
-      static asio::detail::service_id<basic_mysql_service> id;
-
-      void destroy(implementation_type& ) {}
-      void shutdown_service() {}
     private:
-
       template <typename Handler>
       class connect_operation
       {
@@ -266,30 +239,6 @@ namespace manifold
         Handler handler_;
         std::shared_ptr<my_c_api::MYSQL> my_;
       };
-
-    public:
-      template <typename Handler>
-      void async_connect(asio::io_service& ioservice, const std::shared_ptr<my_c_api::MYSQL>& my, const session_opts& opts, Handler handler)
-      {
-        this->work_io_service_.post(connect_operation<Handler>(ioservice, my, opts, handler));
-      }
-
-      template <typename Handler>
-      void async_query(asio::io_service& ioservice, const std::shared_ptr<my_c_api::MYSQL>& my, const std::string& query, Handler handler)
-      {
-        this->work_io_service_.post(query_operation<Handler>(ioservice, my, query, handler));
-      }
-
-    private:
-      asio::io_service work_io_service_;
-      std::unique_ptr<asio::io_service::work> work_;
-      std::unique_ptr<std::thread> work_thread_;
-    };
-
-
-    template <typename Service>
-    class basic_session
-    {
     public:
       explicit basic_session(asio::io_service& ioservice, session_opts opts)
         : io_service_(ioservice),
@@ -303,13 +252,13 @@ namespace manifold
       template <typename Handler>
       void async_connect(Handler handler)
       {
-        Service::inst().async_connect(io_service_, my_, options_, handler);
+        asio::post(asio::system_executor(), connect_operation<Handler>(io_service_, my_, options_, handler));
       }
 
       template <typename Handler>
       void async_query(const std::string& query, Handler handler)
       {
-        Service::inst().async_query(io_service_, my_, query, handler);
+        asio::post(asio::system_executor(), query_operation<Handler>(io_service_, my_, query, handler));
       }
 
 
@@ -327,7 +276,7 @@ namespace manifold
       }
     };
 
-    typedef basic_session<basic_mysql_service> session;
+    typedef basic_session session;
   }
 }
 
