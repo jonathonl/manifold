@@ -14,31 +14,134 @@
 #include "hpack.hpp"
 #include "http_file_transfer.hpp"
 
-#include "mysql.hpp"
+//#include "mysql.hpp"
 #include <experimental/any>
-
 
 
 
 using namespace manifold;
 
-class move_only
-{
-public:
-  move_only() { }
-  move_only(move_only&& source) { }
-  move_only& operator=(move_only&& source) { return *this; }
-private:
-  move_only(const move_only&) = delete;
-  move_only& operator=(const move_only&) = delete;
-};
+//================================================================//
+//class move_only
+//{
+//public:
+//  move_only() { }
+//  move_only(move_only&& source) { }
+//  move_only& operator=(move_only&& source) { return *this; }
+//private:
+//  move_only(const move_only&) = delete;
+//  move_only& operator=(const move_only&) = delete;
+//};
+//
+//std::tuple<move_only, move_only, int> return_move_only()
+//{
+//  static move_only ret;
+//  static move_only ret2;
+//  return std::make_tuple(std::move(ret), std::move(ret2), 5);
+//}
+//
+//void mysql_test()
+//{
+//  move_only first;
+//  move_only second;
+//  int third;
+//  std::tie(first, second, third) = return_move_only();
+//
+//  std::vector<std::string> v = {"foobar","fooman"};
+//  std::string s = "hello world";
+//  std::map<std::string, std::string> m;
+//  m["hello"] = "world";
+//
+//  mysql::session_opts my_ops;
+//  my_ops.host = "localhost";
+//  my_ops.db = "gasp";
+//  my_ops.user = "gasp_user";
+//  my_ops.password = "foobar";
+//  mysql::session my(ioservice, my_ops);
+//
+//
+//
+//  my.async_connect([&my](const std::error_code& ec)
+//  {
+//    if (ec)
+//    {
+//      std::cout << ec.message() << std::endl;
+//    }
+//    else
+//    {
+//      my.async_query("SELECT * FROM jobs", [](const std::error_code& ec, const std::vector<std::map<std::string, std::experimental::any>>& res)
+//      {
+//
+//        if (ec)
+//        {
+//          std::cout << ec.message() << std::endl;
+//        }
+//        else
+//        {
+//          for (std::size_t i = 0; i<res.size(); ++i)
+//          {
+//            const std::map<std::string, std::experimental::any>& r = res[i];
+//            std::cout
+//            << any_cast<const std::string&>(res[i].at("id")) << std::endl
+//            << any_cast<unsigned int>(res[i].at("user_id")) << std::endl
+//            << any_cast<std::string>(res[i].at("name")) << std::endl
+//            << any_cast<std::string>(res[i].at("error_message")) << std::endl
+//            << any_cast<unsigned int>(res[i].at("status_id")) << std::endl
+//            << any_cast<std::string>(res[i].at("creation_date")) << std::endl
+//            << any_cast<std::string>(res[i].at("modified_date")) << std::endl << std::endl;
+//          }
+//        }
+//      });
+//    }
+//  });
+//
+//  ioservice.run();
+//}
+//================================================================//
 
-std::tuple<move_only, move_only, int> return_move_only()
+//================================================================//
+void run_hpack_test()
 {
-  static move_only ret;
-  static move_only ret2;
-  return std::make_tuple(std::move(ret), std::move(ret2), 5);
+  std::size_t http2_default_table_size = 4096;
+  hpack::encoder enc(http2_default_table_size);
+  hpack::decoder dec(http2_default_table_size);
+
+  std::list<hpack::header_field> send_headers{
+    {":path","/"},
+    {":method","GET"},
+    {"content-type","application/json; charset=utf8"},
+    {"content-length","30"},
+    {"custom-header","foobar; baz"},
+    {"custom-header2","NOT INDEXED", hpack::cacheability::no}};
+  std::list<hpack::header_field> send_headers2{
+    {":path","/"},
+    {":method","GET"},
+    {"custom-header","foobar; baz3"},
+    {"custom-header2","NOT INDEXED", hpack::cacheability::never}};
+
+  std::list<hpack::header_field> recv_headers;
+  std::list<hpack::header_field> recv_headers2;
+
+  std::string serialized_headers;
+  enc.encode(send_headers, serialized_headers);
+  dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers);
+
+  for (auto it : recv_headers)
+    std::cout << it.name << ": " << it.value << std::endl;
+  std::cout << std::endl;
+
+  // Encoders can use table size updates to clear dynamic table.
+  enc.add_table_size_update(0);
+  enc.add_table_size_update(4096);
+
+  serialized_headers = "";
+  enc.encode(send_headers2, serialized_headers);
+  dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers2);
+  for (auto it : recv_headers2)
+    std::cout << it.name << ": " << it.value << std::endl;
 }
+//================================================================//
+
 //================================================================//
 void handle_push_promise(http::client::request && req, std::uint32_t dependency_stream_id)
 {
@@ -56,186 +159,9 @@ void handle_push_promise(http::client::request && req, std::uint32_t dependency_
 }
 //================================================================//
 
-using std::experimental::any_cast;
-using std::experimental::any;
-//################################################################//
-int main()
+//================================================================//
+void start_server(asio::io_service& ioservice)
 {
-  move_only first;
-  move_only second;
-  int third;
-  std::tie(first, second, third) = return_move_only();
-
-  asio::io_service ioservice;
-  asio::ssl::context client_ssl_ctx(asio::ssl::context::tlsv12);
-  asio::ssl::context server_ssl_ctx(asio::ssl::context::tlsv12);
-
-  std::vector<std::string> v = {"foobar","fooman"};
-  std::string s = "hello world";
-  std::map<std::string, std::string> m;
-  m["hello"] = "world";
-
-  mysql::session_opts my_ops;
-  my_ops.host = "localhost";
-  my_ops.db = "gasp";
-  my_ops.user = "gasp_user";
-  my_ops.password = "foobar";
-  mysql::session my(ioservice, my_ops);
-
-
-
-  my.async_connect([&my](const std::error_code& ec)
-  {
-    if (ec)
-    {
-      std::cout << ec.message() << std::endl;
-    }
-    else
-    {
-      my.async_query("SELECT * FROM jobs", [](const std::error_code& ec, const std::vector<std::map<std::string, std::experimental::any>>& res)
-      {
-
-        if (ec)
-        {
-          std::cout << ec.message() << std::endl;
-        }
-        else
-        {
-          for (std::size_t i = 0; i<res.size(); ++i)
-          {
-            const std::map<std::string, std::experimental::any>& r = res[i];
-            std::cout
-            << any_cast<const std::string&>(res[i].at("id")) << std::endl
-            << any_cast<unsigned int>(res[i].at("user_id")) << std::endl
-            << any_cast<std::string>(res[i].at("name")) << std::endl
-            << any_cast<std::string>(res[i].at("error_message")) << std::endl
-            << any_cast<unsigned int>(res[i].at("status_id")) << std::endl
-            << any_cast<std::string>(res[i].at("creation_date")) << std::endl
-            << any_cast<std::string>(res[i].at("modified_date")) << std::endl << std::endl;
-          }
-        }
-      });
-    }
-  });
-
-  ioservice.run();
-  return 0;
-
-//  http::user_agent ua(ioservice);
-//  auto r = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
-//  r.on_response([](http::client::response&& resp)
-//  {
-//    std::cout << "status: " << resp.head().status_code() << std::endl;
-//    auto resp_entity = std::make_shared<std::stringstream>();
-//    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
-//    {
-//      resp_entity->write(data, data_sz);
-//    });
-//
-//    resp.on_end([resp_entity]()
-//    {
-//      std::cout << resp_entity->str() << "[DONE]" << std::endl;
-//    });
-//  });
-//
-//  auto r2 = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
-//  r2.on_response([](http::client::response&& resp)
-//  {
-//    std::cout << "status: " << resp.head().status_code() << std::endl;
-//    auto resp_entity = std::make_shared<std::stringstream>();
-//    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
-//    {
-//      resp_entity->write(data, data_sz);
-//    });
-//
-//    resp.on_end([resp_entity]()
-//    {
-//      std::cout << resp_entity->str() << "[DONE2]" << std::endl;
-//    });
-//  });
-//
-//  auto r3 = ua.send_request("POST", uri("https://127.0.0.1:8080/foo"), std::stringstream("FoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooBAR!"));
-//  r3.on_response([](http::client::response&& resp)
-//  {
-//    std::cout << "status: " << resp.head().status_code() << std::endl;
-//    auto resp_entity = std::make_shared<std::stringstream>();
-//    resp.on_data([resp_entity](const char*const data, std::size_t data_sz)
-//    {
-//      resp_entity->write(data, data_sz);
-//    });
-//
-//    resp.on_end([resp_entity]()
-//    {
-//      std::cout << resp_entity->str() << "[DONE3]" << std::endl;
-//    });
-//  });
-
-//  //----------------------------------------------------------------//
-//  std::uint32_t plus_sign_code = (0x7fb << (32 - 11));
-//  auto res = hpack::huffman_code_tree.find(hpack::huffman_code(plus_sign_code, 32));
-//  if (res != hpack::huffman_code_tree.end())
-//    std::cout << res->second << std::endl;
-//
-//  std::string compressed_literal = {(char)0xf1,(char)0xe3,(char)0xc2,(char)0xe5,(char)0xf2,(char)0x3a,(char)0x6b,(char)0xa0,(char)0xab,(char)0x90,(char)0xf4,(char)0xff};
-//  for (auto it = compressed_literal.begin(); it != compressed_literal.end(); ++it)
-//    std::cout << std::hex << (unsigned int)(std::uint8_t)(*it) << std::dec << std::endl;
-//  std::string uncompressed_literal;
-//  hpack::decoder::huffman_decode(compressed_literal.begin(), compressed_literal.end(), uncompressed_literal);
-//  std::cout << "uncompressed size: " << uncompressed_literal.size() << std::endl;
-//  std::cout << "uncompressed value: " << uncompressed_literal << std::endl;
-//
-////  for (auto it = hpack::huffman_code_tree.begin(); it != hpack::huffman_code_tree.end(); ++it)
-////    std::cout << "- " << std::hex << it->first.msb_code << std::dec << " | " << it->second << std::endl;
-//
-//  std::cout.flush();
-//
-//  //----------------------------------------------------------------//
-//
-//  //----------------------------------------------------------------//
-//  // HPack Test
-//  //
-//  std::size_t http2_default_table_size = 4096;
-//  hpack::encoder enc(http2_default_table_size);
-//  hpack::decoder dec(http2_default_table_size);
-//
-//  std::list<hpack::header_field> send_headers{
-//    {":path","/"},
-//    {":method","GET"},
-//    {"content-type","application/json; charset=utf8"},
-//    {"content-length","30"},
-//    {"custom-header","foobar; baz"},
-//    {"custom-header2","NOT INDEXED", hpack::cacheability::no}};
-//  std::list<hpack::header_field> send_headers2{
-//    {":path","/"},
-//    {":method","GET"},
-//    {"custom-header","foobar; baz3"},
-//    {"custom-header2","NOT INDEXED", hpack::cacheability::never}};
-//
-//  std::list<hpack::header_field> recv_headers;
-//  std::list<hpack::header_field> recv_headers2;
-//
-//  std::string serialized_headers;
-//  enc.encode(send_headers, serialized_headers);
-//  dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers);
-//
-//  for (auto it : recv_headers)
-//    std::cout << it.name << ": " << it.value << std::endl;
-//  std::cout << std::endl;
-//
-//  // Encoders can use table size updates to clear dynamic table.
-//  enc.add_table_size_update(0);
-//  enc.add_table_size_update(4096);
-//
-//  serialized_headers = "";
-//  enc.encode(send_headers2, serialized_headers);
-//  dec.decode(serialized_headers.begin(), serialized_headers.end(), recv_headers2);
-//  for (auto it : recv_headers2)
-//    std::cout << it.name << ": " << it.value << std::endl;
-  //----------------------------------------------------------------//
-
-  //----------------------------------------------------------------//
-  // Server Test
-  //
   http::router app;
 
   http::document_root get_doc_root("./");
@@ -269,7 +195,7 @@ int main()
     {
       auto push_promise = res_ptr->send_push_promise(http::request_head("/push-url"));
 
-      res_ptr->send("Received: " + req_entity->str());
+      res_ptr->send("Received: " + req_entity->str() + "\n");
       res_ptr->end();
 
       push_promise.fulfill([](http::server::request&& rq, http::server::response&& rs)
@@ -305,16 +231,17 @@ int main()
 //      ops.ca.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 //  }
 
+
   std::vector<char> chain;
   std::vector<char> key;
   std::vector<char> dhparam;
   {
-    std::ifstream ifs("tests/certs/server.crt");
+    std::ifstream ifs("tests/certs2/cert.crt");
     if (ifs.good())
       chain.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
   }
   {
-    std::ifstream ifs("tests/certs/server.key");
+    std::ifstream ifs("tests/certs2/cert.key");
     if (ifs.good())
       key.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
   }
@@ -324,37 +251,38 @@ int main()
       dhparam.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
   }
 
+  asio::ssl::context server_ssl_ctx(asio::ssl::context::tlsv12);
   server_ssl_ctx.use_certificate_chain(asio::buffer(chain.data(), chain.size()));
   server_ssl_ctx.use_private_key(asio::buffer(key.data(), key.size()), asio::ssl::context::pem);
-  server_ssl_ctx.use_tmp_dh(asio::buffer(dhparam.data(), dhparam.size()));
+  //server_ssl_ctx.use_tmp_dh(asio::buffer(dhparam.data(), dhparam.size()));
 
   http::server srv(ioservice, server_ssl_ctx, 8080);
   srv.reset_timeout(std::chrono::seconds(15));
   srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
-
+  ioservice.run();
   //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
   //ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
-  //----------------------------------------------------------------//
+}
+//================================================================//
 
-  if (true)
+//================================================================//
+void client_to_local_server_test(asio::io_service& ioservice)
+{
+  asio::ssl::context client_ssl_ctx(asio::ssl::context::tlsv12);
+  http::client agnt(ioservice, client_ssl_ctx);
+  http::stream_client stream_agnt(agnt);
+  http::file_transfer_client file_transfer_agnt(stream_agnt);
+
+  agnt.reset_timeout(std::chrono::seconds(5));
+
+  http::file_transfer_client::options ops;
+  ops.replace_existing_file = true;
+  auto t = std::chrono::system_clock::now().time_since_epoch();
+  std::cout << "Starting Download ..." << std::endl;
+  auto last_percent = std::make_shared<std::uint64_t>(0);
+
   {
-    //----------------------------------------------------------------//
-    // Client to Local Server Test
-    //
-    http::client agnt(ioservice, client_ssl_ctx);
-    http::stream_client stream_agnt(agnt);
-    http::file_transfer_client file_transfer_agnt(stream_agnt);
-
-    agnt.reset_timeout(std::chrono::seconds(5));
-
-    http::file_transfer_client::options ops;
-    ops.replace_existing_file = true;
-    auto t = std::chrono::system_clock::now().time_since_epoch();
-    std::cout << "Starting Download ..." << std::endl;
-    auto last_percent = std::make_shared<std::uint64_t>(0);
-
-    {
-      auto p = file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/test_cmp.rfcmp"), "./")
+    auto p = file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/test_cmp.rfcmp"), "./")
       .on_progress([last_percent](std::uint64_t transferred, std::uint64_t total)
       {
         if (total)
@@ -379,213 +307,45 @@ int main()
           std::cout << "SECONDS: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch() - t).count() << std::endl;
         }
       });
-    }
+  }
 
 
 
-    for (size_t i = 0; i < 3; ++i)
+  for (size_t i = 0; i < 3; ++i)
+  {
+    file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/readme.md"), "./").on_complete([i](const std::error_code& ec, const std::string& file_path)
     {
-      file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/readme.md"), "./").on_complete([i](const std::error_code& ec, const std::string& file_path)
+      if (ec)
       {
-        if (ec)
-        {
-          std::cout << ec.message() << std::endl;
-        }
-        else
-        {
-          std::cout << "GET " << std::setfill('0') << std::setw(2) << i;
-          std::cout << " SUCCEEDED" << std::endl;
-        }
-      });
-    }
+        std::cout << ec.message() << std::endl;
+      }
+      else
+      {
+        std::cout << "GET " << std::setfill('0') << std::setw(2) << i;
+        std::cout << " SUCCEEDED" << std::endl;
+      }
+    });
+  }
 
 //    std::thread([&client_ioservice]()
 //    {
 //      client_ioservice.run();
 //      auto a = 0;
 //    }).detach();
-    ioservice.run();
-    return 0;
-
-    auto post_data = std::make_shared<std::stringstream>("name=value&foo=bar");
-    auto post_resp_entity = std::make_shared<std::stringstream>();
-    auto post = stream_agnt.send_request("POST", uri("http://localhost:8080/redirect-url"), {{"content-type","application/x-www-form-urlencoded"}}, *post_data, *post_resp_entity);
-    post.on_complete([post_resp_entity, post_data](const std::error_code& ec, const http::response_head& headers)
-    {
-      if (ec)
-      {
-        std::cout << ec.message() << std::endl;
-      }
-      else
-      {
-        std::cout << "status: " << headers.get_status_code() << std::endl;
-        std::cout << post_resp_entity->str() << std::endl;
-      }
-    });
-
-    ioservice.run();
-
-    agnt.make_request("localhost", 8080, [](const std::error_code& ec, http::client::request&& req)
-    {
-      if (ec)
-      {
-        std::cout << ec.message() << std::endl;
-      }
-      else
-      {
-        req.head() = http::request_head("/foobar", http::method::post,
-          {
-            {"content-type", "application/x-www-form-urlencoded"}
-          });
-
-        req.on_response([](http::client::response&& resp)
-        {
-          for (auto it : resp.head().raw_headers())
-            std::cout << it.first << ": " << it.second << std::endl;
-
-          if (!resp.head().has_successful_status())
-          {
-            resp.cancel();
-          }
-          else
-          {
-            auto response_data = std::make_shared<std::stringstream>("");
-            resp.on_data([response_data](const char* const data, std::size_t datasz)
-            {
-              response_data->write(data, datasz);
-            });
-
-            resp.on_end([response_data]()
-            {
-              if (response_data->rdbuf()->in_avail())
-                std::cout << response_data->rdbuf() << std::endl;
-            });
-          }
-        });
-
-        req.on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req.stream_id()));
-
-        req.on_close([](const std::error_code& e)
-        {
-          std::cout << "on_close called on client" << std::endl;
-        });
-
-        req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
-        req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
-        req.send(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
-        req.end(std::string("0123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value298765432100123456789name=value&name2=value29876543210\r\n"));
-      }
-    });
-    //----------------------------------------------------------------//
-  }
-
-
-//  //----------------------------------------------------------------//
-//  // Client to Google Test
-//  //
-//  else if (false)
-//  {
-//    http::client c2(ioservice, "www.google.com", http::client::ssl_options());
-//    c2.on_connect([&c2]()
-//    {
-//      if (true)
-//      {
-//        auto request = std::make_shared<http::client::request>(c2.make_request());
-//
-//        request->on_response([request, &c2](http::client::response && resp)
-//        {
-//          std::cout << resp.head().status_code() << std::endl;
-//          for (auto it : resp.head().raw_headers())
-//            std::cout << it.first << ": " << it.second << std::endl;
-//
-//          auto response = std::make_shared<http::client::response>(std::move(resp));
-//
-//
-//          response->on_data([](const char *const data, std::size_t datasz)
-//          {
-//            std::cout << std::string(data, datasz);
-//          });
-//
-//          response->on_end([]()
-//          {
-//            std::cout << std::endl << "DONE" << std::endl;
-//          });
-//        });
-//
-//        request->on_close([&c2](http::errc error_code)
-//        {
-//          std::cout << "client request on_close: " << error_code << std::endl;
-//        });
-//
-//        request->head().header("connection","keep-alive");
-//        request->end();
-//
-////        request->head().path("/foobar");
-////        request->head().method(http::method::post);
-////        request->head().header("content-type","application/x-www-form-urlencoded");
-////        request->head().header("accept","text/html,application/json,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-////        request->end("name=value&name2=value2");
-//
-//
-//      }
-//
-//      if (false)
-//      {
-//        auto req2(c2.make_request());
-//
-//
-//        auto req_ptr = std::make_shared<http::client::request>(std::move(req2));
-//
-//        // Create file stream for response.
-//        auto ofs = std::make_shared<std::ofstream>("./reponse_file.txt.tmp");
-//
-//        // Set on response handler.
-//        req_ptr->on_response([&ofs, req_ptr](http::client::response &&res)
-//        {
-//          auto res_ptr = std::make_shared<http::client::response>(std::move(res));
-//
-//          if (res.head().status_code() != 200)
-//          {
-//            req_ptr->close();
-//          }
-//          else
-//          {
-//            // Write response data to file.
-//            res_ptr->on_data([ofs](const char *const data, std::size_t datasz)
-//            {
-//              ofs->write(data, datasz);
-//            });
-//
-//            // Close and rename file when done.
-//            res_ptr->on_end([ofs]()
-//            {
-//              ofs->close();
-//              std::rename("./response_file.txt.tmp","./resonse_file.txt");
-//            });
-//          }
-//        });
-//
-//        //
-//        req_ptr->on_close([ofs](http::errc ec)
-//        {
-//          ofs->close();
-//          std::remove("./response_file.txt.tmp");
-//        });
-//
-//        req_ptr->on_push_promise(std::bind(handle_push_promise, std::placeholders::_1, req_ptr->stream_id()));
-//
-//        req_ptr->end();
-//      }
-//    });
-//
-//    c2.on_close([](http::errc ec)
-//    {
-//      std::cerr << ec << std::endl;
-//    });
-//    ioservice.run();
-//  }
-//  //----------------------------------------------------------------//
-
   ioservice.run();
+}
+//================================================================//
+
+
+//using std::experimental::any_cast;
+//using std::experimental::any;
+//################################################################//
+int main()
+{
+  asio::io_service ioservice;
+  start_server(ioservice);
+
+
+  return 0;
 }
 //################################################################//

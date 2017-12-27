@@ -238,67 +238,24 @@ namespace manifold
       acceptor_(io_service_),
       ssl_context_(&ctx)
     {
-//      this->ssl_context_->set_options(
-//        asio::ssl::context::default_workarounds
-//          | asio::ssl::context::no_sslv2
-//          | asio::ssl::context::single_dh_use);
-
-//      if (true) //options.pfx.size())
-//      {
-//        //this->ssl_context_->use_certificate_chain_file("/Users/jonathonl/Developer/certs2/server-cert.pem");
-//        //this->ssl_context_->use_private_key_file("/Users/jonathonl/Developer/certs2/server-key.pem", asio::ssl::context::pem);
-//        //this->ssl_context_->use_tmp_dh_file("/Users/jonathonl/Developer/certs/dh512.pem");
-//
-//        char cwd[FILENAME_MAX];
-//        getcwd(cwd, FILENAME_MAX);
-//
-//        //this->ssl_context_->use_certificate_chain_file("tests/certs/server.crt");
-//        //this->ssl_context_->use_private_key_file("tests/certs/server.key", asio::ssl::context::pem);
-//        //this->ssl_context_->use_tmp_dh_file("tests/certs/dh2048.pem");
-//
-//        this->ssl_context_->use_certificate_chain(asio::buffer(options.chain.data(), options.chain.size()));
-//        this->ssl_context_->use_private_key(asio::buffer(options.key.data(), options.key.size()), asio::ssl::context::pem);
-//        this->ssl_context_->use_tmp_dh(asio::buffer(options.dhparam.data(), options.dhparam.size()));
-//      }
-//      else
-//      {
-//        std::error_code ec;
-//        if (options.cert.size())
-//          this->ssl_context_->use_certificate_chain(asio::const_buffer(options.cert.data(), options.cert.size()));
-//        if (options.key.size())
-//          this->ssl_context_->use_private_key(asio::const_buffer(options.key.data(), options.key.size()), asio::ssl::context::file_format::pem);
-//        if (options.ca.size())
-//          this->ssl_context_->use_tmp_dh_file("/Users/jonathonl/Developer/certs/dh512.pem");
-//      }
-
-
-      auto ssl_opts = (SSL_OP_ALL & ~SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS) |
-        SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION |
-        SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION |
-        SSL_OP_SINGLE_ECDH_USE | SSL_OP_NO_TICKET |
-        SSL_OP_CIPHER_SERVER_PREFERENCE;
+//      auto ssl_opts = (SSL_OP_ALL & ~SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS) |
+//        SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION |
+//        SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION |
+//        SSL_OP_SINGLE_ECDH_USE | SSL_OP_NO_TICKET |
+//        SSL_OP_CIPHER_SERVER_PREFERENCE;
 
       SSL_CTX_set_options(ssl_context_->native_handle(), SSL_CTX_get_options(ssl_context_->native_handle()) | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
-      //SSL_CTX_set_options(ssl_context_->impl(), ssl_opts);
-      //SSL_CTX_set_mode(ssl_context_->impl(), SSL_MODE_AUTO_RETRY);
-      //SSL_CTX_set_mode(ssl_context_->impl(), SSL_MODE_RELEASE_BUFFERS);
 
-      static const char *const DEFAULT_CIPHER_LIST =
-        //"HIGH:!AES256-SHA:!AES128-GCM-SHA256:!AES128-SHA:!DES-CBC3-SHA";
-        //"DHE:EDH:kDHE:kEDH:DH:kEECDH:kECDHE:ECDHE:EECDH:ECDH";
-        "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-"
-        "AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:"
-        "DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-"
-        "AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-"
-        "AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-"
-        "AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:"
-        "DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:!aNULL:!eNULL:"
-        "!EXPORT:!DES:!RC4:!3DES:!MD5:!PSK";
+      ec_key_st* ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+      if (ecdh)
+      {
+        SSL_CTX_set_tmp_ecdh(ssl_context_->native_handle(), ecdh);
+        EC_KEY_free(ecdh);
+      }
 
+      static const char *const DEFAULT_CIPHER_LIST = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!3DES:!MD5:!PSK";
 
-
-      //SSL_CTX_set_cipher_list(ssl_context_->impl(), DEFAULT_CIPHER_LIST);
-
+      std::cout << "SSL_CTX_set_cipher_list: " << ::SSL_CTX_set_cipher_list(ssl_context_->native_handle(), DEFAULT_CIPHER_LIST) << std::endl;
 
       ::SSL_CTX_set_alpn_select_cb(this->ssl_context_->native_handle(), alpn_select_proto_cb, nullptr);
       this->port_ = port;
