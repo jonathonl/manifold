@@ -5,40 +5,29 @@ set(CMAKE_CXX_STANDARD 11)
 
 #set(CMAKE_MACOSX_RPATH 1)
 
-find_path(MYSQL_INCLUDE_DIR
-          NAMES "mysql.h"
-          PATHS
-          "/usr/local/mysql/include"
-          "/usr/include/mysql"
-          "/usr/local/include/mysql"
-          "/usr/mysql/include/mysql")
+#find_path(MYSQL_INCLUDE_DIR
+#          NAMES "mysql.h"
+#          PATHS
+#          "/usr/local/mysql/include"
+#          "/usr/include/mysql"
+#          "/usr/local/include/mysql"
+#          "/usr/mysql/include/mysql")
+#
+#find_library(MYSQL_LIBRARY
+#             NAMES "mysqlclient"
+#             PATHS
+#             "/usr/local/mysql/lib"
+#             "/lib/mysql"
+#             "/lib64/mysql"
+#             "/usr/lib/mysql"
+#             "/usr/lib64/mysql"
+#             "/usr/local/lib/mysql"
+#             "/usr/local/lib64/mysql"
+#             "/usr/mysql/lib/mysql"
+#             "/usr/mysql/lib64/mysql")
 
-find_library(MYSQL_LIBRARY
-             NAMES "mysqlclient"
-             PATHS
-             "/usr/local/mysql/lib"
-             "/lib/mysql"
-             "/lib64/mysql"
-             "/usr/lib/mysql"
-             "/usr/lib64/mysql"
-             "/usr/local/lib/mysql"
-             "/usr/local/lib64/mysql"
-             "/usr/mysql/lib/mysql"
-             "/usr/mysql/lib64/mysql")
+find_package(OpenSSL REQUIRED)
 
-find_library(SSL_LIBRARY
-             NAMES ssl
-             PATHS /opt/local/lib)
-
-find_library(CRYPTO_LIBRARY
-             NAMES crypto
-             PATHS /opt/local/lib)
-
-set(SSL_LIBRARY /opt/local/lib/libssl.dylib)
-set(CRYPTO_LIBRARY /opt/local/lib/libcrypto.dylib)
-
-message("ssl: ${SSL_LIBRARY}")
-message("ssl: ${CRYPTO_LIBRARY}")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DASIO_STANDALONE -DASIO_HAS_MOVE")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-local-typedefs -DASIO_STANDALONE -DASIO_HAS_MOVE -std=c++1y")
@@ -102,15 +91,11 @@ set(SOURCE_FILES
     src/http_stream_client.cpp
     src/http_file_transfer.cpp)
 
-
-
-
-include_directories("include" ${MYSQL_INCLUDE_DIR})
-
 add_library(manifold ${SOURCE_FILES} ${HEADER_FILES})
-target_link_libraries(manifold ${SSL_LIBRARY} ${CRYPTO_LIBRARY})
+target_include_directories(manifold PUBLIC include ${OPENSSL_INCLUDE_DIR})
+target_link_libraries(manifold ${OPENSSL_LIBRARIES})
 
 
 add_executable(manifold-test tests/test.cpp) # ${SOURCE_FILES} ${HEADER_FILES})
-target_link_libraries(manifold-test manifold ${MYSQL_LIBRARY})
+target_link_libraries(manifold-test manifold)
 #target_link_libraries(manifold /opt/local/lib/libboost_system-mt.a)
