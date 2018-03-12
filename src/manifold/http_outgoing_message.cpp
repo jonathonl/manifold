@@ -1,16 +1,13 @@
 
-#include <sstream>
-
-#include "http_outgoing_message.hpp"
+#include "manifold/http_outgoing_message.hpp"
 
 namespace manifold
 {
   namespace http
   {
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    outgoing_message<SendMsg, RecvMsg>::outgoing_message(const std::shared_ptr<http::connection<SendMsg,RecvMsg>>& conn, std::int32_t stream_id)
-      : message<SendMsg, RecvMsg>(conn, stream_id),
+    outgoing_message::outgoing_message(http::connection& conn, std::int32_t stream_id)
+      : message(conn, stream_id),
       headers_sent_(false),
       ended_(false)
     {
@@ -18,9 +15,8 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    outgoing_message<SendMsg, RecvMsg>::outgoing_message(outgoing_message&& source)
-      : message<SendMsg, RecvMsg>(std::move(source)),
+    outgoing_message::outgoing_message(outgoing_message&& source)
+      : message(std::move(source)),
       headers_sent_(source.headers_sent_),
       ended_(source.ended_)
     {
@@ -28,21 +24,19 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    outgoing_message<SendMsg, RecvMsg>::~outgoing_message()
+    outgoing_message::~outgoing_message()
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    bool outgoing_message<SendMsg, RecvMsg>::send_headers(bool end_stream)
+    bool outgoing_message::send_headers(bool end_stream)
     {
       bool ret = false;
 
-      if (this->connection_ && !this->headers_sent_)
+      if (!this->headers_sent_)
       {
-        ret = this->connection_->send_headers(this->stream_id_, this->message_head(), true, end_stream);
+        // TODO: ret = co_await this->connection_.send_headers(this->stream_id_, this->header_block(), end_stream);
         this->headers_sent_= true;
         this->ended_ = end_stream;
       }
@@ -52,20 +46,17 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    bool outgoing_message<SendMsg, RecvMsg>::send(const char*const data, std::size_t data_sz)
+    bool outgoing_message::send(const char* data, std::size_t data_sz)
     {
       bool ret = true;
 
-      if (this->connection_)
-      {
-        if (!this->headers_sent_)
-          ret = this->send_headers();
+      if (!this->headers_sent_)
+        ret = this->send_headers();
 
-        if (ret && !this->ended_)
-        {
-          ret = this->connection_->send_data(this->stream_id_, data, data_sz, false);
-        }
+      if (ret && !this->ended_)
+      {
+        // TODO: std::size_t bytes_sent = co_await this->connection_.send_data(this->stream_id_, data, data_sz, false);
+        //ret = bytes_sent;
       }
 
       return ret;
@@ -73,34 +64,19 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    void outgoing_message<SendMsg, RecvMsg>::on_drain(const std::function<void()>& fn)
-    {
-      if (this->connection_)
-        this->connection_->on_drain(this->stream_id_, fn);
-    }
-    //----------------------------------------------------------------//
-#ifndef MANIFOLD_REMOVED_TRAILERS
-    //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    bool outgoing_message<SendMsg, RecvMsg>::end(const char*const data, std::size_t data_sz, const header_block& trailers)
+    bool outgoing_message::end(const char* data, std::size_t data_sz)
     {
       bool ret = true;
 
-      if (this->connection_)
+      if (!this->headers_sent_)
+        ret = this->send_headers();
+
+
+      if (ret && !this->ended_)
       {
-        if (!this->headers_sent_)
-          ret = this->send_headers();
-
-
-        if (ret && !this->ended_)
-        {
-          this->connection_->send_data(this->stream_id_, data, data_sz, trailers.size() == 0);
-          // TODO: Check content length against amount sent;
-          if (trailers.size())
-            this->connection_->send_trailers(this->stream_id_, trailers, true, true);
-          this->ended_ = true;
-        }
+        this->connection_.send_data(this->stream_id_, data, data_sz, true);
+        // TODO: Check content length against amount sent;
+        this->ended_ = true;
       }
 
       return ret;
@@ -108,49 +84,13 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    bool outgoing_message<SendMsg, RecvMsg>::end(const header_block& trailers)
-    {
-      return this->end(nullptr, 0, trailers);
-    }
-    //----------------------------------------------------------------//
-#else
-    //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    bool outgoing_message<SendMsg, RecvMsg>::end(const char*const data, std::size_t data_sz)
-    {
-      bool ret = true;
-
-      if (this->connection_)
-      {
-        if (!this->headers_sent_)
-          ret = this->send_headers();
-
-
-        if (ret && !this->ended_)
-        {
-          this->connection_->send_data(this->stream_id_, data, data_sz, true);
-          // TODO: Check content length against amount sent;
-          this->ended_ = true;
-        }
-      }
-
-      return ret;
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    bool outgoing_message<SendMsg, RecvMsg>::end()
+    bool outgoing_message::end()
     {
       return this->end(nullptr, 0);
     }
     //----------------------------------------------------------------//
-#endif
-    //----------------------------------------------------------------//
-    template class outgoing_message<response_head, request_head>;
-    template class outgoing_message<request_head, response_head>;
-    //----------------------------------------------------------------//
+
+
 
 //    //----------------------------------------------------------------//
 //    bool outgoing_message::send(const char* data, std::size_t dataSize)

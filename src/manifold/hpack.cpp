@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <iostream>
 
-#include "hpack.hpp"
+#include "manifold/hpack.hpp"
 
 namespace std
 {

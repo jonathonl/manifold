@@ -1,80 +1,46 @@
 
-#include <sstream>
-#include <algorithm>
-
-#include "http_incoming_message.hpp"
-#include "tcp.hpp"
+#include "manifold/http_incoming_message.hpp"
 
 namespace manifold
 {
   namespace http
   {
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    incoming_message<SendMsg, RecvMsg>::incoming_message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::int32_t stream_id)
-      : message<SendMsg, RecvMsg>(conn, stream_id)
+    incoming_message::incoming_message(http::connection& conn, std::int32_t stream_id)
+      : message(conn, stream_id)
     {
-#ifndef MANIFOLD_REMOVED_TRAILERS
-      if (this->connection_)
-      {
-        this->connection_->on_trailers(this->stream_id_, [this](header_block&& trailers)
-        {
-          this->trailers_ = std::move(trailers);
-        });
-      }
-#endif
+
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    incoming_message<SendMsg, RecvMsg>::incoming_message(incoming_message&& source)
-      : message<SendMsg, RecvMsg>(std::move(source)), trailers_(std::move(source.trailers_))
+    incoming_message::incoming_message(incoming_message&& source)
+      : message(std::move(source)), trailers_(std::move(source.trailers_))
     {
-#ifndef MANIFOLD_REMOVED_TRAILERS
-      if (this->connection_)
-      {
-        this->connection_->on_trailers(this->stream_id_, [this](header_block&& trailers)
-        {
-          this->trailers_ = std::move(trailers);
-        });
-      }
-#endif
+
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    incoming_message<SendMsg, RecvMsg>::~incoming_message()
+    incoming_message::~incoming_message()
     {
-#ifndef MANIFOLD_REMOVED_TRAILERS
-      if (this->connection_)
-        this->connection_->on_trailers(this->stream_id_, nullptr);
-#endif
+
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    void incoming_message<SendMsg, RecvMsg>::on_data(const std::function<void(const char*const buff, std::size_t buff_size)>& fn)
+    void incoming_message::recv(char* buf, std::size_t sz)
     {
-      if (this->connection_)
-        this->connection_->on_data(this->stream_id_, fn);
+      connection_.recv_data(stream_id_, buf, sz);
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    void incoming_message<SendMsg, RecvMsg>::on_end(const std::function<void()>& fn)
+    bool incoming_message::eof()
     {
-      if (this->connection_)
-        this->connection_->on_end(this->stream_id_, fn);
+      return false;
+      // TODO:
     }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    template class incoming_message<request_head, response_head>;
-    template class incoming_message<response_head, request_head>;
     //----------------------------------------------------------------//
 
 //    //----------------------------------------------------------------//

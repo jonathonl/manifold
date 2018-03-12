@@ -5,14 +5,14 @@
 #include <iomanip>
 #include <tuple>
 #include <thread>
-#include <future>
+#include <iostream>
 
 #include "asio.hpp"
-#include "http_server.hpp"
-#include "http_client.hpp"
-#include "http_router.hpp"
-#include "hpack.hpp"
-#include "http_file_transfer.hpp"
+#include "manifold/http_server.hpp"
+//#include "manifold/http_client.hpp"
+#include "manifold/http_router.hpp"
+#include "manifold/hpack.hpp"
+//#include "http_file_transfer.hpp"
 
 //#include "mysql.hpp"
 #include <experimental/any>
@@ -142,95 +142,182 @@ void run_hpack_test()
 }
 //================================================================//
 
-//================================================================//
-void handle_push_promise(http::client::request && req, std::uint32_t dependency_stream_id)
+////================================================================//
+//void handle_push_promise(http::client::request && req, std::uint32_t dependency_stream_id)
+//{
+//
+//  req.on_response([](http::client::response && resp)
+//  {
+//    for (auto it : resp.head().raw_headers())
+//      std::cout << it.first << ": " << it.second << std::endl;
+//
+//    resp.on_data([](const char*const d, std::size_t sz)
+//    {
+//      std::cout << std::string(d, sz) << std::endl;
+//    });
+//  });
+//}
+////================================================================//
+
+////================================================================//
+//void start_server(asio::io_service& ioservice)
+//{
+//  http::router app;
+//
+//  http::document_root get_doc_root("./");
+//  get_doc_root.add_credentials("user", "pass");
+//  app.register_handler(std::regex("^/files/(.*)$"), "HEAD", http::document_root("./"));
+//  app.register_handler(std::regex("^/files/(.*)$"), "GET", std::ref(get_doc_root));
+//  app.register_handler(std::regex("^/files/(.*)$"), "PUT", http::document_root("./"));
+//  get_doc_root.add_credentials("user", "password");
+//
+//  app.register_handler(std::regex("^/redirect-url$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
+//  {
+//    res.head().set_status_code(http::status_code::found);
+//    res.head().header("location","/new-url");
+//    res.end();
+//  });
+//
+//  app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
+//  {
+//    auto res_ptr = std::make_shared<http::server::response>(std::move(res));
+//
+//    for (auto it : req.head().raw_headers())
+//      std::cout << it.first << ": " << it.second << std::endl;
+//
+//    auto req_entity = std::make_shared<std::stringstream>();
+//    req.on_data([req_entity](const char*const data, std::size_t datasz)
+//    {
+//      req_entity->write(data, datasz);
+//    });
+//
+//    req.on_end([res_ptr, req_entity]()
+//    {
+//      auto push_promise = res_ptr->send_push_promise(http::request_head("/push-url"));
+//
+//      res_ptr->send("Received: " + req_entity->str() + "\n");
+//      res_ptr->end();
+//
+//      push_promise.fulfill([](http::server::request&& rq, http::server::response&& rs)
+//      {
+//        // TODO: have on_end immidiately callback if closed or half closed remote.
+//        rs.end("Here's the promised data.");
+//      });
+//
+//    });
+//
+//    req.on_close([](const std::error_code& e)
+//    {
+//      std::cout << "on_close called on server" << std::endl;
+//    });
+//
+//  });
+//
+//
+//  std::vector<char> chain;
+//  std::vector<char> key;
+//  std::vector<char> dhparam;
+//  {
+//    std::ifstream ifs("tests/certs2/cert.crt");
+//    if (ifs.good())
+//      chain.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+//  }
+//  {
+//    std::ifstream ifs("tests/certs2/cert.key");
+//    if (ifs.good())
+//      key.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+//  }
+//  {
+//    std::ifstream ifs("tests/certs/dh2048.pem");
+//    if (ifs.good())
+//      dhparam.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+//  }
+//
+//  asio::ssl::context server_ssl_ctx(asio::ssl::context::tlsv12);
+//  server_ssl_ctx.use_certificate_chain(asio::buffer(chain.data(), chain.size()));
+//  server_ssl_ctx.use_private_key(asio::buffer(key.data(), key.size()), asio::ssl::context::pem);
+//  //server_ssl_ctx.use_tmp_dh(asio::buffer(dhparam.data(), dhparam.size()));
+//
+//  http::server srv(ioservice, server_ssl_ctx, 8080);
+//  srv.reset_timeout(std::chrono::seconds(15));
+//  srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+//  ioservice.run();
+//}
+////================================================================//
+
+////================================================================//
+//void client_to_local_server_test(asio::io_service& ioservice)
+//{
+//  asio::ssl::context client_ssl_ctx(asio::ssl::context::tlsv12);
+//  http::client agnt(ioservice, client_ssl_ctx);
+//  http::stream_client stream_agnt(agnt);
+//  http::file_transfer_client file_transfer_agnt(stream_agnt);
+//
+//  agnt.reset_timeout(std::chrono::seconds(5));
+//
+//  http::file_transfer_client::options ops;
+//  ops.replace_existing_file = true;
+//  auto t = std::chrono::system_clock::now().time_since_epoch();
+//  std::cout << "Starting Download ..." << std::endl;
+//  auto last_percent = std::make_shared<std::uint64_t>(0);
+//
+//  {
+//    auto p = file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/test_cmp.rfcmp"), "./")
+//      .on_progress([last_percent](std::uint64_t transferred, std::uint64_t total)
+//      {
+//        if (total)
+//        {
+//          std::uint64_t percent = (static_cast<double>(transferred) / static_cast<double>(total)) * 100;
+//          if (percent > *last_percent)
+//          {
+//            *last_percent = percent;
+//            std::cout << "\r" << percent << "%" << std::flush;
+//          }
+//        }
+//      }).on_complete([t](const std::error_code& ec, const std::string& file_path)
+//      {
+//        std::cout << std::endl;
+//        if (ec)
+//        {
+//          std::cout << ec.message() << std::endl;
+//        }
+//        else
+//        {
+//          std::cout << "DL SUCCEEDED" << std::endl;
+//          std::cout << "SECONDS: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch() - t).count() << std::endl;
+//        }
+//      });
+//  }
+//
+//
+//
+//  for (size_t i = 0; i < 3; ++i)
+//  {
+//    file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/readme.md"), "./").on_complete([i](const std::error_code& ec, const std::string& file_path)
+//    {
+//      if (ec)
+//      {
+//        std::cout << ec.message() << std::endl;
+//      }
+//      else
+//      {
+//        std::cout << "GET " << std::setfill('0') << std::setw(2) << i;
+//        std::cout << " SUCCEEDED" << std::endl;
+//      }
+//    });
+//  }
+//
+//  ioservice.run();
+//}
+////================================================================//
+
+
+//using std::experimental::any_cast;
+//using std::experimental::any;
+//################################################################//
+int main()
 {
-
-  req.on_response([](http::client::response && resp)
-  {
-    for (auto it : resp.head().raw_headers())
-      std::cout << it.first << ": " << it.second << std::endl;
-
-    resp.on_data([](const char*const d, std::size_t sz)
-    {
-      std::cout << std::string(d, sz) << std::endl;
-    });
-  });
-}
-//================================================================//
-
-//================================================================//
-void start_server(asio::io_service& ioservice)
-{
-  http::router app;
-
-  http::document_root get_doc_root("./");
-  get_doc_root.add_credentials("user", "pass");
-  app.register_handler(std::regex("^/files/(.*)$"), "HEAD", http::document_root("./"));
-  app.register_handler(std::regex("^/files/(.*)$"), "GET", std::ref(get_doc_root));
-  app.register_handler(std::regex("^/files/(.*)$"), "PUT", http::document_root("./"));
-  get_doc_root.add_credentials("user", "password");
-
-  app.register_handler(std::regex("^/redirect-url$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
-  {
-    res.head().set_status_code(http::status_code::found);
-    res.head().header("location","/new-url");
-    res.end();
-  });
-
-  app.register_handler(std::regex("^/(.*)$"), [](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
-  {
-    auto res_ptr = std::make_shared<http::server::response>(std::move(res));
-
-    for (auto it : req.head().raw_headers())
-      std::cout << it.first << ": " << it.second << std::endl;
-
-    auto req_entity = std::make_shared<std::stringstream>();
-    req.on_data([req_entity](const char*const data, std::size_t datasz)
-    {
-      req_entity->write(data, datasz);
-    });
-
-    req.on_end([res_ptr, req_entity]()
-    {
-      auto push_promise = res_ptr->send_push_promise(http::request_head("/push-url"));
-
-      res_ptr->send("Received: " + req_entity->str() + "\n");
-      res_ptr->end();
-
-      push_promise.fulfill([](http::server::request&& rq, http::server::response&& rs)
-      {
-        // TODO: have on_end immidiately callback if closed or half closed remote.
-        rs.end("Here's the promised data.");
-      });
-
-    });
-
-    req.on_close([](const std::error_code& e)
-    {
-      std::cout << "on_close called on server" << std::endl;
-    });
-
-  });
-
-
-//  auto ops = http::server::ssl_options(asio::ssl::context::method::sslv23);
-//  {
-//    std::ifstream ifs("/Users/jonathonl/Developer/certs/server.key");
-//    if (ifs.good())
-//      ops.key.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-//  }
-//  {
-//    std::ifstream ifs("/Users/jonathonl/Developer/certs/server.crt");
-//    if (ifs.good())
-//      ops.cert.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-//  }
-//  {
-//    std::ifstream ifs("/Users/jonathonl/Developer/certs/ca.crt");
-//    if (ifs.good())
-//      ops.ca.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-//  }
-
+  asio::io_service ioservice;
 
   std::vector<char> chain;
   std::vector<char> key;
@@ -258,92 +345,12 @@ void start_server(asio::io_service& ioservice)
 
   http::server srv(ioservice, server_ssl_ctx, 8080);
   srv.reset_timeout(std::chrono::seconds(15));
-  srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
-  ioservice.run();
-  //http::server ssl_srv(ioservice, http::server::ssl_options(asio::ssl::context::method::sslv23), 8081, "0.0.0.0");
-  //ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
-}
-//================================================================//
-
-//================================================================//
-void client_to_local_server_test(asio::io_service& ioservice)
-{
-  asio::ssl::context client_ssl_ctx(asio::ssl::context::tlsv12);
-  http::client agnt(ioservice, client_ssl_ctx);
-  http::stream_client stream_agnt(agnt);
-  http::file_transfer_client file_transfer_agnt(stream_agnt);
-
-  agnt.reset_timeout(std::chrono::seconds(5));
-
-  http::file_transfer_client::options ops;
-  ops.replace_existing_file = true;
-  auto t = std::chrono::system_clock::now().time_since_epoch();
-  std::cout << "Starting Download ..." << std::endl;
-  auto last_percent = std::make_shared<std::uint64_t>(0);
-
+  srv.listen([](http::server::request&& req, http::server::response&& res) -> std::future<void>
   {
-    auto p = file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/test_cmp.rfcmp"), "./")
-      .on_progress([last_percent](std::uint64_t transferred, std::uint64_t total)
-      {
-        if (total)
-        {
-          std::uint64_t percent = (static_cast<double>(transferred) / static_cast<double>(total)) * 100;
-          if (percent > *last_percent)
-          {
-            *last_percent = percent;
-            std::cout << "\r" << percent << "%" << std::flush;
-          }
-        }
-      }).on_complete([t](const std::error_code& ec, const std::string& file_path)
-      {
-        std::cout << std::endl;
-        if (ec)
-        {
-          std::cout << ec.message() << std::endl;
-        }
-        else
-        {
-          std::cout << "DL SUCCEEDED" << std::endl;
-          std::cout << "SECONDS: " << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch() - t).count() << std::endl;
-        }
-      });
-  }
 
-
-
-  for (size_t i = 0; i < 3; ++i)
-  {
-    file_transfer_agnt.download_file(uri("https://user:password@localhost:8080/files/readme.md"), "./").on_complete([i](const std::error_code& ec, const std::string& file_path)
-    {
-      if (ec)
-      {
-        std::cout << ec.message() << std::endl;
-      }
-      else
-      {
-        std::cout << "GET " << std::setfill('0') << std::setw(2) << i;
-        std::cout << " SUCCEEDED" << std::endl;
-      }
-    });
-  }
-
-//    std::thread([&client_ioservice]()
-//    {
-//      client_ioservice.run();
-//      auto a = 0;
-//    }).detach();
+    co_return;
+  });
   ioservice.run();
-}
-//================================================================//
-
-
-//using std::experimental::any_cast;
-//using std::experimental::any;
-//################################################################//
-int main()
-{
-  asio::io_service ioservice;
-  start_server(ioservice);
 
 
   return 0;

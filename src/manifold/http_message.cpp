@@ -1,14 +1,12 @@
 
-#include "http_message.hpp"
-#include "tcp.hpp"
+#include "manifold/http_message.hpp"
 
 namespace manifold
 {
   namespace http
   {
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    message<SendMsg,RecvMsg>::message(const std::shared_ptr<http::connection<SendMsg, RecvMsg>>& conn, std::uint32_t stream_id)
+    message::message(http::connection& conn, std::uint32_t stream_id)
       : connection_(conn),
         stream_id_(stream_id)
     {
@@ -16,63 +14,55 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    message<SendMsg,RecvMsg>::message(message&& source)
+    message::message(message&& source)
       : connection_(source.connection_),
       stream_id_(source.stream_id_)
     {
-      source.connection_ = nullptr;
+
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    message<SendMsg,RecvMsg>::~message()
+    message::~message()
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    std::uint32_t message<SendMsg,RecvMsg>::stream_id() const
+    std::uint32_t message::stream_id() const
     {
       return this->stream_id_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    ::manifold::http::version message<SendMsg,RecvMsg>::http_version() const
+    ::manifold::http::version message::http_version() const
     {
-      if (this->connection_)
-        return this->connection_->get_version();
-      else
-        return http::version::unknown;
+      return this->connection_.version();
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    void message<SendMsg,RecvMsg>::cancel()
+    http::header_block& message::header_block()
     {
-      if (this->connection_)
-        this->connection_->send_reset_stream(this->stream_id_, v2_errc::cancel);
+      return headers_;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    template <typename SendMsg, typename RecvMsg>
-    void message<SendMsg,RecvMsg>::on_close(const std::function<void(const std::error_code&)>& cb)
+    void message::cancel()
     {
-      if (this->connection_)
-        this->connection_->on_close(this->stream_id_, cb);
+      this->connection_.send_reset(this->stream_id_, v2_errc::cancel);
     }
     //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    template class message<response_head, request_head>;
-    template class message<request_head, response_head>;
-    //----------------------------------------------------------------//
+//    //----------------------------------------------------------------//
+//    void message::on_close(const std::function<void(const std::error_code&)>& cb)
+//    {
+//      if (this->connection_)
+//        this->connection_->on_close(this->stream_id_, cb);
+//    }
+//    //----------------------------------------------------------------//
 
 //    //----------------------------------------------------------------//
 //    std::string message::errorMessage() const
