@@ -11,6 +11,7 @@
 
 #include <asio/spawn.hpp>
 
+#include <memory>
 #include <queue>
 #include <list>
 #include <random>
@@ -72,7 +73,7 @@ namespace manifold
       //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
       //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-      class stream
+      class stream : public std::enable_shared_from_this<stream>
       {
       public:
         struct header_awaiter;
@@ -80,20 +81,21 @@ namespace manifold
         stream_state state() const { return this->state_; }
         std::uint32_t id() const { return this->id_; }
 
-        bool has_something_to_send(bool exclude_data);
+        bool has_something_to_send(bool exclude_data) const;
 
-        bool has_sendable_headers();
+        bool has_sendable_headers() const;
         const header_block* sendable_headers();
         void pop_sendable_headers();
 
-        bool has_sendable_data();
+        bool has_sendable_data() const;
         std::tuple<const char*, std::size_t> sendable_data();
         void pop_sendable_data(std::uint32_t amount);
 
-        bool has_sendable_window_update();
+        bool has_sendable_window_update() const;
         std::uint32_t sendable_window_update();
         void pop_sendable_window_update();
 
+        bool has_receivable_data() const;
 
 
         bool adjust_local_window_size(std::int32_t amount) { return false; } // TODO
@@ -156,8 +158,8 @@ namespace manifold
       static const std::uint32_t max_stream_id = 0x7FFFFFFF;
       static const std::uint32_t initial_stream_id;
 
-      connection(manifold::tls_socket&& sock, http::version http_version, std::function<std::future<void>(connection&,std::uint32_t)> on_new_stream_handler = nullptr);
-      connection(manifold::non_tls_socket&& sock, http::version http_version, std::function<std::future<void>(connection&,std::uint32_t)> on_new_stream_handler = nullptr);
+      connection(manifold::tls_socket&& sock, http::version http_version, std::function<std::future<void>(std::shared_ptr<connection::stream>)> on_new_stream_handler = nullptr);
+      connection(manifold::non_tls_socket&& sock, http::version http_version, std::function<std::future<void>(std::shared_ptr<connection::stream>)> on_new_stream_handler = nullptr);
       connection(const connection&) = delete;
       connection(connection&&) = delete;
 
@@ -167,15 +169,15 @@ namespace manifold
       void run_v2_send_loop(asio::yield_context yctx);
       void send_connection_level_window_update(std::int32_t amount);
 
-      std::unordered_map<std::uint32_t, stream>::iterator find_sendable_stream(bool exclude_data);
+      std::unordered_map<std::uint32_t, std::shared_ptr<stream>>::iterator find_sendable_stream(bool exclude_data);
 
-      stream::recv_headers_awaiter recv_headers(std::uint32_t stream_id);
-      stream::recv_data_awaiter recv_data(std::uint32_t stream_id, char* dest, std::size_t sz);
-
-      stream::send_headers_awaiter send_headers(std::uint32_t stream_id, const header_block& headers, bool end_stream);
-      stream::send_data_awaiter send_data(std::uint32_t stream_id, const char* data, std::size_t sz, bool end_stream);
-
-      void send_reset(std::uint32_t stream_id, v2_errc ec);
+//      stream::recv_headers_awaiter recv_headers(std::uint32_t stream_id);
+//      stream::recv_data_awaiter recv_data(std::uint32_t stream_id, char* dest, std::size_t sz);
+//
+//      stream::send_headers_awaiter send_headers(std::uint32_t stream_id, const header_block& headers, bool end_stream);
+//      stream::send_data_awaiter send_data(std::uint32_t stream_id, const char* data, std::size_t sz, bool end_stream);
+//
+//      void send_reset(std::uint32_t stream_id, v2_errc ec);
 
       std::uint32_t create_client_stream();
 
@@ -184,7 +186,7 @@ namespace manifold
       std::minstd_rand rng_;
       hpack::decoder hpack_decoder_;
       hpack::encoder hpack_encoder_;
-      std::unordered_map<std::uint32_t, stream> streams_;
+      std::unordered_map<std::uint32_t, std::shared_ptr<stream>> streams_;
       std::map<setting_code,std::uint32_t> peer_settings_;
       std::map<setting_code,std::uint32_t> local_settings_;
       std::queue<std::list<std::pair<std::uint16_t,std::uint32_t>>> pending_local_settings_;
@@ -192,7 +194,7 @@ namespace manifold
 //      std::queue<settings_frame> outgoing_settings_frames_;
 //      std::queue<ping_frame> outgoing_ping_frames_;
 
-      std::function<std::future<void>(connection&, std::uint32_t)> on_new_stream_;
+      std::function<std::future<void>(std::shared_ptr<stream> stream_ptr)> on_new_stream_;
 
       std::unique_ptr<socket> socket_;
       std::uint32_t last_newly_accepted_stream_id_;
@@ -219,24 +221,24 @@ namespace manifold
     class connection::stream::recv_headers_awaiter
     {
     public:
-      recv_headers_awaiter(connection::stream* p);
+      recv_headers_awaiter(const std::shared_ptr<connection::stream>& p);
       bool await_ready();
 
       header_block await_resume();
       void await_suspend(std::experimental::coroutine_handle<> coro);
     private:
-      connection::stream* parent_stream_;
+      std::shared_ptr<connection::stream> parent_stream_;
     };
 
     class connection::stream::recv_data_awaiter
     {
     public:
-      recv_data_awaiter(connection::stream* p, char* dest, std::size_t sz);
+      recv_data_awaiter(const std::shared_ptr<connection::stream>& p, char* dest, std::size_t sz);
       bool await_ready();
       std::size_t await_resume();
       void await_suspend(std::experimental::coroutine_handle<> coro);
     private:
-      connection::stream* parent_stream_;
+      std::shared_ptr<connection::stream> parent_stream_;
       char* dest_;
       char* dest_end_;
     };
@@ -244,23 +246,23 @@ namespace manifold
     class connection::stream::send_headers_awaiter
     {
     public:
-      send_headers_awaiter(connection::stream* p);
+      send_headers_awaiter(const std::shared_ptr<connection::stream>& p);
       bool await_ready();
       void await_resume();
       void await_suspend(std::experimental::coroutine_handle<> coro);
     private:
-      connection::stream* parent_stream_;
+      std::shared_ptr<connection::stream> parent_stream_;
     };
 
     class connection::stream::send_data_awaiter
     {
     public:
-      send_data_awaiter(connection::stream* p, std::size_t sz);
+      send_data_awaiter(const std::shared_ptr<connection::stream>& p, std::size_t sz);
       bool await_ready();
       std::size_t await_resume();
       void await_suspend(std::experimental::coroutine_handle<> coro);
     private:
-      connection::stream* parent_stream_;
+      std::shared_ptr<connection::stream> parent_stream_;
       std::size_t sz_;
     };
   }

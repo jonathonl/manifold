@@ -135,7 +135,7 @@ namespace manifold
     {
       std::uint32_t ret;
       memcpy(&ret, this->metadata_.data() + 5, 4);
-      return (0x7FFFFFFF & ntohl(ret));
+      return (ntohl(ret) & 0x7FFFFFFF);
     }
     //----------------------------------------------------------------//
 
@@ -192,8 +192,8 @@ namespace manifold
 
       if (destination.type() != frame_type::invalid_type)
       {
-        destination.buf_.resize(destination.serialized_length());
-        sock.recv(destination.buf_.data(), destination.serialized_length(), yctx);
+        destination.buf_.resize(destination.payload_length());
+        sock.recv(destination.buf_.data(), destination.payload_length(), yctx);
       }
     }
     //template void frame_payload::recv_frame_payload<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, frame_payload& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);

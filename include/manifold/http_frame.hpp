@@ -138,6 +138,7 @@ namespace manifold
     public:
       data_frame(std::uint32_t stream_id) : frame_payload(0, frame_type::data, 0, stream_id) {}
       data_frame(std::uint32_t stream_id, const char*const data, std::uint32_t datasz, bool end_stream = false, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
+      data_frame(frame_payload&& source) : frame_payload(std::move(source)) {}
       data_frame(data_frame&& source) : frame_payload(std::move(source)) {}
       data_frame& operator=(data_frame&& source)
       {
@@ -184,7 +185,7 @@ namespace manifold
       headers_frame(std::uint32_t stream_id) : frame_payload(0, frame_type::headers, 0, stream_id) {}
       headers_frame(std::uint32_t stream_id, const char*const header_block, std::uint32_t header_block_sz, bool end_headers, bool end_stream, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
       headers_frame(std::uint32_t stream_id, const char*const header_block, std::uint32_t header_block_sz, bool end_headers, bool end_stream, priority_options priority_ops, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
-      headers_frame(headers_frame&& source) : frame_payload(std::move(source)) {}
+      headers_frame(frame_payload&& source) : frame_payload(std::move(source)) {}
       headers_frame& operator=(headers_frame&& source)
       {
         frame_payload::operator=(std::move(source));
@@ -214,7 +215,7 @@ namespace manifold
       //priority_frame(frame_payload&& src) : frame_payload(std::move(src)) {}
       priority_frame(std::uint32_t stream_id) : frame_payload(0, frame_type::priority, 0, stream_id) {}
       priority_frame(std::uint32_t stream_id, priority_options options);
-      priority_frame(priority_frame&& source) : frame_payload(std::move(source)) {}
+      priority_frame(frame_payload&& source) : frame_payload(std::move(source)) {}
       priority_frame& operator=(priority_frame&& source)
       {
         frame_payload::operator=(std::move(source));
@@ -234,7 +235,7 @@ namespace manifold
     public:
       rst_stream_frame(std::uint32_t stream_id) : frame_payload(0, frame_type::rst_stream, 0, stream_id) {}
       rst_stream_frame(std::uint32_t stream_id, http::v2_errc error_code);
-      rst_stream_frame(rst_stream_frame&& source) : frame_payload(std::move(source)) {}
+      rst_stream_frame(frame_payload&& source) : frame_payload(std::move(source)) {}
       rst_stream_frame& operator=(rst_stream_frame&& source)
       {
         frame_payload::operator=(std::move(source));
@@ -255,7 +256,7 @@ namespace manifold
       settings_frame() : frame_payload(0, frame_type::settings, 0, 0) {}
       settings_frame(ack_flag) : frame_payload(0, frame_type::settings, 0x1, 0) {}
       settings_frame(std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator beg, std::list<std::pair<std::uint16_t,std::uint32_t>>::const_iterator end);
-      settings_frame(settings_frame&& source) : frame_payload(std::move(source)) {}
+      settings_frame(frame_payload&& source) : frame_payload(std::move(source)) {}
       settings_frame& operator=(settings_frame&& source)
       {
         frame_payload::operator=(std::move(source));
@@ -275,7 +276,7 @@ namespace manifold
     public:
       push_promise_frame(std::uint32_t stream_id) : frame_payload(0, frame_type::push_promise, 0, stream_id) {}
       push_promise_frame(std::uint32_t stream_id, const char*const header_block, std::uint32_t header_block_sz, std::uint32_t promise_stream_id, bool end_headers, const char*const padding = nullptr, std::uint8_t paddingsz = 0);
-      push_promise_frame(push_promise_frame&& source) : frame_payload(std::move(source)) {}
+      push_promise_frame(frame_payload&& source) : frame_payload(std::move(source)) {}
       push_promise_frame& operator=(push_promise_frame&& source)
       {
         frame_payload::operator=(std::move(source));
@@ -298,7 +299,7 @@ namespace manifold
     public:
       ping_frame() : frame_payload(0, frame_type::ping, 0, 0) {}
       ping_frame(std::uint64_t ping_data, bool ack = false);
-      ping_frame(ping_frame&& source) : frame_payload(std::move(source)) {}
+      ping_frame(frame_payload&& source) : frame_payload(std::move(source)) {}
       ping_frame& operator=(ping_frame&& source)
       {
         frame_payload::operator=(std::move(source));
@@ -317,7 +318,7 @@ namespace manifold
     public:
       goaway_frame() : frame_payload(0, frame_type::goaway, 0, 0) {}
       goaway_frame(std::uint32_t last_stream_id, http::v2_errc error_code, const char*const addl_error_data, std::uint32_t addl_error_data_sz);
-      goaway_frame(goaway_frame&& source) : frame_payload(std::move(source)) {}
+      goaway_frame(frame_payload&& source) : frame_payload(std::move(source)) {}
       goaway_frame& operator=(goaway_frame&& source)
       {
         frame_payload::operator=(std::move(source));
@@ -338,7 +339,7 @@ namespace manifold
     public:
       window_update_frame(std::uint32_t stream_id) : frame_payload(0, frame_type::window_update, 0, stream_id) {}
       window_update_frame(std::uint32_t stream_id, std::uint32_t window_size_increment);
-      window_update_frame(window_update_frame&& source) : frame_payload(std::move(source)) {}
+      window_update_frame(frame_payload&& source) : frame_payload(std::move(source)) {}
       window_update_frame& operator=(window_update_frame&& source)
       {
         frame_payload::operator=(std::move(source));
@@ -356,7 +357,7 @@ namespace manifold
     public:
       continuation_frame() : frame_payload(0, frame_type::continuation, 0, 0) {}
       continuation_frame(std::uint32_t stream_id, const char*const header_data, std::uint32_t header_data_sz, bool end_headers);
-      continuation_frame(continuation_frame&& source) : frame_payload(std::move(source)) {}
+      continuation_frame(frame_payload&& source) : frame_payload(std::move(source)) {}
       continuation_frame& operator=(continuation_frame&& source)
       {
         frame_payload::operator=(std::move(source));

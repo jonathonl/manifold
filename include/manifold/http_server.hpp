@@ -29,7 +29,7 @@ namespace manifold
       {
       public:
         //----------------------------------------------------------------//
-        request(request_head&& head, http::connection& conn, std::int32_t stream_id);
+        request(request_head&& head, const std::shared_ptr<connection::stream>& stream_ptr);
         request(request&& source);
         ~request();
         //----------------------------------------------------------------//
@@ -54,14 +54,14 @@ namespace manifold
       {
       public:
         //----------------------------------------------------------------//
-        response(response_head&& head, http::connection& conn, std::int32_t stream_id, const std::string& request_method, const std::string& request_authority);
+        response(response_head&& head, const std::shared_ptr<connection::stream>& stream_ptr, const std::string& request_method, const std::string& request_authority);
         response(response&& source);
         ~response();
         //----------------------------------------------------------------//
 
         //----------------------------------------------------------------//
         response_head& head();
-        bool send_headers(bool end_stream = false);
+        connection::stream::send_headers_awaiter send_headers(bool end_stream = false);
         push_promise send_push_promise(request_head&& push_promise_headers);
         push_promise send_push_promise(const request_head& push_promise_headers);
         //----------------------------------------------------------------//
@@ -118,8 +118,8 @@ namespace manifold
 
       //----------------------------------------------------------------//
       void reset_timeout(std::chrono::system_clock::duration value = std::chrono::system_clock::duration::max());
-      void listen(const std::function<std::future<void>(server::request&& req, server::response&& res)>& handler);
-      void listen(const std::function<std::future<void>(server::request&& req, server::response&& res)>& handler, std::error_code& ec);
+      void listen(const std::function<std::future<void>(server::request req, server::response res)>& handler);
+      void listen(const std::function<std::future<void>(server::request req, server::response res)>& handler, std::error_code& ec);
       void close();
       //void register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler);
       void set_default_server_header(const std::string& value);

@@ -15,13 +15,14 @@ namespace manifold
     {
     public:
       //----------------------------------------------------------------//
-      incoming_message(http::connection& conn, std::int32_t stream_id);
+      incoming_message(const std::shared_ptr<connection::stream>& stream_ptr);
       incoming_message(incoming_message&& source);
       virtual ~incoming_message();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void recv(char* buf, std::size_t sz);
+      connection::stream::recv_data_awaiter recv(char* buf, std::size_t sz);
+      operator bool() const;
       bool eof();
       //----------------------------------------------------------------//
     private:

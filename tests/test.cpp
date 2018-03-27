@@ -345,8 +345,23 @@ int main()
 
   http::server srv(ioservice, server_ssl_ctx, 8080);
   srv.reset_timeout(std::chrono::seconds(15));
-  srv.listen([](http::server::request&& req, http::server::response&& res) -> std::future<void>
+  srv.listen([](http::server::request req, http::server::response res) -> std::future<void>
   {
+    std::cout << (req.head().method() + " " + req.head().path()) << std::endl;
+
+    std::string buf(1024, '\0');
+
+    while (req)
+    {
+      std::size_t amount = co_await req.recv(&buf[0], buf.size());
+      buf.resize(amount);
+      std::cout << buf << std::endl;
+    }
+
+    res.head().set_status_code(200);
+    res.send("received.");
+
+
 
     co_return;
   });

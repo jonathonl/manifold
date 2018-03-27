@@ -6,8 +6,8 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    outgoing_message::outgoing_message(http::connection& conn, std::int32_t stream_id)
-      : message(conn, stream_id),
+    outgoing_message::outgoing_message(const std::shared_ptr<connection::stream>& stream_ptr)
+      : message(stream_ptr),
       headers_sent_(false),
       ended_(false)
     {
@@ -30,61 +30,65 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool outgoing_message::send_headers(bool end_stream)
+    connection::stream::send_headers_awaiter outgoing_message::send_headers(bool end_stream)
     {
-      bool ret = false;
-
       if (!this->headers_sent_)
       {
-        // TODO: ret = co_await this->connection_.send_headers(this->stream_id_, this->header_block(), end_stream);
         this->headers_sent_= true;
         this->ended_ = end_stream;
+        return this->stream_->send_headers(this->header_block(), end_stream);
       }
 
-      return ret;
+      return connection::stream::send_headers_awaiter{nullptr};
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool outgoing_message::send(const char* data, std::size_t data_sz)
+    connection::stream::send_data_awaiter outgoing_message::send(const char* data, std::size_t data_sz)
     {
-      bool ret = true;
-
       if (!this->headers_sent_)
-        ret = this->send_headers();
+        this->send_headers();
 
-      if (ret && !this->ended_)
+      if (!this->ended_)
       {
-        // TODO: std::size_t bytes_sent = co_await this->connection_.send_data(this->stream_id_, data, data_sz, false);
-        //ret = bytes_sent;
+        return this->stream_->send_data(data, data_sz, false);
       }
 
-      return ret;
+      return connection::stream::send_data_awaiter{nullptr, 0};
     }
     //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    bool outgoing_message::end(const char* data, std::size_t data_sz)
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+    outgoing_message::operator bool() const
     {
-      bool ret = true;
-
-      if (!this->headers_sent_)
-        ret = this->send_headers();
-
-
-      if (ret && !this->ended_)
+      if (stream_->state() == connection::stream_state::closed || stream_->state() == connection::stream_state::half_closed_local)
       {
-        this->connection_.send_data(this->stream_id_, data, data_sz, true);
+        return false;
+      }
+      return true;
+    }
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
+    //----------------------------------------------------------------//
+    connection::stream::send_data_awaiter outgoing_message::end(const char* data, std::size_t data_sz)
+    {
+      if (!this->headers_sent_)
+        this->send_headers();
+
+      if (!this->ended_)
+      {
         // TODO: Check content length against amount sent;
         this->ended_ = true;
+
+        return this->stream_->send_data(data, data_sz, true);
       }
 
-      return ret;
+      return connection::stream::send_data_awaiter{nullptr, 0};
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    bool outgoing_message::end()
+    connection::stream::send_data_awaiter outgoing_message::end()
     {
       return this->end(nullptr, 0);
     }

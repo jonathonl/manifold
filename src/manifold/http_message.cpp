@@ -6,19 +6,17 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    message::message(http::connection& conn, std::uint32_t stream_id)
-      : connection_(conn),
-        stream_id_(stream_id)
+    message::message(const std::shared_ptr<connection::stream>& stream_ptr) :
+      stream_(stream_ptr)
     {
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     message::message(message&& source)
-      : connection_(source.connection_),
-      stream_id_(source.stream_id_)
+      : stream_(source.stream_)
     {
-
+      source.stream_ = nullptr;
     }
     //----------------------------------------------------------------//
 
@@ -31,16 +29,16 @@ namespace manifold
     //----------------------------------------------------------------//
     std::uint32_t message::stream_id() const
     {
-      return this->stream_id_;
+      return this->stream_->id();
     }
     //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    ::manifold::http::version message::http_version() const
-    {
-      return this->connection_.version();
-    }
-    //----------------------------------------------------------------//
+//    //----------------------------------------------------------------//
+//    ::manifold::http::version message::http_version() const
+//    {
+//      return this->http_version_;
+//    }
+//    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
     http::header_block& message::header_block()
@@ -52,7 +50,7 @@ namespace manifold
     //----------------------------------------------------------------//
     void message::cancel()
     {
-      this->connection_.send_reset(this->stream_id_, v2_errc::cancel);
+      this->stream_->send_reset(v2_errc::cancel);
     }
     //----------------------------------------------------------------//
 

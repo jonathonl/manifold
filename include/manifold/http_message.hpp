@@ -16,14 +16,14 @@ namespace manifold
     {
     public:
       //----------------------------------------------------------------//
-      message(http::connection& conn, std::uint32_t stream_id);
+      message(const std::shared_ptr<connection::stream>& stream_ptr);
       message(message&& source);
       virtual ~message();
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
       std::uint32_t stream_id() const;
-      ::manifold::http::version http_version() const;
+      //::manifold::http::version http_version() const;
       http::header_block& header_block();
       void cancel();
       //void on_close(const std::function<void(const std::error_code& ec)>& cb);
@@ -33,9 +33,8 @@ namespace manifold
       message& operator=(message&&) = delete;
     protected:
       //----------------------------------------------------------------//
-      http::connection& connection_;
+      std::shared_ptr<connection::stream> stream_;
       http::header_block headers_;
-      std::uint32_t stream_id_;
       //----------------------------------------------------------------//
     };
     //================================================================//
