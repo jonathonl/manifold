@@ -36,7 +36,7 @@ namespace manifold
       {
         this->headers_sent_= true;
         this->ended_ = end_stream;
-        return this->stream_->send_headers(this->header_block(), end_stream);
+        return this->stream_->send_headers(this->message_head(), end_stream);
       }
 
       return connection::stream::send_headers_awaiter{nullptr};
@@ -90,7 +90,7 @@ namespace manifold
     //----------------------------------------------------------------//
     connection::stream::send_data_awaiter outgoing_message::end()
     {
-      return this->end(nullptr, 0);
+      return this->end("", 0);
     }
     //----------------------------------------------------------------//
 

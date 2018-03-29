@@ -22,7 +22,7 @@ namespace manifold
       //----------------------------------------------------------------//
       virtual connection::stream::send_headers_awaiter send_headers(bool end_stream = false); // Must be virtual since client::request and server::response override while outgoing_message::end/send call this method.
       connection::stream::send_data_awaiter send(const char* data, std::size_t data_sz);
-      connection::stream::send_data_awaiter send(const char* cstr) { return this->send(std::string(cstr)); }
+      connection::stream::send_data_awaiter send(const char* cstr) { return this->send(cstr, std::strlen(cstr)); }
       template <typename BufferT>
       connection::stream::send_data_awaiter send(const BufferT& dataBuffer)
       {

@@ -84,12 +84,13 @@ namespace manifold
         bool has_something_to_send(bool exclude_data) const;
 
         bool has_sendable_headers() const;
-        const header_block* sendable_headers();
+        const header_block& sendable_headers();
         void pop_sendable_headers();
 
         bool has_sendable_data() const;
         std::tuple<const char*, std::size_t> sendable_data();
         void pop_sendable_data(std::uint32_t amount);
+        std::size_t out_data_size() const;
 
         bool has_sendable_window_update() const;
         std::uint32_t sendable_window_update();
@@ -122,20 +123,21 @@ namespace manifold
         v2_errc handle_incoming_push_promise(header_block&& headers, stream& idle_promised_stream);
         v2_errc handle_incoming_window_update(std::int32_t window_size_increment);
 
-        stream(std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size);
+        stream(connection* parent, std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size);
 
       private:
         const std::uint32_t id_;
         stream_state state_ = stream_state::idle;
+        connection* parent_connection_;
         bool on_headers_called_ = false;
 
         std::queue<std::string> in_data_;
         std::queue<header_block> in_headers_;
 
         bool out_end_;
-        const char* out_data_;
-        std::size_t out_data_sz_;
-        const header_block* out_headers_;
+        const char* out_data_ = nullptr;
+        std::size_t out_data_sz_ = 0;
+        std::queue<header_block> out_headers_;
         bool out_headers_end_stream_ = false;
         std::uint32_t out_window_update_;
         std::int32_t incoming_window_size_ = 65535;
@@ -212,6 +214,8 @@ namespace manifold
       v2_errc handle_incoming(ping_frame&& incoming_frame);
       v2_errc handle_incoming(goaway_frame&& incoming_frame);
       v2_errc handle_incoming(window_update_frame&& incoming_frame);
+
+      void spawn_v2_send_loop_if_needed();
 
       void post_send_loop_if_needed();
       std::uint32_t gen_stream_id();

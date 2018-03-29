@@ -24,7 +24,6 @@ namespace manifold
       //----------------------------------------------------------------//
       std::uint32_t stream_id() const;
       //::manifold::http::version http_version() const;
-      http::header_block& header_block();
       void cancel();
       //void on_close(const std::function<void(const std::error_code& ec)>& cb);
       //----------------------------------------------------------------//
@@ -32,9 +31,11 @@ namespace manifold
       message& operator=(const message&) = delete;
       message& operator=(message&&) = delete;
     protected:
+      virtual http::header_block& message_head() = 0;
+    protected:
       //----------------------------------------------------------------//
       std::shared_ptr<connection::stream> stream_;
-      http::header_block headers_;
+      //http::header_block headers_;
       //----------------------------------------------------------------//
     };
     //================================================================//

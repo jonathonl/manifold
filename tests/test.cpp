@@ -359,8 +359,10 @@ int main()
     }
 
     res.head().set_status_code(200);
-    res.send("received.");
-
+    const char* s = "received.";
+    std::cout  << (void*)s << ": " << s << std::endl;
+    co_await res.send(s); //s.data(), s.size());
+    std::cout  << (void*)s << ": " << s << std::endl;
 
 
     co_return;
