@@ -102,17 +102,11 @@ namespace manifold
         bool adjust_local_window_size(std::int32_t amount) { return false; } // TODO
         bool adjust_peer_window_size(std::int32_t amount) { return false; } // TODO
 
-        class recv_headers_awaiter;
-        recv_headers_awaiter recv_headers();
+        future<header_block> recv_headers();
+        future<std::size_t> recv_data(char* dest, std::size_t sz);
 
-        class recv_data_awaiter;
-        recv_data_awaiter recv_data(char* dest, std::size_t sz);
-
-        class send_headers_awaiter;
-        send_headers_awaiter send_headers(const header_block& headers, bool end_stream);
-
-        class send_data_awaiter;
-        send_data_awaiter send_data(const char* data, std::size_t sz, bool end_stream);
+        future<bool> send_headers(const header_block& headers, bool end_stream);
+        future<std::size_t> send_data(const char* data, std::size_t sz, bool end_stream);
 
         void send_reset(v2_errc ec);
 
@@ -131,7 +125,8 @@ namespace manifold
         connection* parent_connection_;
         bool on_headers_called_ = false;
 
-        std::queue<std::string> in_data_;
+        std::queue<std::string> in_data_overflow_;
+        asio::mutable_buffer in_data_buf_;
         std::queue<header_block> in_headers_;
 
         bool out_end_;
@@ -146,10 +141,10 @@ namespace manifold
         std::uint8_t weight_ = 16;
         bool end_stream_received_ = false;
 
-        std::experimental::coroutine_handle<> recv_headers_coro_;
-        std::experimental::coroutine_handle<> recv_data_coro_;
-        std::experimental::coroutine_handle<> send_headers_coro_;
-        std::experimental::coroutine_handle<> send_data_coro_;
+        std::shared_ptr<future<header_block>::promise_type> recv_headers_promise_;
+        std::shared_ptr<future<std::size_t>::promise_type> recv_data_promise_;
+        std::shared_ptr<future<bool>::promise_type> send_headers_promise_;
+        std::shared_ptr<future<std::size_t>::promise_type> send_data_promise_;
 
       private:
         //static bool incoming_header_is_informational(const RecvMsg &head);
@@ -221,54 +216,6 @@ namespace manifold
       std::uint32_t gen_stream_id();
     };
     //================================================================//
-
-    class connection::stream::recv_headers_awaiter
-    {
-    public:
-      recv_headers_awaiter(const std::shared_ptr<connection::stream>& p);
-      bool await_ready();
-
-      header_block await_resume();
-      void await_suspend(std::experimental::coroutine_handle<> coro);
-    private:
-      std::shared_ptr<connection::stream> parent_stream_;
-    };
-
-    class connection::stream::recv_data_awaiter
-    {
-    public:
-      recv_data_awaiter(const std::shared_ptr<connection::stream>& p, char* dest, std::size_t sz);
-      bool await_ready();
-      std::size_t await_resume();
-      void await_suspend(std::experimental::coroutine_handle<> coro);
-    private:
-      std::shared_ptr<connection::stream> parent_stream_;
-      char* dest_;
-      char* dest_end_;
-    };
-
-    class connection::stream::send_headers_awaiter
-    {
-    public:
-      send_headers_awaiter(const std::shared_ptr<connection::stream>& p);
-      bool await_ready();
-      void await_resume();
-      void await_suspend(std::experimental::coroutine_handle<> coro);
-    private:
-      std::shared_ptr<connection::stream> parent_stream_;
-    };
-
-    class connection::stream::send_data_awaiter
-    {
-    public:
-      send_data_awaiter(const std::shared_ptr<connection::stream>& p, std::size_t sz);
-      bool await_ready();
-      std::size_t await_resume();
-      void await_suspend(std::experimental::coroutine_handle<> coro);
-    private:
-      std::shared_ptr<connection::stream> parent_stream_;
-      std::size_t sz_;
-    };
   }
 }
 

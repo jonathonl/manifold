@@ -21,7 +21,7 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      connection::stream::recv_data_awaiter recv(char* buf, std::size_t sz);
+      future<std::size_t> recv(char* buf, std::size_t sz);
       operator bool() const;
       bool eof();
       //----------------------------------------------------------------//

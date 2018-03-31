@@ -158,13 +158,14 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    connection::stream::send_headers_awaiter server::response::send_headers(bool end_stream)
+    future<bool> server::response::send_headers(bool end_stream)
     {
       if (this->head().header("date").empty())
         this->head().header("date", server::date_string());
       if (this->request_method_ == "HEAD")
         end_stream = true;
-      return outgoing_message::send_headers(end_stream);
+      bool ret = co_await outgoing_message::send_headers(end_stream);
+      co_return ret;
     }
     //----------------------------------------------------------------//
 

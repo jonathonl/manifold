@@ -11,138 +11,54 @@ namespace manifold
 {
   namespace http
   {
-    //================================================================//
-    connection::stream::recv_headers_awaiter::recv_headers_awaiter(const std::shared_ptr<connection::stream>& p) :
-      parent_stream_(p)
-    { }
-
-    bool connection::stream::recv_headers_awaiter::await_ready()
-    {
-      return !parent_stream_ || parent_stream_->in_headers_.size();
-    }
-
-    header_block connection::stream::recv_headers_awaiter::await_resume()
-    {
-      header_block ret;
-      if (parent_stream_ && parent_stream_->in_headers_.size())
-      {
-        ret = std::move(parent_stream_->in_headers_.front());
-        parent_stream_->in_headers_.pop();
-      }
-      return ret;
-    }
-
-    void connection::stream::recv_headers_awaiter::await_suspend(std::experimental::coroutine_handle<> coro)
-    {
-      if (parent_stream_)
-        parent_stream_->recv_headers_coro_ = coro;
-    }
-    //================================================================//
-
-    //================================================================//
-    connection::stream::recv_data_awaiter::recv_data_awaiter(const std::shared_ptr<connection::stream>& p, char* dest, std::size_t sz) :
-    parent_stream_(p),
-    dest_(dest),
-    dest_end_(dest + sz)
-    { }
-
-    bool connection::stream::recv_data_awaiter::await_ready()
-    {
-      return !parent_stream_ || parent_stream_->in_data_.size() || dest_ >= dest_end_;
-    }
-
-    std::size_t connection::stream::recv_data_awaiter::await_resume()
-    {
-      std::size_t ret = 0;
-
-      while (parent_stream_ && parent_stream_->in_data_.size() && dest_ < dest_end_)
-      {
-        std::size_t front_size = parent_stream_->in_data_.front().size();
-
-        std::size_t remaining_in_dest = dest_end_ - dest_;
-        if (front_size > remaining_in_dest)
-        {
-          std::memcpy(dest_,  parent_stream_->in_data_.front().data(), remaining_in_dest);
-          parent_stream_->in_data_.front().erase(0, remaining_in_dest);
-          dest_ += remaining_in_dest;
-          ret += remaining_in_dest;
-        }
-        else
-        {
-          std::memcpy(dest_, parent_stream_->in_data_.front().data(), front_size);
-          dest_ += front_size;
-          ret += front_size;
-          parent_stream_->in_data_.pop();
-        }
-
-        parent_stream_->out_window_update_ += std::uint32_t(ret);
-      }
-
-      return ret;
-    }
-
-    void connection::stream::recv_data_awaiter::await_suspend(std::experimental::coroutine_handle<> coro)
-    {
-      if (parent_stream_)
-        parent_stream_->recv_data_coro_ = coro;
-    }
-    //================================================================//
-
-    //================================================================//
-    connection::stream::send_headers_awaiter::send_headers_awaiter(const std::shared_ptr<connection::stream>& p) :
-      parent_stream_(p)
-    { }
-
-    bool connection::stream::send_headers_awaiter::await_ready()
-    {
-      return !parent_stream_;
-    }
-
-    void connection::stream::send_headers_awaiter::await_resume()
-    {
-
-    }
-
-    void connection::stream::send_headers_awaiter::await_suspend(std::experimental::coroutine_handle<> coro)
-    {
-      if (parent_stream_)
-      {
-        parent_stream_->send_headers_coro_ = coro;
-      }
-    }
-    //================================================================//
-
-    //================================================================//
-    connection::stream::send_data_awaiter::send_data_awaiter(const std::shared_ptr<connection::stream>& p, std::size_t sz) :
-      parent_stream_(p),
-      sz_(sz)
-    { }
-
-    bool connection::stream::send_data_awaiter::await_ready()
-    {
-      return !parent_stream_; // TODO: check window.
-    }
-
-    std::size_t connection::stream::send_data_awaiter::await_resume()
-    {
-      std::size_t ret = 0;
-
-      if (parent_stream_)
-      {
-        return sz_;
-      }
-
-      return ret;
-    }
-
-    void connection::stream::send_data_awaiter::await_suspend(std::experimental::coroutine_handle<> coro)
-    {
-      if (parent_stream_)
-      {
-        parent_stream_->send_data_coro_ = coro;
-      }
-    }
-    //================================================================//
+//    //================================================================//
+//    connection::stream::recv_data_awaiter::recv_data_awaiter(const std::shared_ptr<connection::stream>& p, char* dest, std::size_t sz) :
+//    parent_stream_(p),
+//    dest_(dest),
+//    dest_end_(dest + sz)
+//    { }
+//
+//    bool connection::stream::recv_data_awaiter::await_ready()
+//    {
+//      return !parent_stream_ || parent_stream_->in_data_.size() || dest_ >= dest_end_;
+//    }
+//
+//    std::size_t connection::stream::recv_data_awaiter::await_resume()
+//    {
+//      std::size_t ret = 0;
+//
+//      while (parent_stream_ && parent_stream_->in_data_.size() && dest_ < dest_end_)
+//      {
+//        std::size_t front_size = parent_stream_->in_data_.front().size();
+//
+//        std::size_t remaining_in_dest = dest_end_ - dest_;
+//        if (front_size > remaining_in_dest)
+//        {
+//          std::memcpy(dest_,  parent_stream_->in_data_.front().data(), remaining_in_dest);
+//          parent_stream_->in_data_.front().erase(0, remaining_in_dest);
+//          dest_ += remaining_in_dest;
+//          ret += remaining_in_dest;
+//        }
+//        else
+//        {
+//          std::memcpy(dest_, parent_stream_->in_data_.front().data(), front_size);
+//          dest_ += front_size;
+//          ret += front_size;
+//          parent_stream_->in_data_.pop();
+//        }
+//
+//        parent_stream_->out_window_update_ += std::uint32_t(ret);
+//      }
+//
+//      return ret;
+//    }
+//
+//    void connection::stream::recv_data_awaiter::await_suspend(std::experimental::coroutine_handle<> coro)
+//    {
+//      if (parent_stream_)
+//        parent_stream_->recv_data_coro_ = coro;
+//    }
+//    //================================================================//
 
     //================================================================//
     connection::stream::stream(connection* parent_conn, std::uint32_t stream_id, uint32_t initial_window_size, uint32_t initial_peer_window_size) :
@@ -171,13 +87,13 @@ namespace manifold
 
     void connection::stream::pop_sendable_headers()
     {
-      if (out_headers_.size())
-      {
-        out_headers_.pop();
-        std::experimental::coroutine_handle<> coro;
-        std::swap(send_headers_coro_, coro);
-        coro ? coro() : void();
-      }
+      assert(out_headers_.size());
+
+      out_headers_.pop();
+      auto prom = send_headers_promise_;
+      send_headers_promise_ = nullptr;
+      if (prom)
+        prom->return_value(true);
     }
 
     bool connection::stream::has_sendable_data() const
@@ -208,9 +124,10 @@ namespace manifold
         out_data_ = nullptr;
         out_data_sz_ = 0;
 
-        std::experimental::coroutine_handle<> coro;
-        std::swap(send_data_coro_, coro);
-        coro ? coro() : void();
+        auto prom = send_data_promise_;
+        send_data_promise_ = nullptr;
+        if (prom)
+          prom->return_value(1); // TODO: set to amount sent in total.
       }
     }
 
@@ -236,21 +153,71 @@ namespace manifold
 
     bool connection::stream::has_receivable_data() const
     {
-      return !in_data_.empty();
+      return !in_data_overflow_.empty();
     }
 
-    connection::stream::recv_headers_awaiter connection::stream::recv_headers()
+    future<header_block> connection::stream::recv_headers()
     {
-      return recv_headers_awaiter{shared_from_this()};
+
+      auto prom = std::make_shared<future<header_block>::promise_type>();
+
+      if (in_headers_.empty())
+      {
+        recv_headers_promise_ = prom;
+      }
+      else
+      {
+        prom->return_value(std::move(in_headers_.front()));
+        in_headers_.pop();
+      }
+
+      return prom->get_return_object();
     }
 
-    connection::stream::recv_data_awaiter connection::stream::recv_data(char* dest, std::size_t sz)
+    future<std::size_t> connection::stream::recv_data(char* dest, std::size_t sz)
     {
-      return recv_data_awaiter{shared_from_this(), dest, sz};
+      auto prom = std::make_shared<future<std::size_t>::promise_type>();
+
+      if (in_data_overflow_.empty())
+      {
+        recv_data_promise_ = prom;
+        in_data_buf_ = asio::mutable_buffer(dest, sz);
+      }
+      else
+      {
+        std::size_t ret = 0;
+
+        char* dest_end = dest + sz;
+        while (in_data_overflow_.size() && dest < dest_end)
+        {
+          std::size_t front_size =  in_data_overflow_.front().size();
+          std::size_t remaining_in_dest = dest_end - dest;
+          if (front_size > remaining_in_dest)
+          {
+            std::memcpy(dest,  in_data_overflow_.front().data(), remaining_in_dest);
+            in_data_overflow_.front().erase(0, remaining_in_dest);
+            dest += remaining_in_dest;
+            ret += remaining_in_dest;
+          }
+          else
+          {
+            std::memcpy(dest, in_data_overflow_.front().data(), front_size);
+            dest += front_size;
+            ret += front_size;
+            in_data_overflow_.pop();
+          }
+        }
+
+        out_window_update_ += std::uint32_t(ret);
+        prom->return_value(ret);
+      }
+
+      return prom->get_return_object();
     }
 
-    connection::stream::send_headers_awaiter connection::stream::send_headers(const header_block& headers, bool end_stream)
+    future<bool> connection::stream::send_headers(const header_block& headers, bool end_stream)
     {
+      auto prom = std::make_shared<future<bool>::promise_type>();
       switch (this->state_)
       {
       case stream_state::idle:
@@ -258,6 +225,7 @@ namespace manifold
       case stream_state::open:
       case stream_state::half_closed_remote:
       {
+        connection* conn = parent_connection_;
 //        std::string header_data;
 //        v2_header_block::serialize(enc, headers, header_data);
 //
@@ -298,21 +266,25 @@ namespace manifold
           break;
         }
 
-        parent_connection_->spawn_v2_send_loop_if_needed();
-        return send_headers_awaiter{shared_from_this()};
+        send_headers_promise_ = prom;
+        if (conn)
+          conn->spawn_v2_send_loop_if_needed();
+        break;
       }
       case stream_state::reserved_remote:
       case stream_state::half_closed_local:
       case stream_state::closed:
-        return send_headers_awaiter{nullptr};
+        prom->return_value(false);
+        break;
       }
 
-      return send_headers_awaiter{nullptr};
+      return prom->get_return_object();
     }
 
-    connection::stream::send_data_awaiter connection::stream::send_data(const char* data, std::size_t sz, bool end_stream)
+    future<std::size_t> connection::stream::send_data(const char* data, std::size_t sz, bool end_stream)
     {
       // TODO: Check max_frame_size
+      auto prom = std::make_shared<future<std::size_t>::promise_type>();
       switch (this->state_)
       {
       case stream_state::open:
@@ -323,8 +295,10 @@ namespace manifold
           out_end_ = true;
         if (end_stream)
           this->state_ = stream_state::half_closed_local;
+
+        send_data_promise_ = prom;
         parent_connection_->spawn_v2_send_loop_if_needed();
-        return send_data_awaiter{shared_from_this(), sz};
+        break;
       case stream_state::half_closed_remote:
         out_data_  = data;
         out_data_sz_ = sz;
@@ -336,17 +310,19 @@ namespace manifold
           this->state_ = stream_state::closed;
           //this->on_close_ ? this->on_close_(v2_errc::no_error) : void();
         }
+        send_data_promise_ = prom;
         parent_connection_->spawn_v2_send_loop_if_needed();
-        return send_data_awaiter{shared_from_this(), sz};
+        break;
       case stream_state::reserved_remote:
       case stream_state::idle:
       case stream_state::reserved_local:
       case stream_state::half_closed_local:
       case stream_state::closed:
-        return send_data_awaiter{nullptr, 0};
+        prom->return_value(0);
+        break;
       }
 
-      return send_data_awaiter{nullptr, 0};
+      return prom->get_return_object();
     }
 
     void connection::stream::send_reset(v2_errc ec)
@@ -386,8 +362,6 @@ namespace manifold
   //            if (this->incoming_window_size_ < local_initial_window_size / 2)
   //              this->out_window_updates_.emplace(local_initial_window_size - this->incoming_window_size_);
 
-            this->in_data_.emplace(data, sz);
-
             if (end_stream)
             {
               if (this->state_ == stream_state::open)
@@ -396,9 +370,32 @@ namespace manifold
                 this->state_ = stream_state::closed;
             }
 
-            std::experimental::coroutine_handle<> coro{nullptr};
-            std::swap(coro, recv_data_coro_);
-            coro ? coro() : void();
+            if (recv_data_promise_)
+            {
+              std::size_t amount_copied;
+              if (sz > in_data_buf_.size())
+              {
+                amount_copied = in_data_buf_.size();
+                std::memcpy(in_data_buf_.data(), data, amount_copied);
+                in_data_overflow_.emplace(data + amount_copied, sz - amount_copied);
+              }
+              else
+              {
+                amount_copied = sz;
+                std::memcpy(in_data_buf_.data(), data, amount_copied);
+              }
+
+              in_data_buf_ += in_data_buf_.size();
+              out_window_update_ += static_cast<std::uint32_t>(amount_copied); // TODO: ensure sz doesn't overflow out_window_update.
+
+              auto prom = recv_data_promise_;
+              recv_data_promise_ = nullptr;
+              prom->return_value(amount_copied);
+            }
+            else
+            {
+              this->in_data_overflow_.emplace(data, sz);
+            }
           }
           break;
         }
@@ -456,11 +453,17 @@ namespace manifold
               if (end_stream)
                 this->state_ = (this->state_ == stream_state::half_closed_local ? stream_state::closed : stream_state::half_closed_remote);
             }
-            in_headers_.emplace(std::move(headers));
 
-            std::experimental::coroutine_handle<> coro{nullptr};
-            std::swap(coro, recv_headers_coro_);
-            coro ? coro() : void();
+            if (!recv_headers_promise_)
+            {
+              in_headers_.emplace(std::move(headers));
+            }
+            else
+            {
+              auto prom = recv_headers_promise_;
+              recv_headers_promise_ = nullptr;
+              prom->return_value(std::move(headers));
+            }
 
               // TODO !!!
   //          RecvMsg generic_head(std::move(headers));

@@ -61,7 +61,7 @@ namespace manifold
 
         //----------------------------------------------------------------//
         response_head& head();
-        connection::stream::send_headers_awaiter send_headers(bool end_stream = false);
+        future<bool> send_headers(bool end_stream = false);
         push_promise send_push_promise(request_head&& push_promise_headers);
         push_promise send_push_promise(const request_head& push_promise_headers);
         //----------------------------------------------------------------//

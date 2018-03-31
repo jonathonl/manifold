@@ -20,11 +20,11 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      virtual connection::stream::send_headers_awaiter send_headers(bool end_stream = false); // Must be virtual since client::request and server::response override while outgoing_message::end/send call this method.
-      connection::stream::send_data_awaiter send(const char* data, std::size_t data_sz);
-      connection::stream::send_data_awaiter send(const char* cstr) { return this->send(cstr, std::strlen(cstr)); }
+      virtual future<bool> send_headers(bool end_stream = false); // Must be virtual since client::request and server::response override while outgoing_message::end/send call this method.
+      future<std::size_t> send(const char* data, std::size_t data_sz);
+      future<std::size_t> send(const char* cstr) { return this->send(cstr, std::strlen(cstr)); }
       template <typename BufferT>
-      connection::stream::send_data_awaiter send(const BufferT& dataBuffer)
+      future<std::size_t> send(const BufferT& dataBuffer)
       {
         return this->send(dataBuffer.data(), dataBuffer.size());
       }
@@ -33,17 +33,17 @@ namespace manifold
       operator bool() const;
 
 
-      connection::stream::send_data_awaiter end(const char* data, std::size_t data_sz);
-      connection::stream::send_data_awaiter end(const char* cstr)
+      future<void> end(const char* data, std::size_t data_sz);
+      future<void> end(const char* cstr)
       {
         return this->end(std::string(cstr));
       }
       template <typename BufferT>
-      connection::stream::send_data_awaiter end(const BufferT& dataBuffer)
+      future<void> end(const BufferT& dataBuffer)
       {
         return this->end(dataBuffer.data(), dataBuffer.size());
       }
-      connection::stream::send_data_awaiter end();
+      future<void> end();
 
       //----------------------------------------------------------------//
     private:

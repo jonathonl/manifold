@@ -29,7 +29,7 @@ namespace manifold
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-    connection::stream::recv_data_awaiter incoming_message::recv(char* buf, std::size_t sz)
+    future<std::size_t> incoming_message::recv(char* buf, std::size_t sz)
     {
       return stream_->recv_data(buf, sz);
     }

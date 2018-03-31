@@ -30,31 +30,33 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    connection::stream::send_headers_awaiter outgoing_message::send_headers(bool end_stream)
+    future<bool> outgoing_message::send_headers(bool end_stream)
     {
+      bool ret = false;
       if (!this->headers_sent_)
       {
         this->headers_sent_= true;
         this->ended_ = end_stream;
-        return this->stream_->send_headers(this->message_head(), end_stream);
+        ret = co_await this->stream_->send_headers(this->message_head(), end_stream);
       }
 
-      return connection::stream::send_headers_awaiter{nullptr};
+      co_return ret;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    connection::stream::send_data_awaiter outgoing_message::send(const char* data, std::size_t data_sz)
+    future<std::size_t> outgoing_message::send(const char* data, std::size_t data_sz)
     {
+      std::size_t ret = 0;
       if (!this->headers_sent_)
-        this->send_headers();
+        bool res = co_await this->send_headers();
 
       if (!this->ended_)
       {
-        return this->stream_->send_data(data, data_sz, false);
+        ret = co_await this->stream_->send_data(data, data_sz, false);
       }
 
-      return connection::stream::send_data_awaiter{nullptr, 0};
+      co_return ret;
     }
     //----------------------------------------------------------------//
 
@@ -70,25 +72,25 @@ namespace manifold
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
     //----------------------------------------------------------------//
-    connection::stream::send_data_awaiter outgoing_message::end(const char* data, std::size_t data_sz)
+    future<void> outgoing_message::end(const char* data, std::size_t data_sz)
     {
       if (!this->headers_sent_)
-        this->send_headers();
+        bool res = co_await this->send_headers();
 
       if (!this->ended_)
       {
         // TODO: Check content length against amount sent;
         this->ended_ = true;
 
-        return this->stream_->send_data(data, data_sz, true);
+        std::size_t res = co_await this->stream_->send_data(data, data_sz, true);
       }
 
-      return connection::stream::send_data_awaiter{nullptr, 0};
+      co_return;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    connection::stream::send_data_awaiter outgoing_message::end()
+    future<void> outgoing_message::end()
     {
       return this->end("", 0);
     }
