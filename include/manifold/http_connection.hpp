@@ -160,8 +160,8 @@ namespace manifold
       static const std::uint32_t max_stream_id = 0x7FFFFFFF;
       static const std::uint32_t initial_stream_id;
 
-      connection(manifold::tls_socket&& sock, http::version http_version, std::function<std::future<void>(std::shared_ptr<connection::stream>)> on_new_stream_handler = nullptr);
-      connection(manifold::non_tls_socket&& sock, http::version http_version, std::function<std::future<void>(std::shared_ptr<connection::stream>)> on_new_stream_handler = nullptr);
+      connection(manifold::tls_socket&& sock, http::version http_version, std::function<future<void>(std::shared_ptr<connection::stream>)> on_new_stream_handler = nullptr);
+      connection(manifold::non_tls_socket&& sock, http::version http_version, std::function<future<void>(std::shared_ptr<connection::stream>)> on_new_stream_handler = nullptr);
       connection(const connection&) = delete;
       connection(connection&&) = delete;
 
@@ -196,7 +196,7 @@ namespace manifold
 //      std::queue<settings_frame> outgoing_settings_frames_;
 //      std::queue<ping_frame> outgoing_ping_frames_;
 
-      std::function<std::future<void>(std::shared_ptr<stream> stream_ptr)> on_new_stream_;
+      std::function<future<void>(std::shared_ptr<stream> stream_ptr)> on_new_stream_;
 
       std::unique_ptr<socket> socket_;
       std::uint32_t last_newly_accepted_stream_id_;

@@ -345,7 +345,7 @@ int main()
 
   http::server srv(ioservice, server_ssl_ctx, 8080);
   srv.reset_timeout(std::chrono::seconds(15));
-  srv.listen([](http::server::request req, http::server::response res) -> std::future<void>
+  srv.listen([](http::server::request req, http::server::response res) -> manifold::future<void>
   {
     std::cout << (req.head().method() + " " + req.head().path()) << std::endl;
 
@@ -359,10 +359,7 @@ int main()
     }
 
     res.head().set_status_code(200);
-    const char* s = "received.";
-    std::cout  << (void*)s << ": " << s << std::endl;
-    co_await res.send(s); //s.data(), s.size());
-    std::cout  << (void*)s << ": " << s << std::endl;
+    co_await res.send("received."); //s.data(), s.size());
 
 
     co_return;

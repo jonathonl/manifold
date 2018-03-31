@@ -586,7 +586,7 @@ namespace manifold
 
     const std::array<char,24> connection::http2_preface{{0x50, 0x52, 0x49, 0x20, 0x2a, 0x20, 0x48, 0x54, 0x54, 0x50, 0x2f, 0x32, 0x2e, 0x30, 0x0d, 0x0a, 0x0d, 0x0a, 0x53, 0x4d, 0x0d, 0x0a, 0x0d, 0x0a}};
 
-    connection::connection(manifold::tls_socket&& sock, http::version http_version, std::function<std::future<void>(std::shared_ptr<connection::stream>)> on_new_stream_handler) :
+    connection::connection(manifold::tls_socket&& sock, http::version http_version, std::function<future<void>(std::shared_ptr<connection::stream>)> on_new_stream_handler) :
       socket_(new tls_socket(std::move(sock))),
       hpack_encoder_(default_header_table_size),
       hpack_decoder_(default_header_table_size),
@@ -618,7 +618,7 @@ namespace manifold
       //asio::spawn(socket_->io_service(), std::bind(&connection::run_v2_send_loop, this, std::placeholders::_1));
     }
 
-    connection::connection(manifold::non_tls_socket&& sock, http::version http_version, std::function<std::future<void>(std::shared_ptr<connection::stream>)> on_new_stream_handler) :
+    connection::connection(manifold::non_tls_socket&& sock, http::version http_version, std::function<future<void>(std::shared_ptr<connection::stream>)> on_new_stream_handler) :
       socket_(new non_tls_socket(std::move(sock))),
       hpack_encoder_(default_header_table_size),
       hpack_decoder_(default_header_table_size),

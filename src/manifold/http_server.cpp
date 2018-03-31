@@ -50,7 +50,7 @@ namespace manifold
 
       //----------------------------------------------------------------//
       void timeout(std::chrono::system_clock::duration value);
-      void listen(const std::function<std::future<void>(server::request req, server::response res)>& handler, std::error_code& ec);
+      void listen(const std::function<future<void>(server::request req, server::response res)>& handler, std::error_code& ec);
       void close();
       //void register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler);
       void set_default_server_header(const std::string& value);
@@ -64,7 +64,7 @@ namespace manifold
       std::string host_;
       bool closed_ = false;
       std::set<std::unique_ptr<http::connection>> connections_;
-      std::function<std::future<void>(server::request req, server::response res)> request_handler_;
+      std::function<future<void>(server::request req, server::response res)> request_handler_;
       std::string default_server_header_ = "Manifold";
       std::chrono::system_clock::duration timeout_;
       //std::list<std::pair<std::regex,std::function<void(server::request&& req, server::response&& res)>>> stream_handlers_;
@@ -73,7 +73,7 @@ namespace manifold
       //----------------------------------------------------------------//
       void accept();
       void accept(asio::ssl::context& ctx);
-      std::future<void> new_stream_handler(std::shared_ptr<connection::stream> stream_ptr);
+      future<void> new_stream_handler(std::shared_ptr<connection::stream> stream_ptr);
       void manage_connection(http::connection& conn);
       //----------------------------------------------------------------//
 
@@ -277,7 +277,7 @@ namespace manifold
     }
 
     //----------------------------------------------------------------//
-    void server_impl::listen(const std::function<std::future<void>(server::request req, server::response res)>& handler, std::error_code& ec)
+    void server_impl::listen(const std::function<future<void>(server::request req, server::response res)>& handler, std::error_code& ec)
     {
       this->request_handler_ = handler;
       // Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
@@ -426,7 +426,7 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
-    std::future<void> server_impl::new_stream_handler(std::shared_ptr<connection::stream> stream_ptr)
+    future<void> server_impl::new_stream_handler(std::shared_ptr<connection::stream> stream_ptr)
     {
       http::header_block headers = co_await stream_ptr->recv_headers();
       //std::string method = headers.method();
@@ -497,7 +497,7 @@ namespace manifold
     }
 
     //----------------------------------------------------------------//
-    void server::listen(const std::function<std::future<void>(server::request req, server::response res)>& handler)
+    void server::listen(const std::function<future<void>(server::request req, server::response res)>& handler)
     {
       std::error_code ec;
       this->impl_->listen(handler, ec);
@@ -505,7 +505,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void server::listen(const std::function<std::future<void>(server::request req, server::response res)>& handler, std::error_code& ec)
+    void server::listen(const std::function<future<void>(server::request req, server::response res)>& handler, std::error_code& ec)
     {
       this->impl_->listen(handler, ec);
     }
