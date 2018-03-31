@@ -4,7 +4,7 @@
 #ifndef MANIFOLD_SOCKET_HPP
 #define MANIFOLD_SOCKET_HPP
 
-
+#include "future.hpp"
 
 #include <asio.hpp>
 #include <asio/ssl.hpp>
@@ -14,19 +14,81 @@
 namespace manifold
 {
   //================================================================//
+  template <typename Sock>
+  future<void> async_accept(asio::ip::tcp::acceptor& acceptor, Sock& peer, std::error_code& ec)
+  {
+    auto prom = std::make_shared<future<void>::promise_type>();
+    acceptor.async_accept(peer, [prom, &ec](const std::error_code& e)
+    {
+      ec = e;
+      prom->return_void();
+    });
+    return prom->get_return_object();
+  }
+
+  template <typename Sock>
+  future<void> async_handshake(asio::ssl::stream<Sock>& stream, asio::ssl::stream_base::handshake_type type, std::error_code& ec)
+  {
+    auto prom = std::make_shared<future<void>::promise_type>();
+    stream.async_handshake(type, [prom, &ec](const std::error_code& e)
+    {
+      ec = e;
+      prom->return_void();
+    });
+    return prom->get_return_object();
+  }
+
+  template <typename S, typename B>
+  future<std::size_t> async_read(S& stream, const B& buf, std::error_code& ec)
+  {
+    auto prom = std::make_shared<future<std::size_t>::promise_type>();
+    asio::async_read(stream, buf, [prom, &ec](const std::error_code& e, std::size_t amount_read)
+    {
+      ec = e;
+      prom->return_value(amount_read);
+    });
+    return prom->get_return_object();
+  }
+
+  template <typename S, typename B, typename MatchCondition>
+  future<std::size_t> async_read_until(S& stream, B& buf, MatchCondition match_condition, std::error_code& ec)
+  {
+    auto prom = std::make_shared<future<std::size_t>::promise_type>();
+    asio::async_read_until(stream, buf, match_condition, [prom, &ec](const std::error_code& e, std::size_t amount_read)
+    {
+      ec = e;
+      prom->return_value(amount_read);
+    });
+    return prom->get_return_object();
+  }
+
+  template <typename S, typename B>
+  future<std::size_t> async_write(S& stream, const B& buf, std::error_code& ec)
+  {
+    auto prom = std::make_shared<future<std::size_t>::promise_type>();
+    asio::async_write(stream, buf, [prom, &ec](const std::error_code& e, std::size_t amount_written)
+    {
+      ec = e;
+      prom->return_value(amount_written);
+    });
+    return prom->get_return_object();
+  }
+  //================================================================//
+
+  //================================================================//
   class socket
   {
   public:
     socket() {}
     virtual ~socket() {}
     virtual asio::io_service& io_service() = 0;
-    virtual std::size_t recv(char* buf, std::size_t buf_sz, asio::yield_context yctx) = 0;
+    virtual future<std::size_t> recv(char* buf, std::size_t buf_sz, std::error_code& ec) = 0;
     //virtual void recv(asio::streambuf& b, std::size_t bytes_to_recv, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
     //virtual void recv(asio::streambuf& b, std::size_t bytes_to_recv, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
     //virtual void recv_until(asio::streambuf& b, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb) = 0;
     //virtual void recv_until(asio::streambuf& b, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb) = 0;
-    virtual std::size_t recvline(char* buf, std::size_t buf_sz, asio::yield_context yctx, const std::string& delim = "\r\n") = 0;
-    virtual std::size_t send(const char*const data, std::size_t data_sz, asio::yield_context yctx) = 0;
+    virtual future<std::size_t> recvline(char* buf, std::size_t buf_sz, std::error_code& ec, const std::string& delim = "\r\n") = 0;
+    virtual future<std::size_t> send(const char*const data, std::size_t data_sz, std::error_code& ec) = 0;
     virtual void close() = 0;
     virtual void reset() = 0;
     virtual bool is_encrypted() const = 0;
@@ -61,13 +123,13 @@ namespace manifold
 
 
     asio::io_service& io_service() { return this->s_->get_io_service(); }
-    std::size_t recv(char* data, std::size_t data_sz, asio::yield_context yctx);
+    future<std::size_t> recv(char* data, std::size_t data_sz, std::error_code& ec);
     //void recv(asio::streambuf& b, std::size_t bytes_to_recv, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     //void recv(asio::streambuf& b, std::size_t bytes_to_recv, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
     //void recv_until(asio::streambuf& b, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     //void recv_until(asio::streambuf& b, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
-    std::size_t recvline(char* buf, std::size_t buf_sz, asio::yield_context yctx, const std::string& delim = "\r\n");
-    std::size_t send(const char*const data, std::size_t data_sz, asio::yield_context yctx);
+    future<std::size_t> recvline(char* buf, std::size_t buf_sz, std::error_code& ec, const std::string& delim = "\r\n");
+    future<std::size_t> send(const char*const data, std::size_t data_sz, std::error_code& ec);
     void close();
     bool is_encrypted() const { return false; }
 
@@ -75,8 +137,9 @@ namespace manifold
     operator asio::ip::tcp::socket& () { return *this->s_; }
   private:
     asio::ip::tcp::socket* s_;
+    asio::streambuf recvline_buffer_;
 
-    std::size_t recvline(char* buf, std::size_t bufSize, std::size_t putPosition, char* bufEnd, asio::yield_context yctx, const std::string& delim);
+    //std::size_t recvline(char* buf, std::size_t bufSize, std::size_t putPosition, char* bufEnd, std::error_code& ec, const std::string& delim);
   };
   //================================================================//
 
@@ -110,13 +173,13 @@ namespace manifold
     }
 
     asio::io_service& io_service() { return this->s_->get_io_service(); }
-    std::size_t recv(char* data, std::size_t data_sz, asio::yield_context yctx);
+    future<std::size_t> recv(char* data, std::size_t data_sz, std::error_code& ec);
     //void recv(asio::streambuf& b, std::size_t bytes_to_recv, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     //void recv(asio::streambuf& b, std::size_t bytes_to_recv, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
     //void recv_until(asio::streambuf& b, const std::string& delim, std::function<void(const std::error_code& ec, std::size_t bytes_read)>&& cb);
     //void recv_until(asio::streambuf& b, const std::string& delim, const std::function<void(const std::error_code& ec, std::size_t bytes_read)>& cb);
-    std::size_t recvline(char* buf, std::size_t buf_sz, asio::yield_context yctx, const std::string& delim = "\r\n");
-    std::size_t send(const char*const data, std::size_t data_sz, asio::yield_context yctx);
+    future<std::size_t> recvline(char* buf, std::size_t buf_sz, std::error_code& ec, const std::string& delim = "\r\n");
+    future<std::size_t> send(const char*const data, std::size_t data_sz, std::error_code& ec);
     void close();
     bool is_encrypted() const { return true; }
 

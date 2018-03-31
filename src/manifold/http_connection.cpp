@@ -614,7 +614,7 @@ namespace manifold
 
       this->peer_settings_ = this->local_settings_;
 
-      asio::spawn(socket_->io_service(), std::bind(&connection::run_v2_recv_loop, this, std::placeholders::_1));
+      run_v2_recv_loop();
       //asio::spawn(socket_->io_service(), std::bind(&connection::run_v2_send_loop, this, std::placeholders::_1));
     }
 
@@ -646,8 +646,9 @@ namespace manifold
 
       this->peer_settings_ = this->local_settings_;
 
-      asio::spawn(socket_->io_service(), std::bind(&connection::run_v2_recv_loop, this, std::placeholders::_1));
-      asio::spawn(socket_->io_service(), std::bind(&connection::run_v2_send_loop, this, std::placeholders::_1));
+      run_v2_recv_loop();
+//      asio::spawn(socket_->io_service(), std::bind(&connection::run_v2_recv_loop, this, std::placeholders::_1));
+//      asio::spawn(socket_->io_service(), std::bind(&connection::run_v2_send_loop, this, std::placeholders::_1));
     }
 
     http::version connection::version()
@@ -700,13 +701,13 @@ namespace manifold
 //    }
 
 
-    void connection::run_v2_recv_loop(asio::yield_context yield)
+    future<void> connection::run_v2_recv_loop()
     {
       while (!this->closed_)
       {
         std::error_code ec;
         frame_payload frame(0, frame_type::invalid_type, 0x0, 0);
-        frame_payload::recv(*this->socket_, frame, yield[ec]);
+        co_await frame_payload::recv(*this->socket_, frame, ec);
         if (ec)
         {
           this->close(v2_errc::internal_error);
@@ -764,7 +765,7 @@ namespace manifold
                   continuation_frame cframe;
                   do
                   {
-                    frame_payload::recv(*this->socket_, cframe, yield[ec]);
+                    co_await frame_payload::recv(*this->socket_, cframe, ec);
                     if (ec)
                     {
                       this->close(v2_errc::internal_error);
@@ -859,7 +860,7 @@ namespace manifold
       }
     }
 
-    void connection::run_v2_send_loop(asio::yield_context yctx)
+    future<void> connection::run_v2_send_loop()
     {
       if (!this->send_loop_running_)
       {
@@ -872,7 +873,7 @@ namespace manifold
           {
             if (this->outgoing_frames_.front().type() == frame_type::goaway)
             {
-              frame_payload::send(*this->socket_, this->outgoing_frames_.front(), yctx[ec]);
+              co_await frame_payload::send(*this->socket_, this->outgoing_frames_.front(), ec);
               outgoing_frames_.pop();
 
               this->socket_->close();
@@ -891,7 +892,7 @@ namespace manifold
             if (this->outgoing_frames_.size())
             {
               // TODO: this->data_transfer_deadline_timer_.expires_from_now(this->data_transfer_timeout_);
-              frame_payload::send(*this->socket_, this->outgoing_frames_.front(), yctx[ec]);
+              co_await frame_payload::send(*this->socket_, this->outgoing_frames_.front(), ec);
               this->outgoing_frames_.pop();
             }
             else
@@ -906,7 +907,7 @@ namespace manifold
                   hpack_encoder_.encode(stream_it->second->sendable_headers().raw_headers(), header_string);
                   bool end_stream = ((stream_it->second->state() == stream_state::half_closed_local || stream_it->second->state() == stream_state::closed) && stream_it->second->out_data_size() == 0);
                   headers_frame frame(stream_it->first, header_string.data(), header_string.size(), true, end_stream);
-                  frame_payload::send(*socket_, frame, yctx[ec]);
+                  co_await frame_payload::send(*socket_, frame, ec);
                   if (ec)
                   {
                     this->close(v2_errc::internal_error);
@@ -929,7 +930,7 @@ namespace manifold
                   bool end_stream = ((stream_it->second->state() == stream_state::half_closed_local || stream_it->second->state() == stream_state::closed) && stream_it->second->out_data_size() == data_sz);
 
                   data_frame frame(stream_it->first, data, data_sz, end_stream);
-                  frame_payload::send(*socket_, frame, yctx[ec]);
+                  co_await frame_payload::send(*socket_, frame, ec);
                   if (ec)
                   {
                     this->close(v2_errc::internal_error);
@@ -942,7 +943,7 @@ namespace manifold
                 {
                   std::uint32_t amount = stream_it->second->sendable_window_update();
                   window_update_frame frame(stream_it->first, amount);
-                  frame_payload::send(*socket_, frame, yctx[ec]);
+                  co_await frame_payload::send(*socket_, frame, ec);
                   if (ec)
                   {
                     this->close(v2_errc::internal_error);
@@ -1133,10 +1134,10 @@ namespace manifold
       return v2_errc::no_error;
     }
 
-    void connection::spawn_v2_send_loop_if_needed()
+    void connection::spawn_v2_send_loop_if_needed() // TODO: revisit corner cases.
     {
       if (!this->send_loop_running_)
-        asio::spawn(socket_->io_service(), std::bind(&connection::run_v2_send_loop, this, std::placeholders::_1));
+        connection::run_v2_send_loop();
     }
     //================================================================//
   }

@@ -140,11 +140,11 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void frame_header::recv(socket& sock, frame_header& destination, asio::yield_context yctx)
+    future<void> frame_header::recv(socket& sock, frame_header& destination, std::error_code& ec)
     {
-      std::size_t bytes_read = sock.recv(destination.metadata_.data(), 9, yctx);
+      std::size_t bytes_read = co_await sock.recv(destination.metadata_.data(), 9, ec);
 
-      if (yctx.ec_ && *yctx.ec_)
+      if (ec)
       {
 
       }
@@ -158,17 +158,18 @@ namespace manifold
           // Will be ignored.
         }
       }
-
+      co_return;
     }
     //template void frame::recv_frame<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, frame& source, const std::function<void(const std::error_code& ec)>& cb);
     //template void frame::recv_frame<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, frame& source, const std::function<void(const std::error_code& ec)>& cb);
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void frame_header::send(socket& sock, const frame_header& source, asio::yield_context yctx)
+    future<void> frame_header::send(socket& sock, const frame_header& source, std::error_code& ec)
     {
       log(source, log_dir::outgoing);
-      std::size_t bytes_transfered = sock.send(source.metadata_.data(), source.metadata_.size(), yctx);
+      std::size_t bytes_transfered = co_await sock.send(source.metadata_.data(), source.metadata_.size(), ec);
+      co_return;
     }
 
     //template void frame::send_frame<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, const frame& source, const std::function<void(const std::error_code& ec)>& cb);
@@ -186,26 +187,28 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void frame_payload::recv(socket& sock, frame_payload& destination, asio::yield_context yctx)
+    future<void> frame_payload::recv(socket& sock, frame_payload& destination, std::error_code& ec)
     {
-      frame_header::recv(sock, destination, yctx);
+      co_await frame_header::recv(sock, destination, ec);
 
       if (destination.type() != frame_type::invalid_type)
       {
         destination.buf_.resize(destination.payload_length());
-        sock.recv(destination.buf_.data(), destination.payload_length(), yctx);
+        std::size_t amount = co_await sock.recv(destination.buf_.data(), destination.payload_length(), ec);
       }
+      co_return;
     }
     //template void frame_payload::recv_frame_payload<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, frame_payload& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
     //template void frame_payload::recv_frame_payload<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, frame_payload& destination, std::uint32_t payload_size, std::uint8_t flags, const std::function<void(const std::error_code& ec)>& cb);
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void frame_payload::send(socket& sock, const frame_payload& source, asio::yield_context yctx)
+    future<void> frame_payload::send(socket& sock, const frame_payload& source, std::error_code& ec)
     {
-      frame_header::send(sock, source, yctx);
-      if (!yctx.ec_ || !yctx.ec_->value())
-        sock.send(source.buf_.data(), source.buf_.size(), yctx);
+      co_await frame_header::send(sock, source, ec);
+      if (!ec)
+        std::size_t amount = co_await sock.send(source.buf_.data(), source.buf_.size(), ec);
+      co_return;
     }
     //template void frame_payload::send_frame_payload<asio::ip::tcp::socket>(asio::ip::tcp::socket& sock, const frame_payload& source, const std::function<void(const std::error_code& ec)>& cb);
     //template void frame_payload::send_frame_payload<asio::ssl::stream<asio::ip::tcp::socket>>(asio::ssl::stream<asio::ip::tcp::socket>& sock, const frame_payload& source, const std::function<void(const std::error_code& ec)>& cb);

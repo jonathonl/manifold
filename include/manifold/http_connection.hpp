@@ -167,8 +167,8 @@ namespace manifold
 
       http::version version();
 
-      void run_v2_recv_loop(asio::yield_context yctx);
-      void run_v2_send_loop(asio::yield_context yctx);
+      future<void> run_v2_recv_loop();
+      future<void> run_v2_send_loop();
       void send_connection_level_window_update(std::int32_t amount);
 
       std::unordered_map<std::uint32_t, std::shared_ptr<stream>>::iterator find_sendable_stream(bool exclude_data);

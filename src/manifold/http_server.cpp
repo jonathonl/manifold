@@ -71,8 +71,8 @@ namespace manifold
       //----------------------------------------------------------------//
 
       //----------------------------------------------------------------//
-      void accept();
-      void accept(asio::ssl::context& ctx);
+      future<void> accept();
+      future<void> accept(asio::ssl::context& ctx);
       future<void> new_stream_handler(std::shared_ptr<connection::stream> stream_ptr);
       void manage_connection(http::connection& conn);
       //----------------------------------------------------------------//
@@ -318,111 +318,106 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void server_impl::accept()
+    future<void> server_impl::accept()
     {
-      asio::spawn(io_service_, [this](asio::yield_context yield)
+      while (acceptor_.is_open() && !this->closed_)
       {
-        while (acceptor_.is_open() && !this->closed_)
+        std::error_code ec;
+        non_tls_socket sock(io_service_);
+        co_await async_accept(acceptor_, (asio::ip::tcp::socket&)sock, ec);
+        if (ec)
         {
-          std::error_code ec;
-          non_tls_socket sock(io_service_);
-          acceptor_.async_accept((asio::ip::tcp::socket&)sock, yield[ec]);
+          std::cout << "accept error: " << ec.message() << std::endl;
+        }
+        else
+        {
+          auto res = this->connections_.emplace(std::make_unique<connection>(std::move(sock), http::version::http1_1, nullptr));
+          if (res.second)
+          {
+            //res.first->run(this->timeout_); //TODO: allow to configure.
+          }
+        }
+      }
+      co_return;
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    future<void> server_impl::accept(asio::ssl::context& ctx)
+    {
+      while (acceptor_.is_open() && !this->closed_)
+      {
+        std::error_code ec;
+        tls_socket sock(this->io_service_, ctx);
+        co_await async_accept(acceptor_, ((asio::ssl::stream<asio::ip::tcp::socket>&)sock).lowest_layer(), ec);
+        if (ec)
+        {
+          std::cout << "accept error: " << ec.message() << std::endl;
+        }
+        else
+        {
+          co_await async_handshake(((asio::ssl::stream<asio::ip::tcp::socket>&)sock), asio::ssl::stream_base::server, ec);
+
+          std::cout << "Cipher: " << SSL_CIPHER_get_name(SSL_get_current_cipher(((asio::ssl::stream<asio::ip::tcp::socket>&)sock).native_handle())) << std::endl;
+          const unsigned char* selected_alpn = nullptr;
+          unsigned int selected_alpn_sz = 0;
+          SSL_get0_alpn_selected(((asio::ssl::stream<asio::ip::tcp::socket>&)sock).native_handle(), &selected_alpn, &selected_alpn_sz);
+          std::cout << "Server ALPN: " << std::string((char*)selected_alpn, selected_alpn_sz) << std::endl;
           if (ec)
           {
-            std::cout << "accept error: " << ec.message() << std::endl;
+            std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
           }
+#ifndef MANIFOLD_DISABLE_HTTP2
+          else if (std::string((char*)selected_alpn, selected_alpn_sz) == "h2")
+          {
+            auto* preface_buf = new std::array<char, connection::http2_preface.size()>();
+            std::size_t bytes_read = co_await sock.recv(preface_buf->data(), preface_buf->size(), ec);
+
+            if (ec)
+            {
+              std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
+              std::string err = ec.message();
+              if (ec.category() == asio::error::get_ssl_category())
+              {
+                err = std::string(" (");
+                //ERR_PACK /* crypto/err/err.h */
+                char buf[128];
+                ::ERR_error_string_n(ec.value(), buf, sizeof(buf));
+                err += buf;
+              }
+            }
+            else
+            {
+              const char* t = preface_buf->data();
+              if (*preface_buf != connection::http2_preface)
+              {
+                std::cout << "Invalid Connection Preface" << ":" __FILE__ << "/" << __LINE__ << std::endl;
+              }
+              else
+              {
+                auto res = this->connections_.emplace(std::make_unique<connection>(std::move(sock), http::version::http2, std::bind(&server_impl::new_stream_handler, this, std::placeholders::_1)));
+
+                if (res.second)
+                {
+
+                  //c->run(this->timeout_, {});
+                }
+              }
+            }
+            delete preface_buf;
+          }
+#endif //MANIFOLD_DISABLE_HTTP2
           else
           {
             auto res = this->connections_.emplace(std::make_unique<connection>(std::move(sock), http::version::http1_1, nullptr));
             if (res.second)
             {
-              //res.first->run(this->timeout_); //TODO: allow to configure.
+              //res.second->run(this->timeout_); // TODO: Allow to configure
             }
           }
         }
-      });
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void server_impl::accept(asio::ssl::context& ctx)
-    {
-      asio::spawn(io_service_, [this, &ctx](asio::yield_context yield)
-      {
-        while (acceptor_.is_open() && !this->closed_)
-        {
-          std::error_code ec;
-          tls_socket sock(this->io_service_, ctx);
-          acceptor_.async_accept(((asio::ssl::stream<asio::ip::tcp::socket>&)sock).lowest_layer(), yield[ec]);
-          if (ec)
-          {
-            std::cout << "accept error: " << ec.message() << std::endl;
-          }
-          else
-          {
-            ((asio::ssl::stream<asio::ip::tcp::socket>&)sock).async_handshake(asio::ssl::stream_base::server, yield[ec]);
-
-
-            std::cout << "Cipher: " << SSL_CIPHER_get_name(SSL_get_current_cipher(((asio::ssl::stream<asio::ip::tcp::socket>&)sock).native_handle())) << std::endl;
-            const unsigned char* selected_alpn = nullptr;
-            unsigned int selected_alpn_sz = 0;
-            SSL_get0_alpn_selected(((asio::ssl::stream<asio::ip::tcp::socket>&)sock).native_handle(), &selected_alpn, &selected_alpn_sz);
-            std::cout << "Server ALPN: " << std::string((char*)selected_alpn, selected_alpn_sz) << std::endl;
-            if (ec)
-            {
-              std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
-            }
-#ifndef MANIFOLD_DISABLE_HTTP2
-            else if (std::string((char*)selected_alpn, selected_alpn_sz) == "h2")
-            {
-              auto* preface_buf = new std::array<char, connection::http2_preface.size()>();
-              std::size_t bytes_read = sock.recv(preface_buf->data(), preface_buf->size(), yield[ec]);
-
-              if (ec)
-              {
-                std::cout << ec.message() << ":" __FILE__ << "/" << __LINE__ << std::endl;
-                std::string err = ec.message();
-                if (ec.category() == asio::error::get_ssl_category())
-                {
-                  err = std::string(" (");
-                  //ERR_PACK /* crypto/err/err.h */
-                  char buf[128];
-                  ::ERR_error_string_n(ec.value(), buf, sizeof(buf));
-                  err += buf;
-                }
-              }
-              else
-              {
-                const char* t = preface_buf->data();
-                if (*preface_buf != connection::http2_preface)
-                {
-                  std::cout << "Invalid Connection Preface" << ":" __FILE__ << "/" << __LINE__ << std::endl;
-                }
-                else
-                {
-                  auto res = this->connections_.emplace(std::make_unique<connection>(std::move(sock), http::version::http2, std::bind(&server_impl::new_stream_handler, this, std::placeholders::_1)));
-
-                  if (res.second)
-                  {
-
-                    //c->run(this->timeout_, {});
-                  }
-                }
-              }
-              delete preface_buf;
-            }
-#endif //MANIFOLD_DISABLE_HTTP2
-            else
-            {
-              auto res = this->connections_.emplace(std::make_unique<connection>(std::move(sock), http::version::http1_1, nullptr));
-              if (res.second)
-              {
-                //res.second->run(this->timeout_); // TODO: Allow to configure
-              }
-            }
-          }
-        }
-      });
+      }
+      co_return;
     }
     //----------------------------------------------------------------//
 

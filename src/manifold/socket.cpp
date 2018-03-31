@@ -51,9 +51,29 @@ namespace asio
 namespace manifold
 {
   //----------------------------------------------------------------//
-  std::size_t non_tls_socket::recv(char* data, std::size_t data_sz, asio::yield_context yctx)
+  future<std::size_t> non_tls_socket::recv(char* data, std::size_t data_sz, std::error_code& ec)
   {
-    return asio::async_read(*this->s_, asio::buffer(data, data_sz), std::move(yctx));
+    std::size_t streambuf_sz = this->recvline_buffer_.size();
+    if (streambuf_sz == 0)
+    {
+      std::size_t ret =  co_await async_read(*this->s_, asio::buffer(data, data_sz), ec);
+      co_return ret;
+    }
+    else
+    {
+      std::istream is(&this->recvline_buffer_);
+      std::size_t bytes_to_read_from_socket = 0;
+      if (data_sz <= streambuf_sz)
+        is.read(data, data_sz);
+      else
+      {
+        bytes_to_read_from_socket = data_sz - streambuf_sz;
+        is.read(data, streambuf_sz);
+      }
+
+      std::size_t bytes_read = co_await async_read(*this->s_, asio::buffer(data + (data_sz - bytes_to_read_from_socket), bytes_to_read_from_socket), ec);
+      co_return (data_sz - bytes_to_read_from_socket) + bytes_read;
+    }
   }
   //----------------------------------------------------------------//
 
@@ -86,90 +106,112 @@ namespace manifold
 //  //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  std::size_t non_tls_socket::recvline(char* buf, std::size_t buf_sz, asio::yield_context yctx, const std::string& delim)
+  future<std::size_t> non_tls_socket::recvline(char* buf, std::size_t buf_sz, std::error_code& ec, const std::string& delim)
   {
     if (buf_sz < delim.size())
     {
-      if (!yctx.ec_)
-        throw  make_error_code(std::errc::value_too_large);
-      (*yctx.ec_) = make_error_code(std::errc::value_too_large);
-      return 0;
-    }
-    else
-      return this->recvline(buf, buf_sz, 0, buf, std::move(yctx), delim);
-  }
-  //----------------------------------------------------------------//
-
-  //----------------------------------------------------------------//
-  std::size_t non_tls_socket::recvline(char* buf, std::size_t buf_size, std::size_t put_position, char* buf_end, asio::yield_context yctx, const std::string& delim)
-  {
-    // TODO: Create functor to to move cb.
-    std::size_t bytes_transferred = this->s_->async_receive(asio::null_buffers(), 0,  std::move(yctx)); //[this, buf, buf_size, put_position, buf_end, delim, cb](const std::error_code& ec, std::size_t bytes_transferred) mutable
-
-    if (yctx.ec_ && (*yctx.ec_))
-    {
-      return 0;
+      ec = make_error_code(std::errc::value_too_large);
+      co_return 0;
     }
     else
     {
-      std::error_code err;
-      const size_t discard_buffer_size = 8;
-      std::size_t bytes_to_read = buf_size - put_position;
-      if (bytes_to_read > discard_buffer_size)
-        bytes_to_read = discard_buffer_size;
+      std::size_t bytes_read = co_await ::manifold::async_read_until(*this->s_, this->recvline_buffer_, recvline_match_condition(delim, buf_sz), ec); //[cb, delim, buf, buf_sz, this](const std::error_code& ec, std::size_t bytes_read)
 
-      const std::size_t bytes_actually_read = this->s_->receive(asio::buffer(buf + put_position, bytes_to_read), asio::ip::tcp::socket::message_peek, err);
-      if (err)
+      std::istream is(&this->recvline_buffer_);
+      is.read(buf, bytes_read);
+
+      if (!ec && bytes_read == buf_sz)
       {
-        if (!yctx.ec_)
-          throw err;
-        (*yctx.ec_) = err;
-        return 0;
+        char* buf_end = (buf + buf_sz);
+        if (std::search(buf_end - delim.size(), buf_end, delim.begin(), delim.end()) == buf_end)
+        {
+          ec = make_error_code(std::errc::value_too_large);
+          co_return bytes_read;
+        }
+        else
+        {
+          co_return bytes_read;
+        }
       }
       else
       {
-        assert(bytes_actually_read > 0);
-        buf_end += bytes_actually_read;
-
-        bool delim_found = false;
-        char* search_result = std::search(buf, buf_end, delim.begin(), delim.end());
-        if (search_result != buf_end)
-        {
-          buf_end = search_result + delim.size();
-          delim_found = true;
-        }
-
-        std::array<char, discard_buffer_size> discard;
-        size_t bytes_to_discard = buf_end - &buf[put_position];
-        this->s_->receive(asio::buffer(discard.data(), bytes_to_discard), 0, err);
-        put_position += bytes_to_discard;
-
-        std::size_t buf_output_size = buf_end - buf;
-        if (delim_found || err)
-        {
-          if (!yctx.ec_)
-            throw err;
-          (*yctx.ec_) = err;
-          return buf_output_size;
-        }
-        else if (buf_output_size == buf_size)
-        {
-          if (!yctx.ec_)
-            throw make_error_code(std::errc::value_too_large);
-          (*yctx.ec_) = make_error_code(std::errc::value_too_large);
-          return buf_output_size;
-        }
-        else
-          return this->recvline(buf, buf_size, put_position, buf_end, std::move(yctx), delim);
+        co_return bytes_read;
       }
     }
   }
   //----------------------------------------------------------------//
 
+//  //----------------------------------------------------------------//
+//  std::size_t non_tls_socket::recvline(char* buf, std::size_t buf_size, std::size_t put_position, char* buf_end, std::error_code& ec, const std::string& delim)
+//  {
+//    // TODO: Create functor to to move cb.
+//    std::size_t bytes_transferred = this->s_->async_receive(asio::null_buffers(), 0,  std::move(yctx)); //[this, buf, buf_size, put_position, buf_end, delim, cb](const std::error_code& ec, std::size_t bytes_transferred) mutable
+//
+//    if (yctx.ec_ && (*yctx.ec_))
+//    {
+//      return 0;
+//    }
+//    else
+//    {
+//      std::error_code err;
+//      const size_t discard_buffer_size = 8;
+//      std::size_t bytes_to_read = buf_size - put_position;
+//      if (bytes_to_read > discard_buffer_size)
+//        bytes_to_read = discard_buffer_size;
+//
+//      const std::size_t bytes_actually_read = this->s_->receive(asio::buffer(buf + put_position, bytes_to_read), asio::ip::tcp::socket::message_peek, err);
+//      if (err)
+//      {
+//        if (!yctx.ec_)
+//          throw err;
+//        (*yctx.ec_) = err;
+//        return 0;
+//      }
+//      else
+//      {
+//        assert(bytes_actually_read > 0);
+//        buf_end += bytes_actually_read;
+//
+//        bool delim_found = false;
+//        char* search_result = std::search(buf, buf_end, delim.begin(), delim.end());
+//        if (search_result != buf_end)
+//        {
+//          buf_end = search_result + delim.size();
+//          delim_found = true;
+//        }
+//
+//        std::array<char, discard_buffer_size> discard;
+//        size_t bytes_to_discard = buf_end - &buf[put_position];
+//        this->s_->receive(asio::buffer(discard.data(), bytes_to_discard), 0, err);
+//        put_position += bytes_to_discard;
+//
+//        std::size_t buf_output_size = buf_end - buf;
+//        if (delim_found || err)
+//        {
+//          if (!yctx.ec_)
+//            throw err;
+//          (*yctx.ec_) = err;
+//          return buf_output_size;
+//        }
+//        else if (buf_output_size == buf_size)
+//        {
+//          if (!yctx.ec_)
+//            throw make_error_code(std::errc::value_too_large);
+//          (*yctx.ec_) = make_error_code(std::errc::value_too_large);
+//          return buf_output_size;
+//        }
+//        else
+//          return this->recvline(buf, buf_size, put_position, buf_end, std::move(yctx), delim);
+//      }
+//    }
+//  }
+//  //----------------------------------------------------------------//
+
   //----------------------------------------------------------------//
-  std::size_t non_tls_socket::send(const char*const data, std::size_t data_sz, asio::yield_context yctx)
+  future<std::size_t> non_tls_socket::send(const char*const data, std::size_t data_sz, std::error_code& ec)
   {
-    return asio::async_write(*this->s_, asio::buffer(data, data_sz), std::move(yctx));
+    std::size_t ret = co_await async_write(*this->s_, asio::buffer(data, data_sz), ec);
+    co_return ret;
   }
   //----------------------------------------------------------------//
 
@@ -182,11 +224,14 @@ namespace manifold
   //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  std::size_t tls_socket::recv(char* data, std::size_t data_sz, asio::yield_context yctx)
+  future<std::size_t> tls_socket::recv(char* data, std::size_t data_sz, std::error_code& ec)
   {
     std::size_t streambuf_sz = this->recvline_buffer_.size();
     if (streambuf_sz == 0)
-      return asio::async_read(*this->s_, asio::buffer(data, data_sz), std::move(yctx));
+    {
+      std::size_t ret =  co_await async_read(*this->s_, asio::buffer(data, data_sz), ec);
+      co_return ret;
+    }
     else
     {
       std::istream is(&this->recvline_buffer_);
@@ -199,8 +244,8 @@ namespace manifold
         is.read(data, streambuf_sz);
       }
 
-      std::size_t bytes_read = asio::async_read(*this->s_, asio::buffer(data + (data_sz - bytes_to_read_from_socket), bytes_to_read_from_socket), std::move(yctx));
-      return (data_sz - bytes_to_read_from_socket) + bytes_read;
+      std::size_t bytes_read = co_await async_read(*this->s_, asio::buffer(data + (data_sz - bytes_to_read_from_socket), bytes_to_read_from_socket), ec);
+      co_return (data_sz - bytes_to_read_from_socket) + bytes_read;
     }
   }
   //----------------------------------------------------------------//
@@ -234,40 +279,36 @@ namespace manifold
 //  //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  std::size_t tls_socket::recvline(char* buf, std::size_t buf_sz, asio::yield_context yctx, const std::string& delim)
+  future<std::size_t> tls_socket::recvline(char* buf, std::size_t buf_sz, std::error_code& ec, const std::string& delim)
   {
     if (buf_sz < delim.size())
     {
-      if (!yctx.ec_)
-        throw make_error_code(std::errc::value_too_large);
-      (*yctx.ec_) = make_error_code(std::errc::value_too_large);
-      return 0;
+      ec = make_error_code(std::errc::value_too_large);
+      co_return 0;
     }
     else
     {
-      std::size_t bytes_read = asio::async_read_until(*this->s_, this->recvline_buffer_, recvline_match_condition(delim, buf_sz), std::move(yctx)); //[cb, delim, buf, buf_sz, this](const std::error_code& ec, std::size_t bytes_read)
+      std::size_t bytes_read = co_await ::manifold::async_read_until(*this->s_, this->recvline_buffer_, recvline_match_condition(delim, buf_sz), ec); //[cb, delim, buf, buf_sz, this](const std::error_code& ec, std::size_t bytes_read)
 
       std::istream is(&this->recvline_buffer_);
       is.read(buf, bytes_read);
 
-      if ((!yctx.ec_ || !(*yctx.ec_)) && bytes_read == buf_sz)
+      if (!ec && bytes_read == buf_sz)
       {
         char* buf_end = (buf + buf_sz);
         if (std::search(buf_end - delim.size(), buf_end, delim.begin(), delim.end()) == buf_end)
         {
-          if (!yctx.ec_)
-            throw make_error_code(std::errc::value_too_large);
-          (*yctx.ec_) = make_error_code(std::errc::value_too_large);
-          return bytes_read;
+          ec = make_error_code(std::errc::value_too_large);
+          co_return bytes_read;
         }
         else
         {
-          return bytes_read;
+          co_return bytes_read;
         }
       }
       else
       {
-        return bytes_read;
+        co_return bytes_read;
       }
     }
   }
@@ -328,9 +369,10 @@ namespace manifold
 //  //----------------------------------------------------------------//
 
   //----------------------------------------------------------------//
-  std::size_t tls_socket::send(const char*const data, std::size_t data_sz, asio::yield_context yctx)
+  future<std::size_t> tls_socket::send(const char*const data, std::size_t data_sz, std::error_code& ec)
   {
-    return asio::async_write(*this->s_, asio::buffer(data, data_sz), std::move(yctx));
+    std::size_t ret = co_await async_write(*this->s_, asio::buffer(data, data_sz), ec);
+    co_return ret;
   }
   //----------------------------------------------------------------//
 

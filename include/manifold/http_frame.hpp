@@ -69,8 +69,8 @@ namespace manifold
     {
     public:
       //----------------------------------------------------------------//
-      static void recv(manifold::socket& sock, frame_header& destination, asio::yield_context yctx);
-      static void send(manifold::socket& sock, const frame_header& source, asio::yield_context yctx);
+      static future<void> recv(manifold::socket& sock, frame_header& destination, std::error_code& ec);
+      static future<void> send(manifold::socket& sock, const frame_header& source, std::error_code& ec);
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
@@ -127,8 +127,8 @@ namespace manifold
       std::uint32_t serialized_length() const;
 
 
-      static void recv(socket& sock, frame_payload& destination, asio::yield_context yctx);
-      static void send(socket& sock, const frame_payload& source, asio::yield_context yctx);
+      static future<void> recv(socket& sock, frame_payload& destination, std::error_code& ec);
+      static future<void> send(socket& sock, const frame_payload& source, std::error_code& ec);
     };
     //================================================================//
 
