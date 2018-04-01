@@ -72,7 +72,24 @@ namespace manifold
 
     bool connection::stream::has_something_to_send(bool exclude_data) const
     {
-      return (has_sendable_headers() || (!exclude_data && has_sendable_data()) || has_sendable_window_update());
+      return (has_sendable_headers() || (!exclude_data && has_sendable_data()) || has_sendable_window_update() || has_sendable_reset());
+    }
+
+    bool connection::stream::has_sendable_reset() const
+    {
+      if (out_reset_)
+        return true;
+      return false;
+    }
+
+    v2_errc connection::stream::sendable_reset() const
+    {
+      return *out_reset_;
+    }
+
+    void connection::stream::pop_sendable_reset()
+    {
+      out_reset_ = nullptr;
     }
 
     bool connection::stream::has_sendable_headers() const
@@ -80,7 +97,7 @@ namespace manifold
       return !out_headers_.empty();
     }
 
-    const header_block& connection::stream::sendable_headers()
+    const header_block& connection::stream::sendable_headers() const
     {
       return out_headers_.front();
     }
@@ -156,6 +173,24 @@ namespace manifold
       return !in_data_overflow_.empty();
     }
 
+    bool connection::stream::adjust_local_window_size(std::int32_t amount)
+    {
+      if (amount > 0 && (amount + this->incoming_window_size_) < this->incoming_window_size_)
+        return false; // overflow
+
+      this->incoming_window_size_ = (amount + this->incoming_window_size_);
+      return true;
+    }
+
+    bool connection::stream::adjust_peer_window_size(std::int32_t amount)
+    {
+      if (amount > 0 && (amount + this->outgoing_window_size_) < this->outgoing_window_size_)
+        return false; // overflow
+
+      this->outgoing_window_size_ = (amount + this->outgoing_window_size_);
+      return true;
+    }
+
     future<header_block> connection::stream::recv_headers()
     {
 
@@ -208,7 +243,7 @@ namespace manifold
           }
         }
 
-        out_window_update_ += std::uint32_t(ret);
+        send_window_update(std::int32_t(ret));
         prom->return_value(ret);
       }
 
@@ -288,7 +323,7 @@ namespace manifold
       switch (this->state_)
       {
       case stream_state::open:
-        out_data_  = data;
+        out_data_ = data;
         out_data_sz_ = sz;
 
         if (end_stream)
@@ -325,22 +360,44 @@ namespace manifold
       return prom->get_return_object();
     }
 
-    void connection::stream::send_reset(v2_errc ec)
+    bool connection::stream::send_reset(v2_errc ec)
     {
-      // TODO: !!!
-//      switch (this->state_)
-//      {
-//      case stream_state::idle:
-//      case stream_state::closed:
-//        return false;
-//      default:
-//        this->outgoing_non_data_frames_.push(http::frame(http::rst_stream_frame(ec), this->id_));
-//        std::queue<data_frame> rmv;
-//        this->outgoing_data_frames_.swap(rmv);
-//        this->state_ = stream_state::closed;
-//        this->on_close_ ? this->on_close_(ec) : void();
-//        return true;
-//      }
+      switch (this->state_)
+      {
+      case stream_state::idle:
+      case stream_state::closed:
+        return false;
+      default:
+        this->out_reset_ = std::make_unique<v2_errc>(ec);
+        std::queue<header_block> rmv;
+        this->out_headers_.swap(rmv);
+        this->out_data_ = nullptr;
+        this->out_data_sz_ = 0;
+        this->state_ = stream_state::closed;
+        connection* conn = this->parent_connection_;
+        this->parent_connection_ = nullptr;
+        if (conn)
+          conn->spawn_v2_send_loop_if_needed();
+        return true;
+      }
+    }
+
+    bool connection::stream::send_window_update(std::int32_t amount)
+    {
+      switch (this->state_)
+      {
+      case stream_state::idle:
+      case stream_state::closed:
+      case stream_state::reserved_local:
+        return false;
+      default:
+        std::cout << "stream_wu:" << amount << std::endl;
+        this->out_window_update_ += amount;
+        this->incoming_window_size_ += amount;
+        if (this->parent_connection_)
+          this->parent_connection_->spawn_v2_send_loop_if_needed();
+        return true;
+      }
     }
 
 
@@ -358,9 +415,7 @@ namespace manifold
           }
           else
           {
-  //            this->incoming_window_size_ -= sz;
-  //            if (this->incoming_window_size_ < local_initial_window_size / 2)
-  //              this->out_window_updates_.emplace(local_initial_window_size - this->incoming_window_size_);
+            this->incoming_window_size_ -= sz;
 
             if (end_stream)
             {
@@ -386,7 +441,7 @@ namespace manifold
               }
 
               in_data_buf_ += in_data_buf_.size();
-              out_window_update_ += static_cast<std::uint32_t>(amount_copied); // TODO: ensure sz doesn't overflow out_window_update.
+              send_window_update(static_cast<std::int32_t>(amount_copied)); // TODO: ensure sz doesn't overflow out_window_update.
 
               auto prom = recv_data_promise_;
               recv_data_promise_ = nullptr;
@@ -573,10 +628,8 @@ namespace manifold
 
     v2_errc connection::stream::handle_incoming_window_update(std::int32_t window_size_increment)
     {
-      if (window_size_increment == 0 || (window_size_increment + this->outgoing_window_size_) < this->outgoing_window_size_)
+      if (!this->adjust_peer_window_size(window_size_increment))
         this->send_reset(v2_errc::flow_control_error);
-      else
-        this->outgoing_window_size_ = (window_size_increment + this->outgoing_window_size_);
       return v2_errc::no_error;
     }
     //================================================================//
@@ -806,6 +859,7 @@ namespace manifold
                     this->send_connection_level_window_update(this->local_settings_[setting_code::initial_window_size] - this->incoming_window_size_);
 
                   handle_frame_conn_error = current_stream_it->second->handle_incoming_data(tmp.data(), tmp.data_length(), this->local_settings_[setting_code::initial_window_size], tmp.has_end_stream_flag());
+                  this->spawn_v2_send_loop_if_needed();
                 }
                 break;
               }
@@ -904,55 +958,70 @@ namespace manifold
               if (stream_it != this->streams_.end())
               {
                 auto& s = *stream_it;
-                if (stream_it->second->has_sendable_headers())
+
+                if (stream_it->second->has_sendable_reset())
                 {
-                  std::string header_string;
-                  hpack_encoder_.encode(stream_it->second->sendable_headers().raw_headers(), header_string);
-                  bool end_stream = ((stream_it->second->state() == stream_state::half_closed_local || stream_it->second->state() == stream_state::closed) && stream_it->second->out_data_size() == 0);
-                  headers_frame frame(stream_it->first, header_string.data(), header_string.size(), true, end_stream);
+                  rst_stream_frame frame(stream_it->first, stream_it->second->sendable_reset());
                   co_await frame_payload::send(*socket_, frame, ec);
                   if (ec)
                   {
                     this->close(v2_errc::internal_error);
                     std::cout << "ERROR " << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
                   }
-                  stream_it->second->pop_sendable_headers();
+                  stream_it->second->pop_sendable_reset();
                 }
-
-                if (!ec && outgoing_window_size_ && stream_it->second->has_sendable_data())
+                else
                 {
-                  const char* data;
-                  std::size_t data_sz;
-                  std::tie(data, data_sz) = stream_it->second->sendable_data();
-
-                  if (data_sz > outgoing_window_size_)
-                    data_sz = outgoing_window_size_;
-
-                  outgoing_window_size_ -= data_sz;
-
-                  bool end_stream = ((stream_it->second->state() == stream_state::half_closed_local || stream_it->second->state() == stream_state::closed) && stream_it->second->out_data_size() == data_sz);
-
-                  data_frame frame(stream_it->first, data, data_sz, end_stream);
-                  co_await frame_payload::send(*socket_, frame, ec);
-                  if (ec)
+                  if (stream_it->second->has_sendable_headers())
                   {
-                    this->close(v2_errc::internal_error);
-                    std::cout << "ERROR " << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
+                    std::string header_string;
+                    hpack_encoder_.encode(stream_it->second->sendable_headers().raw_headers(), header_string);
+                    bool end_stream = ((stream_it->second->state() == stream_state::half_closed_local || stream_it->second->state() == stream_state::closed) && stream_it->second->out_data_size() == 0);
+                    headers_frame frame(stream_it->first, header_string.data(), header_string.size(), true, end_stream);
+                    co_await frame_payload::send(*socket_, frame, ec);
+                    if (ec)
+                    {
+                      this->close(v2_errc::internal_error);
+                      std::cout << "ERROR " << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
+                    }
+                    stream_it->second->pop_sendable_headers();
                   }
-                  stream_it->second->pop_sendable_data(data_sz);
-                }
 
-                if (!ec && stream_it->second->has_sendable_window_update())
-                {
-                  std::uint32_t amount = stream_it->second->sendable_window_update();
-                  window_update_frame frame(stream_it->first, amount);
-                  co_await frame_payload::send(*socket_, frame, ec);
-                  if (ec)
+                  if (!ec && outgoing_window_size_ && stream_it->second->has_sendable_data())
                   {
-                    this->close(v2_errc::internal_error);
-                    std::cout << "ERROR " << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
+                    const char* data;
+                    std::size_t data_sz;
+                    std::tie(data, data_sz) = stream_it->second->sendable_data();
+
+                    if (data_sz > outgoing_window_size_)
+                      data_sz = outgoing_window_size_;
+
+                    outgoing_window_size_ -= data_sz;
+
+                    bool end_stream = ((stream_it->second->state() == stream_state::half_closed_local || stream_it->second->state() == stream_state::closed) && stream_it->second->out_data_size() == data_sz);
+
+                    data_frame frame(stream_it->first, data, data_sz, end_stream);
+                    co_await frame_payload::send(*socket_, frame, ec);
+                    if (ec)
+                    {
+                      this->close(v2_errc::internal_error);
+                      std::cout << "ERROR " << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
+                    }
+                    stream_it->second->pop_sendable_data(data_sz);
                   }
-                  stream_it->second->pop_sendable_window_update();
+
+                  if (!ec && stream_it->second->has_sendable_window_update())
+                  {
+                    std::uint32_t amount = stream_it->second->sendable_window_update();
+                    window_update_frame frame(stream_it->first, amount);
+                    co_await frame_payload::send(*socket_, frame, ec);
+                    if (ec)
+                    {
+                      this->close(v2_errc::internal_error);
+                      std::cout << "ERROR " << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
+                    }
+                    stream_it->second->pop_sendable_window_update();
+                  }
                 }
               }
               else
@@ -1067,6 +1136,7 @@ namespace manifold
         }
 
         this->outgoing_frames_.emplace(settings_frame(ack_flag()));
+        this->spawn_v2_send_loop_if_needed();
       }
 
       return ret;
@@ -1075,12 +1145,14 @@ namespace manifold
     void connection::send_connection_level_window_update(std::int32_t amount)
     {
       outgoing_frames_.emplace(window_update_frame(0, amount));
+      // send_loop ran after stream handles incoming data.
     }
 
     void connection::close(v2_errc ec)
     {
       std::uint32_t last_stream_id = 0; // TODO:
       outgoing_frames_.emplace(goaway_frame(last_stream_id, ec, nullptr, 0));
+      this->spawn_v2_send_loop_if_needed();
     }
 
     std::unordered_map<std::uint32_t, std::shared_ptr<connection::stream>>::iterator connection::find_sendable_stream(bool exclude_data)

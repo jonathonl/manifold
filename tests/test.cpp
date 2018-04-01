@@ -359,7 +359,12 @@ int main()
     }
 
     res.head().set_status_code(200);
-    co_await res.send("received."); //s.data(), s.size());
+    for (std::size_t i = 0; i < 10 && res; ++i)
+    {
+      co_await res.send("i: " + std::to_string(i) + "\n"); //s.data(), s.size());
+    }
+
+    co_await res.end(buf);
 
 
     co_return;

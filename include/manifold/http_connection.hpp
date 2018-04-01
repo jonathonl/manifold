@@ -83,8 +83,12 @@ namespace manifold
 
         bool has_something_to_send(bool exclude_data) const;
 
+        bool has_sendable_reset() const;
+        v2_errc sendable_reset() const;
+        void pop_sendable_reset();
+
         bool has_sendable_headers() const;
-        const header_block& sendable_headers();
+        const header_block& sendable_headers() const;
         void pop_sendable_headers();
 
         bool has_sendable_data() const;
@@ -99,8 +103,8 @@ namespace manifold
         bool has_receivable_data() const;
 
 
-        bool adjust_local_window_size(std::int32_t amount) { return false; } // TODO
-        bool adjust_peer_window_size(std::int32_t amount) { return false; } // TODO
+        bool adjust_local_window_size(std::int32_t amount);
+        bool adjust_peer_window_size(std::int32_t amount);
 
         future<header_block> recv_headers();
         future<std::size_t> recv_data(char* dest, std::size_t sz);
@@ -108,7 +112,8 @@ namespace manifold
         future<bool> send_headers(const header_block& headers, bool end_stream);
         future<std::size_t> send_data(const char* data, std::size_t sz, bool end_stream);
 
-        void send_reset(v2_errc ec);
+        bool send_reset(v2_errc ec);
+        bool send_window_update(std::int32_t amount);
 
         v2_errc handle_incoming_data(const char*const data, std::size_t sz, std::int32_t local_initial_window_size, bool end_stream);
         v2_errc handle_incoming_headers(header_block&& headers, bool end_stream);
@@ -129,12 +134,14 @@ namespace manifold
         asio::mutable_buffer in_data_buf_;
         std::queue<header_block> in_headers_;
 
-        bool out_end_;
+        bool out_end_ = false;
         const char* out_data_ = nullptr;
         std::size_t out_data_sz_ = 0;
         std::queue<header_block> out_headers_;
         bool out_headers_end_stream_ = false;
-        std::uint32_t out_window_update_;
+        std::uint32_t out_window_update_ = 0;
+        std::unique_ptr<v2_errc> out_reset_;
+
         std::int32_t incoming_window_size_ = 65535;
         std::int32_t outgoing_window_size_ = 65535;
         std::uint32_t stream_dependency_id_ = 0;
