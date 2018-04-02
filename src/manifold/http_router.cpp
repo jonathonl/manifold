@@ -8,7 +8,7 @@ namespace manifold
   namespace http
   {
     //----------------------------------------------------------------//
-    void router::register_handler(const std::regex& expression, const std::function<std::future<void>(server::request&& req, server::response&& res, const std::smatch& matches)>& handler)
+    void router::register_handler(const std::regex& expression, const std::function<future<void>(server::request req, server::response res, std::smatch matches)>& handler)
     {
       if (handler)
         this->routes_.emplace_back(expression, handler);
@@ -16,7 +16,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void router::register_handler(const std::regex& expression, const std::string& method, const std::function<std::future<void>(server::request&& req, server::response&& res, const std::smatch& matches)>& handler)
+    void router::register_handler(const std::regex& expression, const std::string& method, const std::function<future<void>(server::request req, server::response res, std::smatch matches)>& handler)
     {
       if (handler)
         this->routes_.emplace_back(expression, handler, method);
@@ -24,7 +24,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    void router::route(server::request&& req, server::response&& res)
+    future<void> router::route(server::request req, server::response res)
     {
       bool both_matched = false;
       bool path_matched = false;
@@ -59,6 +59,7 @@ namespace manifold
           res.end();
         }
       }
+      co_return;
     }
     //----------------------------------------------------------------//
   }

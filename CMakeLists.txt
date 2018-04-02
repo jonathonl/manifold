@@ -100,6 +100,7 @@ add_library(manifold
             src/manifold/hpack.cpp include/manifold/hpack.hpp
             src/manifold/http_connection.cpp include/manifold/http_connection.hpp
             src/manifold/http_error_category.cpp include/manifold/http_error_category.hpp
+            src/manifold/http_file_transfer.cpp include/manifold/http_file_transfer.hpp
             src/manifold/http_frame.cpp include/manifold/http_frame.hpp
             src/manifold/http_header_block.cpp include/manifold/http_header_block.hpp
             src/manifold/http_incoming_message.cpp include/manifold/http_incoming_message.hpp

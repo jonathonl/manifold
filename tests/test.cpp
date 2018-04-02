@@ -12,7 +12,7 @@
 //#include "manifold/http_client.hpp"
 #include "manifold/http_router.hpp"
 #include "manifold/hpack.hpp"
-//#include "http_file_transfer.hpp"
+#include "manifold/http_file_transfer.hpp"
 
 //#include "mysql.hpp"
 #include <experimental/any>
@@ -314,9 +314,58 @@ void run_hpack_test()
 
 //using std::experimental::any_cast;
 //using std::experimental::any;
+using re = std::regex;
 //################################################################//
 int main()
 {
+  http::router app;
+
+  http::document_root get_doc_root("./");
+  get_doc_root.add_credentials("user", "pass");
+  app.register_handler(std::regex("^/files/(.*)$"), "HEAD", http::document_root("./"));
+  app.register_handler(std::regex("^/files/(.*)$"), "GET", std::ref(get_doc_root));
+  app.register_handler(std::regex("^/files/(.*)$"), "PUT", http::document_root("./"));
+  get_doc_root.add_credentials("user", "password");
+
+  app.register_handler(re("^/redirect-url$"), [](http::server::request req, http::server::response res, std::smatch matches) -> manifold::future<void>
+  {
+    res.head().set_status_code(http::status_code::found);
+    res.head().header("location","/new-url");
+    co_await res.end();
+    co_return;
+  });
+
+  app.register_handler(re("^/(.*)$"), [](http::server::request req, http::server::response res, std::smatch matches) -> manifold::future<void>
+  {
+    std::cout << (req.head().method() + " " + req.head().path()) << std::endl;
+
+    std::cout << "matches size: " << matches.size() << std::endl;
+    for (auto it = matches.begin(); it != matches.end(); ++it)
+    {
+      std::cout << "match: " << it->str() << std::endl;
+    }
+
+    std::string buf(1024, '\0');
+
+    while (req)
+    {
+      std::size_t amount = co_await req.recv(&buf[0], buf.size());
+      buf.resize(amount);
+      std::cout << buf << std::endl;
+    }
+
+    res.head().set_status_code(200);
+    for (std::size_t i = 0; i < 10 && res; ++i)
+    {
+      co_await res.send("i: " + std::to_string(i) + "\n"); //s.data(), s.size());
+    }
+
+    co_await res.end(buf);
+
+
+    co_return;
+  });
+
   asio::io_service ioservice;
 
   std::vector<char> chain;
@@ -345,30 +394,31 @@ int main()
 
   http::server srv(ioservice, server_ssl_ctx, 8080);
   srv.reset_timeout(std::chrono::seconds(15));
-  srv.listen([](http::server::request req, http::server::response res) -> manifold::future<void>
-  {
-    std::cout << (req.head().method() + " " + req.head().path()) << std::endl;
-
-    std::string buf(1024, '\0');
-
-    while (req)
-    {
-      std::size_t amount = co_await req.recv(&buf[0], buf.size());
-      buf.resize(amount);
-      std::cout << buf << std::endl;
-    }
-
-    res.head().set_status_code(200);
-    for (std::size_t i = 0; i < 10 && res; ++i)
-    {
-      co_await res.send("i: " + std::to_string(i) + "\n"); //s.data(), s.size());
-    }
-
-    co_await res.end(buf);
-
-
-    co_return;
-  });
+  srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+//  srv.listen([](http::server::request req, http::server::response res) -> manifold::future<void>
+//  {
+//    std::cout << (req.head().method() + " " + req.head().path()) << std::endl;
+//
+//    std::string buf(1024, '\0');
+//
+//    while (req)
+//    {
+//      std::size_t amount = co_await req.recv(&buf[0], buf.size());
+//      buf.resize(amount);
+//      std::cout << buf << std::endl;
+//    }
+//
+//    res.head().set_status_code(200);
+//    for (std::size_t i = 0; i < 10 && res; ++i)
+//    {
+//      co_await res.send("i: " + std::to_string(i) + "\n"); //s.data(), s.size());
+//    }
+//
+//    co_await res.end(buf);
+//
+//
+//    co_return;
+//  });
   ioservice.run();
 
 

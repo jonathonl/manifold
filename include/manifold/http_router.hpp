@@ -21,9 +21,9 @@ namespace manifold
       struct route
       {
         std::regex expression;
-        std::function<std::future<void>(server::request&& req, server::response&& res, const std::smatch& matches)> handler;
+        std::function<future<void>(server::request req, server::response res, std::smatch matches)> handler;
         std::string method;
-        route(const std::regex& exp, const std::function<std::future<void>(server::request&& req, server::response&& res, const std::smatch& matches)>& fn, const std::string& meth = "")
+        route(const std::regex& exp, const std::function<future<void>(server::request req, server::response res, std::smatch matches)>& fn, const std::string& meth = "")
           : expression(exp), handler(fn), method(meth)
         {}
       };
@@ -34,9 +34,9 @@ namespace manifold
       //----------------------------------------------------------------//
     public:
       //----------------------------------------------------------------//
-      void register_handler(const std::regex& expression, const std::function<std::future<void>(server::request&& req, server::response&& res, const std::smatch& matches)>& handler);
-      void register_handler(const std::regex& expression, const std::string& method, const std::function<std::future<void>(server::request&& req, server::response&& res, const std::smatch& matches)>& handler);
-      void route(server::request&& req, server::response&& res);
+      void register_handler(const std::regex& expression, const std::function<future<void>(server::request req, server::response res, std::smatch matches)>& handler);
+      void register_handler(const std::regex& expression, const std::string& method, const std::function<future<void>(server::request req, server::response res, std::smatch matches)>& handler);
+      future<void> route(server::request req, server::response res);
       //----------------------------------------------------------------//
     };
     //================================================================//

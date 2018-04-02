@@ -565,12 +565,34 @@ namespace manifold
 
       if (this->state_ != stream_state::closed)
       {
-        std::queue<data_frame> rmv;
-        this->out_data_ = nullptr;
-        this->state_= stream_state::closed;
+        {
+          std::queue<header_block> rmv;
+          in_headers_.swap(rmv);
+        }
+        {
+          std::queue<std::string> rmv;
+          in_data_overflow_.swap(rmv);
+        }
+        in_data_buf_ += in_data_buf_.size();
 
-        // TODO: resume coro
-        //this->on_close_ ? this->on_close_(int_to_v2_errc(incoming_rst_stream_frame.error_code())) : void();
+        {
+          std::queue<header_block> rmv;
+          out_headers_.swap(rmv);
+        }
+        out_data_ = nullptr;
+        out_data_sz_ = 0;
+        out_window_update_ = 0;
+        out_reset_ = nullptr;
+        state_= stream_state::closed;
+
+        if (recv_headers_promise_)
+          recv_headers_promise_->return_value(header_block());
+        if (recv_data_promise_)
+          recv_data_promise_->return_value(0);
+        if (send_headers_promise_)
+          send_headers_promise_->return_value(false);
+        if (send_data_promise_)
+          send_data_promise_->return_value(0);
       }
 
       return ret;
@@ -603,7 +625,7 @@ namespace manifold
               //              auto it = this->parent_connection_.streams_.find(this->parent_connection_.last_newly_accepted_stream_id_);
               //              assert(it != this->parent_connection_.streams_.end());
               idle_promised_stream.state_ = stream_state::reserved_remote;
-              // TODO: !!! idle_promised_stream.send_rst_stream_frame(v2_errc::refused_stream);
+              idle_promised_stream.send_reset(v2_errc::refused_stream);
               //this->parent_connection_.send_reset_stream(this->parent_connection_.last_newly_accepted_stream_id_, errc::refused_stream);
             }
             else
@@ -804,7 +826,7 @@ namespace manifold
             if (current_stream_it == this->streams_.end())
             {
               // TODO: Handle Error.
-              //self->close(errc::protocol_error); //Ignoring for now. Sending frame resets leaves the possibility for streams to be closed while frames are in flight.
+              //this->close(v2_errc::protocol_error); //Ignoring for now. Sending frame resets leaves the possibility for streams to be closed while frames are in flight.
             }
             else
             {
@@ -1150,9 +1172,18 @@ namespace manifold
 
     void connection::close(v2_errc ec)
     {
-      std::uint32_t last_stream_id = 0; // TODO:
-      outgoing_frames_.emplace(goaway_frame(last_stream_id, ec, nullptr, 0));
+      outgoing_frames_.emplace(goaway_frame(this->last_newly_accepted_stream_id_, ec, nullptr, 0));
       this->spawn_v2_send_loop_if_needed();
+
+      for (auto it = streams_.begin(); it != streams_.end(); ++it)
+      {
+        if (it->second->state() != stream_state::closed)
+        {
+          it->second->send_reset(v2_errc::internal_error); // Frame will never actually be sent. This is just being called to change state and call callback.
+        }
+      }
+
+      //self->data_transfer_deadline_timer_.cancel(); // TODO:
     }
 
     std::unordered_map<std::uint32_t, std::shared_ptr<connection::stream>>::iterator connection::find_sendable_stream(bool exclude_data)
