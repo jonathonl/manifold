@@ -38,6 +38,29 @@ namespace manifold
     return prom->get_return_object();
   }
 
+  inline future<asio::ip::tcp::resolver::iterator> async_resolve(asio::ip::tcp::resolver& tcp_resolver, asio::ip::tcp::resolver::query&& q, std::error_code& ec)
+  {
+    auto prom = std::make_shared<future<asio::ip::tcp::resolver::iterator>::promise_type>();
+    tcp_resolver.async_resolve(std::move(q), [prom, &ec](const std::error_code& e, asio::ip::tcp::resolver::iterator it)
+    {
+      ec = e;
+      prom->return_value(it);
+    });
+    return prom->get_return_object();
+  }
+
+  template <typename Sock>
+  future<void> async_connect(Sock& sock, const asio::ip::basic_resolver_entry<asio::ip::tcp>& entry, std::error_code& ec)
+  {
+    auto prom = std::make_shared<future<void>::promise_type>();
+    sock.async_connect(entry, [prom, &ec](const std::error_code& e)
+    {
+      ec = e;
+      prom->return_void();
+    });
+    return prom->get_return_object();
+  }
+
   template <typename S, typename B>
   future<std::size_t> async_read(S& stream, const B& buf, std::error_code& ec)
   {

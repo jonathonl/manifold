@@ -670,10 +670,9 @@ namespace manifold
       hpack_decoder_(default_header_table_size),
       outgoing_window_size_(default_initial_window_size),
       incoming_window_size_(default_initial_window_size),
+      next_stream_id_(on_new_stream_handler ? 2 : 1),
       on_new_stream_(on_new_stream_handler),
       protocol_version_(http_version),
-      send_loop_running_(false),
-      closed_(false),
       is_server_(on_new_stream_handler != nullptr)
     {
       // header_table_size      = 0x1, // 4096
@@ -702,10 +701,9 @@ namespace manifold
       hpack_decoder_(default_header_table_size),
       outgoing_window_size_(default_initial_window_size),
       incoming_window_size_(default_initial_window_size),
+      next_stream_id_(on_new_stream_handler ? 2 : 1),
       on_new_stream_(on_new_stream_handler),
       protocol_version_(http_version),
-      send_loop_running_(false),
-      closed_(false),
       is_server_(on_new_stream_handler != nullptr)
     {
       // header_table_size      = 0x1, // 4096
@@ -732,6 +730,40 @@ namespace manifold
     http::version connection::version()
     {
       return protocol_version_;
+    }
+
+    std::shared_ptr<connection::stream> connection::create_stream(std::uint32_t dependency_stream_id, std::uint32_t stream_id) //TODO: allow for dependency other than root.
+    {
+      std::shared_ptr<stream> ret;
+
+      //std::unique_ptr<v2_connection<SendMsg, RecvMsg>::stream> s(this->create_stream_object(stream_id));
+
+      if (stream_id == 0)
+        stream_id = this->get_next_stream_id();
+      if (stream_id)
+      {
+        auto insert_res = this->streams_.emplace(stream_id, std::make_shared<stream>(this, stream_id, this->local_settings_.at(setting_code::initial_window_size), this->peer_settings_.at(setting_code::initial_window_size)));
+        if (insert_res.second)
+        {
+//#ifndef MANIFOLD_REMOVED_PRIORITY
+//          this->stream_dependency_tree_.insert_child(stream_dependency_tree_child_node(&(insert_res.first->second)));
+//#endif
+          ret = insert_res.first->second;
+        }
+      }
+
+      return ret;
+    }
+
+    std::uint32_t connection::get_next_stream_id()
+    {
+      std::uint32_t ret = 0;
+      if (this->next_stream_id_ <= max_stream_id)
+      {
+        ret = this->next_stream_id_;
+        this->next_stream_id_ += 2;
+      }
+      return ret;
     }
 
 //    connection::stream::recv_headers_awaiter connection::recv_headers(std::uint32_t stream_id)
@@ -1172,6 +1204,7 @@ namespace manifold
 
     void connection::close(v2_errc ec)
     {
+      closed_ = true;
       outgoing_frames_.emplace(goaway_frame(this->last_newly_accepted_stream_id_, ec, nullptr, 0));
       this->spawn_v2_send_loop_if_needed();
 
@@ -1184,6 +1217,11 @@ namespace manifold
       }
 
       //self->data_transfer_deadline_timer_.cancel(); // TODO:
+    }
+
+    bool connection::is_closed() const
+    {
+      return closed_;
     }
 
     std::unordered_map<std::uint32_t, std::shared_ptr<connection::stream>>::iterator connection::find_sendable_stream(bool exclude_data)

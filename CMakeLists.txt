@@ -98,6 +98,7 @@ add_definitions(-DASIO_STANDALONE -DASIO_HAS_MOVE -DBOOST_COROUTINES_NO_DEPRECAT
 
 add_library(manifold
             src/manifold/hpack.cpp include/manifold/hpack.hpp
+            src/manifold/http_client.cpp include/manifold/http_client.hpp
             src/manifold/http_connection.cpp include/manifold/http_connection.hpp
             src/manifold/http_error_category.cpp include/manifold/http_error_category.hpp
             src/manifold/http_file_transfer.cpp include/manifold/http_file_transfer.hpp

@@ -6,29 +6,28 @@ In progress.
 ## Server
 
 ```C++
+using namespace manifold;
 asio::io_service ioservice;
 asio::ssl::context ssl_ctx(asio::ssl::context::tlsv12);
 // Add certs to context...
 
 http::router app;
-app.register_handler(std::regex("^/(.*)$"), [&app](http::server::request&& req, http::server::response&& res, const std::smatch& matches)
+app.register_handler(std::regex("^/(.*)$"), [&app](http::server::request&& req, http::server::response&& res, const std::smatch& matches) -> future<void>
 {
-  auto res_ptr = std::make_shared<http::server::response>(std::move(res));
-
-  auto req_entity = std::make_shared<std::stringstream>();
-  req.on_data([req_entity](const char*const data, std::size_t datasz)
+  std::array<char, 1024> buf;
+  std::stringstream req_entity;
+  while (req)
   {
-    req_entity->write(data, datasz);
-  });
+    std::size_t datasz = co_await req.read(buf.data(), buf.size());
+    req_entity.write(buf.data(), datasz);
+  }
 
-  req.on_end([res_ptr, req_entity, &app]()
-  {
-    auto push_promise = res_ptr->send_push_promise(http::request_head("/main.css"));
+  
+  auto push_promise = res.send_push_promise(http::request_head("/main.css"));
 
-    res_ptr->end("Received: " + req_entity->str());
-
-    push_promise.fulfill(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
-  });
+  co_await res.end("Received: " + req_entity.str());
+  
+  push_promise.fulfill(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
 });
 
 http::server srv(ioservice, 80, "0.0.0.0");

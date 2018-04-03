@@ -169,6 +169,8 @@ namespace manifold
 
       http::version version();
 
+      std::shared_ptr<stream> create_stream(std::uint32_t dependency_stream_id, std::uint32_t stream_id);
+
       future<void> run_v2_recv_loop();
       future<void> run_v2_send_loop();
       void send_connection_level_window_update(std::int32_t amount);
@@ -186,6 +188,7 @@ namespace manifold
       std::uint32_t create_client_stream();
 
       void close(v2_errc ec);
+      bool is_closed() const;
     private:
       std::minstd_rand rng_;
       hpack::decoder hpack_decoder_;
@@ -201,12 +204,13 @@ namespace manifold
       std::function<future<void>(std::shared_ptr<stream> stream_ptr)> on_new_stream_;
 
       std::unique_ptr<socket> socket_;
-      std::uint32_t last_newly_accepted_stream_id_;
+      std::uint32_t last_newly_accepted_stream_id_ = 0;
+      std::uint32_t next_stream_id_ = 0;
       std::int32_t outgoing_window_size_;
       std::int32_t incoming_window_size_;
       http::version protocol_version_;
-      bool send_loop_running_;
-      bool closed_;
+      bool send_loop_running_ = false;
+      bool closed_ = false;
       bool is_server_;
     private:
       connection& operator=(const connection&) = delete;
@@ -216,6 +220,8 @@ namespace manifold
       v2_errc handle_incoming(ping_frame&& incoming_frame);
       v2_errc handle_incoming(goaway_frame&& incoming_frame);
       v2_errc handle_incoming(window_update_frame&& incoming_frame);
+
+      std::uint32_t get_next_stream_id();
 
       void spawn_v2_send_loop_if_needed();
 

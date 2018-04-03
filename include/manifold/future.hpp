@@ -25,7 +25,7 @@ namespace manifold
       template <typename U>
       void return_value(U &&u)
       {
-        p_.set_value(std::forward<U>(u));
+        p_.set_value(std::move(u));
         if (*c_)
           (*c_)();
       }

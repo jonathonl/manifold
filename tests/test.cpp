@@ -322,9 +322,9 @@ int main()
 
   http::document_root get_doc_root("./");
   get_doc_root.add_credentials("user", "pass");
-  app.register_handler(std::regex("^/files/(.*)$"), "HEAD", http::document_root("./"));
-  app.register_handler(std::regex("^/files/(.*)$"), "GET", std::ref(get_doc_root));
-  app.register_handler(std::regex("^/files/(.*)$"), "PUT", http::document_root("./"));
+  app.register_handler(re("^/files/(.*)$"), "HEAD", http::document_root("./"));
+  app.register_handler(re("^/files/(.*)$"), "GET", std::ref(get_doc_root));
+  app.register_handler(re("^/files/(.*)$"), "PUT", http::document_root("./"));
   get_doc_root.add_credentials("user", "password");
 
   app.register_handler(re("^/redirect-url$"), [](http::server::request req, http::server::response res, std::smatch matches) -> manifold::future<void>
