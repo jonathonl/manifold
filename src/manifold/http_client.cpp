@@ -74,7 +74,9 @@ namespace manifold
     {
       if (this->stream_)
         this->end();
-      std::cout << "client::request::~request()" << std::endl;
+
+      if (this->stream_)
+        std::cout << "client::request::~request()" << std::endl;
     }
     //----------------------------------------------------------------//
 
@@ -147,7 +149,8 @@ namespace manifold
     //----------------------------------------------------------------//
     client::response::~response()
     {
-      std::cout << "client::response::~response()" << std::endl;
+      if (this->stream_)
+        std::cout << "client::response::~response()" << std::endl;
     }
     //----------------------------------------------------------------//
 
@@ -423,7 +426,7 @@ namespace manifold
     //----------------------------------------------------------------//
     client::~client()
     {
-      this->shutdown();
+      //this->shutdown();
     }
     //----------------------------------------------------------------//
 
@@ -488,9 +491,11 @@ namespace manifold
         {
           auto insert_res = this->connections_.emplace(endpoint(ep), std::move(conn));
           auto stream_ptr = insert_res->second->create_stream(0, 0);
-          bool result = co_await stream_ptr->send_headers(head, head.method() == "GET" || head.method() == "HEAD");
+          bool end_stream = head.method() == "GET" || head.method() == "HEAD";
+          request req(std::move(head), stream_ptr, ep.socket_address());
+          bool result = co_await req.send_headers(end_stream);
 
-          co_return request(std::move(head), stream_ptr, ep.socket_address());
+          co_return req;
         }
       }
 
@@ -518,11 +523,10 @@ namespace manifold
 
         ::manifold::tls_socket sock(io_service_, ssl_ctx_);
 
-        while (resolve_it != asio::ip::tcp::resolver::iterator())
+        for ( ; resolve_it != asio::ip::tcp::resolver::iterator(); ++resolve_it)
         {
           std::error_code conn_ec;
-          auto endpoint_to_try = resolve_it++;
-          co_await async_connect(((asio::ssl::stream<asio::ip::tcp::socket>&)sock).next_layer(), *endpoint_to_try, conn_ec);
+          co_await async_connect(((asio::ssl::stream<asio::ip::tcp::socket>&)sock).next_layer(), *resolve_it, conn_ec);
           if (!conn_ec)
             break;
         }

@@ -58,6 +58,8 @@ namespace manifold
     class endpoint
     {
     public:
+      static const bool secure = true;
+      static const bool plain_text = false;
       endpoint() {}
 //      endpoint(const uri& uri)
 //        : host_(uri.host()), port_(uri.port()), encrypted_(uri.scheme_name() == "https")

@@ -98,7 +98,7 @@ namespace manifold
 
         bool has_sendable_window_update() const;
         std::uint32_t sendable_window_update();
-        void pop_sendable_window_update();
+        void pop_sendable_window_update(std::uint32_t amount);
 
         bool has_receivable_data() const;
 

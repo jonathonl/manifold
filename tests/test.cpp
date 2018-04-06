@@ -9,6 +9,7 @@
 
 #include "asio.hpp"
 #include "manifold/http_server.hpp"
+#include "manifold/http_client.hpp"
 //#include "manifold/http_client.hpp"
 #include "manifold/http_router.hpp"
 #include "manifold/hpack.hpp"
@@ -368,6 +369,40 @@ int main()
 
   asio::io_service ioservice;
 
+  if (false)
+  {
+    asio::ssl::context client_ssl_ctx(asio::ssl::context::tlsv12);
+    manifold::http::client client(ioservice, client_ssl_ctx);
+
+    auto req_fn = [](manifold::http::client& client) -> manifold::future<void>
+    {
+      std::error_code ec;
+      http::request_head rh;
+
+      http::client::request req = co_await client.make_request({http::endpoint::secure, "www.google.com", 443}, rh, ec);
+      if (ec)
+      {
+        std::cerr << ec.message() << std::endl;
+      }
+      else
+      {
+        http::client::response res = co_await req.response();
+
+        std::array<char, 1024> buf;
+        while (res)
+        {
+          std::size_t amount = co_await res.recv(buf.data(), buf.size());
+          std::cout << std::string(buf.data(), amount);
+
+        }
+      }
+    };
+
+    req_fn(client);
+
+    ioservice.run();
+  }
+
   std::vector<char> chain;
   std::vector<char> key;
   std::vector<char> dhparam;
@@ -419,6 +454,35 @@ int main()
 //
 //    co_return;
 //  });
+
+  asio::ssl::context client_ssl_ctx(asio::ssl::context::tlsv12);
+  manifold::http::client client(ioservice, client_ssl_ctx);
+
+  auto req_fn = [](manifold::http::client& client) -> manifold::future<void>
+  {
+    std::error_code ec;
+    http::request_head rh;
+
+    http::client::request req = co_await client.make_request({http::endpoint::secure, "localhost", 8080}, rh, ec);
+    if (ec)
+    {
+      std::cerr << ec.message() << std::endl;
+    }
+    else
+    {
+      http::client::response res = co_await req.response();
+
+      std::array<char, 1024> buf;
+      while (res)
+      {
+        std::size_t amount = co_await res.recv(buf.data(), buf.size());
+
+      }
+    }
+  };
+
+  req_fn(client);
+
   ioservice.run();
 
 

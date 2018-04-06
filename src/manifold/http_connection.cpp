@@ -104,9 +104,11 @@ namespace manifold
 
     void connection::stream::pop_sendable_headers()
     {
-      assert(out_headers_.size());
+      //assert(out_headers_.size());
 
-      out_headers_.pop();
+      if (out_headers_.size())
+        out_headers_.pop();
+
       auto prom = send_headers_promise_;
       send_headers_promise_ = nullptr;
       if (prom)
@@ -163,9 +165,9 @@ namespace manifold
       return out_window_update_;
     }
 
-    void connection::stream::pop_sendable_window_update()
+    void connection::stream::pop_sendable_window_update(std::uint32_t amount)
     {
-      out_window_update_ = 0;
+      out_window_update_ -= amount;
     }
 
     bool connection::stream::has_receivable_data() const
@@ -279,13 +281,12 @@ namespace manifold
 
         switch (this->state_)
         {
-        case stream_state::idle:
-          this->state_ = stream_state::open;
-          break;
         case stream_state::reserved_local:
           this->state_ = stream_state::half_closed_remote;
           break;
+        case stream_state::idle:
         case stream_state::open:
+          this->state_ = stream_state::open;
           if (end_stream)
             this->state_ = stream_state::half_closed_local;
           break;
@@ -692,7 +693,8 @@ namespace manifold
       this->peer_settings_ = this->local_settings_;
 
       run_v2_recv_loop();
-      //asio::spawn(socket_->io_service(), std::bind(&connection::run_v2_send_loop, this, std::placeholders::_1));
+      this->outgoing_frames_.emplace(settings_frame());
+      run_v2_send_loop();
     }
 
     connection::connection(manifold::non_tls_socket&& sock, http::version http_version, std::function<future<void>(std::shared_ptr<connection::stream>)> on_new_stream_handler) :
@@ -723,8 +725,8 @@ namespace manifold
       this->peer_settings_ = this->local_settings_;
 
       run_v2_recv_loop();
-//      asio::spawn(socket_->io_service(), std::bind(&connection::run_v2_recv_loop, this, std::placeholders::_1));
-//      asio::spawn(socket_->io_service(), std::bind(&connection::run_v2_send_loop, this, std::placeholders::_1));
+      this->outgoing_frames_.emplace(settings_frame());
+      run_v2_send_loop();
     }
 
     http::version connection::version()
@@ -985,13 +987,12 @@ namespace manifold
             if (this->outgoing_frames_.front().type() == frame_type::goaway)
             {
               co_await frame_payload::send(*this->socket_, this->outgoing_frames_.front(), ec);
-              outgoing_frames_.pop();
-
               this->socket_->close();
 
               streams_.clear();
             }
-            this->outgoing_frames_.pop();
+            assert(outgoing_frames_.size());
+            outgoing_frames_.pop();
           }
 
           this->send_loop_running_ = false;
@@ -1011,8 +1012,7 @@ namespace manifold
               auto stream_it = this->find_sendable_stream(outgoing_window_size_ == 0);
               if (stream_it != this->streams_.end())
               {
-                auto& s = *stream_it;
-
+                std::shared_ptr<stream> current_stream = stream_it->second;
                 if (stream_it->second->has_sendable_reset())
                 {
                   rst_stream_frame frame(stream_it->first, stream_it->second->sendable_reset());
@@ -1074,7 +1074,7 @@ namespace manifold
                       this->close(v2_errc::internal_error);
                       std::cout << "ERROR " << __FILE__ << ":" << __LINE__ << " " << ec.message() << std::endl;
                     }
-                    stream_it->second->pop_sendable_window_update();
+                    stream_it->second->pop_sendable_window_update(amount); // TODO: This could have changed
                   }
                 }
               }
@@ -1093,11 +1093,7 @@ namespace manifold
       v2_errc ret = v2_errc::no_error;
       if (incoming_frame.has_ack_flag())
       {
-        if (this->pending_local_settings_.empty())
-        {
-          this->close(v2_errc::protocol_error);
-        }
-        else
+        if (!this->pending_local_settings_.empty())
         {
           auto& settings_list = this->pending_local_settings_.front();
           for (auto it = settings_list.begin(); it != settings_list.end(); ++it)
