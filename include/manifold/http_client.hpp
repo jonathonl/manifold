@@ -59,7 +59,7 @@ namespace manifold
     {
     public:
       static const bool secure = true;
-      static const bool plain_text = false;
+      static const bool plaintext = false;
       endpoint() {}
 //      endpoint(const uri& uri)
 //        : host_(uri.host()), port_(uri.port()), encrypted_(uri.scheme_name() == "https")
@@ -67,7 +67,7 @@ namespace manifold
 //        if (!port_)
 //          port_ = (unsigned short)(encrypted_ ? 443 : 80);
 //      }
-      endpoint(bool encrypted, const std::string& host, std::uint16_t port = 0)
+      endpoint(const std::string& host, bool encrypted = true, std::uint16_t port = 0)
         : host_(host), port_(port), encrypted_(encrypted)
       {
         if (!port_)
