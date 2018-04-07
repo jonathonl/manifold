@@ -472,13 +472,53 @@ namespace manifold
       co_return;
     }
 
-    // TODO:
-//    future<void> file_transfer_client::upload_file(const std::string& local_source, const uri& remote_destination, std::error_code& ec)
-//    {
-//    }
-//    future<statistics> file_transfer_client::stat_remote_file(const uri& remote_file, std::error_code& ec)
-//    {
-//    }
+
+    future<void> file_transfer_client::upload_file(const std::string& local_source, const uri& remote_destination, std::error_code& ec)
+    {
+      std::ifstream src_ifs(local_source, std::ios::binary);
+
+      if (!src_ifs.good())
+      {
+        ec = std::error_code(errno, std::system_category());
+      }
+      else
+      {
+        std::list<std::pair<std::string, std::string>> headers;
+        if (remote_destination.password().size() || remote_destination.username().size())
+          headers.emplace_back("authorization", basic_auth(remote_destination.username(), remote_destination.password()));
+
+        auto resp_head = co_await stream_client_.send_request("PUT", remote_destination, ec, headers, &src_ifs, nullptr);
+      }
+    }
+
+    future<file_transfer_client::statistics> file_transfer_client::stat_remote_file(const uri& remote_file, std::error_code& ec)
+    {
+      statistics st;
+
+      std::list<std::pair<std::string, std::string>> headers;
+      if (remote_file.password().size() || remote_file.username().size())
+        headers.emplace_back("authorization", basic_auth(remote_file.username(), remote_file.password()));
+
+      auto req_head = co_await stream_client_.send_request("HEAD", remote_file, ec, headers);
+
+      if (!ec)
+      {
+        st.file_size = 0;
+        if (req_head.header_exists("content-length"))
+          st.file_size = -1;
+        else
+        {
+          std::stringstream ss(req_head.header("content-length"));
+          ss >> st.file_size;
+        }
+
+        st.mime_type = req_head.header("content-type");
+
+        st.modification_date = req_head.header("last-modified");
+      }
+
+      co_return st;
+    }
     //================================================================//
 #if 0
     //================================================================//
