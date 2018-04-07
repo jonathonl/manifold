@@ -209,5 +209,45 @@ namespace manifold
       this->pseudo_header(":status", std::to_string((unsigned short)value));
     }
     //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool response_head::has_informational_status() const
+    {
+      std::uint16_t status = this->get_status_code();
+      return (status >= 100 && status < 200);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool response_head::has_successful_status() const
+    {
+      std::uint16_t status = this->get_status_code();
+      return (status >= 200 && status < 300);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool response_head::has_redirection_status() const
+    {
+      std::uint16_t status = this->get_status_code();
+      return (status >= 300 && status < 400);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool response_head::has_client_error_status() const
+    {
+      std::uint16_t status = this->get_status_code();
+      return (status >= 400 && status < 500);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    bool response_head::has_server_error_status() const
+    {
+      std::uint16_t status = this->get_status_code();
+      return (status >= 500 && status < 600);
+    }
+    //----------------------------------------------------------------//
   }
 }

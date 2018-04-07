@@ -111,6 +111,7 @@ add_library(manifold
             src/manifold/http_request_head.cpp include/manifold/http_request_head.hpp
             src/manifold/http_router.cpp include/manifold/http_router.hpp
             src/manifold/http_server.cpp include/manifold/http_server.hpp
+            src/manifold/http_stream_client.cpp include/manifold/http_stream_client.hpp
             src/manifold/socket.cpp include/manifold/socket.hpp
             src/manifold/uniform_resource_identifier.cpp include/manifold/uniform_resource_identifier.hpp)
 

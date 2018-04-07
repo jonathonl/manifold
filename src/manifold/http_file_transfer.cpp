@@ -363,6 +363,123 @@ namespace manifold
       }
     }
     //================================================================//
+
+    //================================================================//
+    file_transfer_client::file_transfer_client(asio::io_service& io_ctx) :
+      stream_client_(io_ctx)
+    {
+      auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+      std::uint32_t arr[3] = {(std::uint32_t) (0xFFFFFFFF & (millis >> 32)), (std::uint32_t) std::clock(), (std::uint32_t) (0xFFFFFFFF & millis)};
+      std::seed_seq seq(std::begin(arr), std::end(arr));
+      this->rng_.seed(seq);
+    }
+
+    future<void> file_transfer_client::download_file(const uri& remote_source, const std::string& local_destination, std::error_code& ec)
+    {
+      std::string tmp_file_path;
+      if (is_directory(local_destination))
+      {
+        tmp_file_path = local_destination;
+        if (tmp_file_path.size() && (tmp_file_path.back() != '/' && tmp_file_path.back() != '\\'))
+          tmp_file_path.push_back('/');
+      }
+      else
+      {
+        tmp_file_path = directory(local_destination);
+      }
+
+      tmp_file_path += (gen_uuid_str(this->rng_) + ".tmp");
+
+      std::ofstream dest_ofs(tmp_file_path, std::ios::binary);
+
+      if (!dest_ofs.good())
+      {
+        ec = std::error_code(errno, std::system_category());
+      }
+      else
+      {
+        std::list<std::pair<std::string, std::string>> headers;
+        if (remote_source.password().size() || remote_source.username().size())
+          headers.emplace_back("authorization", basic_auth(remote_source.username(), remote_source.password()));
+
+        auto resp_head = co_await stream_client_.send_request("GET", remote_source, ec, headers, nullptr, &dest_ofs);
+
+        dest_ofs.close();
+
+        if (ec)
+        {
+          std::remove(tmp_file_path.c_str());
+          co_return;
+        }
+        else
+        {
+          std::string local_file_path = local_destination;
+          std::replace(local_file_path.begin(), local_file_path.end(), '\\', '/');
+          if (is_directory(local_file_path))
+          {
+            if (local_file_path.size() && local_file_path.back() != '/')
+              local_file_path += "/";
+            std::string content_disposition = resp_head.header("content-disposition");
+            std::string filename;
+            std::regex exp(".*filename=(?:\"([^\"]*)\"|([^\\s;]*)).*", std::regex::ECMAScript);
+            std::smatch sm;
+            if (std::regex_match(content_disposition, sm, exp))
+            {
+              if (sm[1].matched)
+                filename = basename(sm[1].str());
+              else if (sm[2].matched)
+                filename = basename(sm[2].str());
+            }
+            else
+            {
+              filename = basename(remote_source.path());
+            }
+
+            if (filename.empty() || filename == "." || filename == "/")
+              filename = "file";
+            local_file_path += filename;
+          }
+
+          std::string destination_file_path = local_file_path;
+
+
+          if (false) // TODO: !ops.replace_existing_file)
+          {
+            for (std::size_t i = 1; path_exists(destination_file_path); ++i)
+            {
+              std::stringstream ss;
+              ss << directory(local_file_path) << basename_sans_extension(local_file_path) << "_" << i << extension(local_file_path);
+              destination_file_path = ss.str();
+            }
+          }
+          else if (is_regular_file(destination_file_path))
+          {
+            std::remove(destination_file_path.c_str());
+          }
+
+          if (std::rename(tmp_file_path.c_str(), destination_file_path.c_str()) != 0)
+          {
+            std::remove(tmp_file_path.c_str());
+            ec = std::error_code(errno, std::system_category());
+          }
+          else
+          {
+            std::remove(tmp_file_path.c_str());
+          }
+        }
+      }
+
+      co_return;
+    }
+
+    // TODO:
+//    future<void> file_transfer_client::upload_file(const std::string& local_source, const uri& remote_destination, std::error_code& ec)
+//    {
+//    }
+//    future<statistics> file_transfer_client::stat_remote_file(const uri& remote_file, std::error_code& ec)
+//    {
+//    }
+    //================================================================//
 #if 0
     //================================================================//
     const char* file_transfer_error_category_impl::name() const noexcept

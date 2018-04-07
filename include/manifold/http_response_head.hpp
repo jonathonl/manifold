@@ -85,6 +85,12 @@ namespace manifold
       unsigned short get_status_code() const;
       void set_status_code(unsigned short value);
       void set_status_code(http::status_code value);
+
+      bool has_informational_status() const;
+      bool has_successful_status() const;
+      bool has_redirection_status() const;
+      bool has_client_error_status() const;
+      bool has_server_error_status() const;
       //----------------------------------------------------------------//
     };
     //================================================================//

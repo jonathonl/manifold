@@ -1,5 +1,5 @@
 # Manifold
-A lightweight http/2 library.
+An elegant http/2 library using coroutines TS.
 
 In progress.
 
@@ -18,8 +18,8 @@ app.register_handler(std::regex("^/(.*)$"), [&app](http::server::request req, ht
   std::stringstream req_entity;
   while (req)
   {
-    std::size_t datasz = co_await req.read(buf.data(), buf.size());
-    req_entity.write(buf.data(), datasz);
+    std::size_t datasz = co_await req.recv(buf.data(), buf.size());
+    req_entity.send(buf.data(), datasz);
   }
 
   
@@ -46,28 +46,32 @@ asio::io_service ioservice;
 asio::ssl::context ssl_ctx(asio::ssl::context::tlsv12);
 
 http::client user_agent(ioservice, ssl_ctx);
-auto req = co_await user_agent.make_request("www.example.com", 8080, http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}}), ec);
-if (ec)
+[](http::client& user_agent) -> future<void>
 {
-  // Handle connect error...
-}
-else
-{
-  co_await req.end("name=value&name2=value2");
-  
-  auto res = co_await req.response()
-  if (!res.head().has_successful_status())
-    res.cancel();
+  auto req = co_await user_agent.make_request("www.example.com", 8080, http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}}), ec);
+  if (ec)
+  {
+    // Handle connect error...
+  }
   else
   {
-    std::array<char, 1024> buf;
-    while (res)
+    co_await req.end("name=value&name2=value2");
+    
+    auto res = co_await req.response()
+    if (!res.head().has_successful_status())
+      res.cancel();
+    else
     {
-      std::size_t cnt = co_await res.recv(buf.data(), buf.size());
-      // ...
+      std::ofstream ofs("/tmp/foobar", std::ios::binary);
+      std::array<char, 1024> buf;
+      while (res)
+      {
+        std::size_t datasz = co_await res.recv(buf.data(), buf.size());
+        ofs.write(buf.data(), datasz):
+      }
     }
   }
-}
+}(user_agent);
 
 ioservice.run();
 ```
@@ -104,5 +108,6 @@ for (auto it : recv_headers)
 ```
 
 ## Dependencies
-* Non-boost version of asio.
+* Non-boost version of ASIO.
 * OpenSSL.
+* Compiler supporting C++ coroutines.
