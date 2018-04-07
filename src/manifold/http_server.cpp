@@ -38,67 +38,6 @@ namespace manifold
       return SSL_TLSEXT_ERR_NOACK;
     }
 
-    //================================================================//
-    class server_impl : public std::enable_shared_from_this<server_impl>
-    {
-    public:
-      //----------------------------------------------------------------//
-      server_impl(asio::io_service& ioService, unsigned short port = 80, const std::string& host = "0.0.0.0");
-      server_impl(asio::io_service& ioService, asio::ssl::context& ctx, unsigned short port = 443, const std::string& host = "0.0.0.0");
-      ~server_impl();
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-      void timeout(std::chrono::system_clock::duration value);
-      void listen(const std::function<future<void>(server::request req, server::response res)>& handler, std::error_code& ec);
-      void close();
-      //void register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler);
-      void set_default_server_header(const std::string& value);
-      //----------------------------------------------------------------//
-    private:
-      //----------------------------------------------------------------//
-      asio::io_service& io_service_;
-      asio::ip::tcp::acceptor acceptor_;
-      asio::ssl::context* ssl_context_;
-      unsigned short port_;
-      std::string host_;
-      bool closed_ = false;
-      std::set<std::unique_ptr<http::connection>> connections_;
-      std::function<future<void>(server::request req, server::response res)> request_handler_;
-      std::string default_server_header_ = "Manifold";
-      std::chrono::system_clock::duration timeout_;
-      //std::list<std::pair<std::regex,std::function<void(server::request&& req, server::response&& res)>>> stream_handlers_;
-      //----------------------------------------------------------------//
-
-      //----------------------------------------------------------------//
-      future<void> accept();
-      future<void> accept(asio::ssl::context& ctx);
-      future<void> new_stream_handler(std::shared_ptr<connection::stream> stream_ptr);
-      void manage_connection(http::connection& conn);
-      //----------------------------------------------------------------//
-
-      // TODO: Set enable_push in v2_connection
-//#ifndef MANIFOLD_DISABLE_HTTP2
-//      //================================================================//
-//      class v2_connection : public http::v2_connection<response_head, request_head>
-//      {
-//      public:
-//        v2_connection(non_tls_socket&& sock)
-//          : http::v2_connection<response_head, request_head>(std::move(sock))
-//        {
-//          this->local_settings_[setting_code::enable_push] = 0;
-//        }
-//        v2_connection(tls_socket&& sock)
-//          : http::v2_connection<response_head, request_head>(std::move(sock))
-//        {
-//          this->local_settings_[setting_code::enable_push] = 0;
-//        }
-//      };
-//      //================================================================//
-//#endif //MANIFOLD_DISABLE_HTTP2
-    };
-    //================================================================//
-
     //----------------------------------------------------------------//
     server::request::request(request_head&& head, const std::shared_ptr<connection::stream>& stream_ptr)
       : incoming_message(stream_ptr)
@@ -224,7 +163,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server_impl::server_impl(asio::io_service& ioservice, unsigned short port, const std::string& host)
+    server::server(asio::io_service& ioservice, unsigned short port, const std::string& host)
       : io_service_(ioservice),
         acceptor_(io_service_),
         ssl_context_(nullptr)
@@ -235,7 +174,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server_impl::server_impl(asio::io_service& ioservice, asio::ssl::context& ctx, unsigned short port, const std::string& host)
+    server::server(asio::io_service& ioservice, asio::ssl::context& ctx, unsigned short port, const std::string& host)
       : io_service_(ioservice),
       acceptor_(io_service_),
       ssl_context_(&ctx)
@@ -265,44 +204,13 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
-    server_impl::~server_impl()
-    {
-      this->close();
-    }
-    //----------------------------------------------------------------//
-
-    void server_impl::timeout(std::chrono::system_clock::duration value)
+    void server::reset_timeout(std::chrono::system_clock::duration value)
     {
       this->timeout_ = value;
     }
 
     //----------------------------------------------------------------//
-    void server_impl::listen(const std::function<future<void>(server::request req, server::response res)>& handler, std::error_code& ec)
-    {
-      this->request_handler_ = handler;
-      // Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
-      //asio::ip::tcp::resolver resolver(io_service_);
-      //asio::ip::tcp::endpoint endpoint = *(resolver.resolve({host, std::to_string(port)}));
-      auto ep = asio::ip::tcp::endpoint(asio::ip::address::from_string(this->host_), this->port_);
-
-      acceptor_.open(ep.protocol(), ec);
-      if (!ec) acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true), ec);
-      if (!ec) acceptor_.bind(ep, ec);
-      if (!ec) acceptor_.listen(asio::socket_base::max_connections, ec);
-
-      if (!ec)
-      {
-        if (this->ssl_context_)
-          this->accept(*this->ssl_context_);
-        else
-          this->accept();
-      }
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void server_impl::close()
+    void server::close()
     {
       if (!this->closed_)
       {
@@ -319,7 +227,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    future<void> server_impl::accept()
+    future<void> server::accept()
     {
       while (acceptor_.is_open() && !this->closed_)
       {
@@ -344,7 +252,7 @@ namespace manifold
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    future<void> server_impl::accept(asio::ssl::context& ctx)
+    future<void> server::accept(asio::ssl::context& ctx)
     {
       while (acceptor_.is_open() && !this->closed_)
       {
@@ -396,7 +304,7 @@ namespace manifold
               }
               else
               {
-                auto res = this->connections_.emplace(std::make_unique<connection>(std::move(sock), http::version::http2, std::bind(&server_impl::new_stream_handler, this, std::placeholders::_1)));
+                auto res = this->connections_.emplace(std::make_unique<connection>(std::move(sock), http::version::http2, std::bind(&server::new_stream_handler, this, std::placeholders::_1)));
 
                 if (res.second)
                 {
@@ -422,7 +330,7 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
-    future<void> server_impl::new_stream_handler(std::shared_ptr<connection::stream> stream_ptr)
+    future<void> server::new_stream_handler(std::shared_ptr<connection::stream> stream_ptr)
     {
       http::header_block headers = co_await stream_ptr->recv_headers();
       //std::string method = headers.method();
@@ -432,9 +340,9 @@ namespace manifold
         this->request_handler_(server::request(std::move(headers), stream_ptr), server::response(response_head(), stream_ptr, "", ""));
     }
 
-    //----------------------------------------------------------------//
-    void server_impl::manage_connection(http::connection& conn)
-    {
+// TODO: default push_promise and cleaning up stale connections.
+//   void server_impl::manage_connection(http::connection& conn)
+//   {
 //      conn->on_new_stream([this, conn](std::int32_t stream_id)
 //      {
 //        conn->on_headers(stream_id, [conn, stream_id, this](request_head&& headers)
@@ -454,70 +362,20 @@ namespace manifold
 //      {
 //        this->connections_.erase(conn);
 //      });
-    }
-    //----------------------------------------------------------------//
+//  }
+
 
     //----------------------------------------------------------------//
-    void server_impl::set_default_server_header(const std::string& value)
+    void server::set_default_server_header(const std::string& value)
     {
       this->default_server_header_ = value;
     }
     //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    server::server(asio::io_service& ioservice, unsigned short port, const std::string& host)
-      : impl_(std::make_shared<server_impl>(ioservice, port, host))
-    {
-      this->reset_timeout();
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    server::server(asio::io_service& ioservice, asio::ssl::context& ctx, unsigned short port, const std::string& host)
-      : impl_(std::make_shared<server_impl>(ioservice, ctx, port, host))
-    {
-      this->reset_timeout();
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
     server::~server()
     {
-      this->impl_->close();
-    }
-    //----------------------------------------------------------------//
-
-    void server::reset_timeout(std::chrono::system_clock::duration value)
-    {
-      this->impl_->timeout(value);
-    }
-
-    //----------------------------------------------------------------//
-    void server::listen(const std::function<future<void>(server::request req, server::response res)>& handler)
-    {
-      std::error_code ec;
-      this->impl_->listen(handler, ec);
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void server::listen(const std::function<future<void>(server::request req, server::response res)>& handler, std::error_code& ec)
-    {
-      this->impl_->listen(handler, ec);
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void server::close()
-    {
-      this->impl_->close();
-    }
-    //----------------------------------------------------------------//
-
-    //----------------------------------------------------------------//
-    void server::set_default_server_header(const std::string& value)
-    {
-      this->impl_->set_default_server_header(value);
+      this->close();
     }
     //----------------------------------------------------------------//
   }

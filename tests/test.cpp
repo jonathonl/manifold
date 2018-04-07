@@ -429,7 +429,7 @@ int main()
 
   http::server srv(ioservice, server_ssl_ctx, 8080);
   srv.reset_timeout(std::chrono::seconds(15));
-  srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+  srv.listen(std::ref(app));
 //  srv.listen([](http::server::request req, http::server::response res) -> manifold::future<void>
 //  {
 //    std::cout << (req.head().method() + " " + req.head().path()) << std::endl;

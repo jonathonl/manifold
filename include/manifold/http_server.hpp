@@ -118,8 +118,11 @@ namespace manifold
 
       //----------------------------------------------------------------//
       void reset_timeout(std::chrono::system_clock::duration value = std::chrono::system_clock::duration::max());
-      void listen(const std::function<future<void>(server::request req, server::response res)>& handler);
-      void listen(const std::function<future<void>(server::request req, server::response res)>& handler, std::error_code& ec);
+
+      template <typename Handler>
+      void listen(Handler handler);
+      template <typename Handler>
+      void listen(Handler handler, std::error_code& ec);
       void close();
       //void register_handler(const std::regex& expression, const std::function<void(server::request&& req, server::response&& res)>& handler);
       void set_default_server_header(const std::string& value);
@@ -155,9 +158,57 @@ namespace manifold
       }
       //----------------------------------------------------------------//
     private:
-      std::shared_ptr<class server_impl> impl_;
+      future<void> accept();
+      future<void> accept(asio::ssl::context& ctx);
+      future<void> new_stream_handler(std::shared_ptr<connection::stream> stream_ptr);
+    private:
+      asio::io_service& io_service_;
+      asio::ip::tcp::acceptor acceptor_;
+      asio::ssl::context* ssl_context_;
+      unsigned short port_;
+      std::string host_;
+      bool closed_ = false;
+      std::set<std::unique_ptr<http::connection>> connections_;
+      std::function<future<void>(server::request req, server::response res)> request_handler_;
+      std::string default_server_header_ = "Manifold";
+      std::chrono::system_clock::duration timeout_;
+      //std::list<std::pair<std::regex,std::function<void(server::request&& req, server::response&& res)>>> stream_handlers_;
     };
     //================================================================//
+
+    //----------------------------------------------------------------//
+    template <typename Handler>
+    void server::listen(Handler handler)
+    {
+      std::error_code ec;
+      this->listen(handler, ec);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    template <typename Handler>
+    void server::listen(Handler handler, std::error_code& ec)
+    {
+      this->request_handler_ = handler;
+      // Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
+      //asio::ip::tcp::resolver resolver(io_service_);
+      //asio::ip::tcp::endpoint endpoint = *(resolver.resolve({host, std::to_string(port)}));
+      auto ep = asio::ip::tcp::endpoint(asio::ip::address::from_string(this->host_), this->port_);
+
+      acceptor_.open(ep.protocol(), ec);
+      if (!ec) acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true), ec);
+      if (!ec) acceptor_.bind(ep, ec);
+      if (!ec) acceptor_.listen(asio::socket_base::max_connections, ec);
+
+      if (!ec)
+      {
+        if (this->ssl_context_)
+          this->accept(*this->ssl_context_);
+        else
+          this->accept();
+      }
+    }
+    //----------------------------------------------------------------//
   }
 }
 

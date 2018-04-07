@@ -12,7 +12,7 @@ asio::ssl::context ssl_ctx(asio::ssl::context::tlsv12);
 // Add certs to context...
 
 http::router app;
-app.register_handler(std::regex("^/(.*)$"), [&app](http::server::request&& req, http::server::response&& res, const std::smatch& matches) -> future<void>
+app.register_handler(std::regex("^/(.*)$"), [&app](http::server::request req, http::server::response res, std::smatch matches) -> future<void>
 {
   std::array<char, 1024> buf;
   std::stringstream req_entity;
@@ -27,14 +27,14 @@ app.register_handler(std::regex("^/(.*)$"), [&app](http::server::request&& req, 
 
   co_await res.end("Received: " + req_entity.str());
   
-  push_promise.fulfill(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+  push_promise.fulfill(std::ref(app));
 });
 
 http::server srv(ioservice, 80, "0.0.0.0");
-srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+srv.listen(std::ref(app));
 
 http::server ssl_srv(ioservice, ssl_ctx, 443, "0.0.0.0");
-ssl_srv.listen(std::bind(&http::router::route, &app, std::placeholders::_1, std::placeholders::_2));
+ssl_srv.listen(std::ref(app));
 
 ioservice.run();
 ```

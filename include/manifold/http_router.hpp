@@ -37,6 +37,7 @@ namespace manifold
       void register_handler(const std::regex& expression, const std::function<future<void>(server::request req, server::response res, std::smatch matches)>& handler);
       void register_handler(const std::regex& expression, const std::string& method, const std::function<future<void>(server::request req, server::response res, std::smatch matches)>& handler);
       future<void> route(server::request req, server::response res);
+      future<void> operator()(server::request req, server::response res);
       //----------------------------------------------------------------//
     };
     //================================================================//

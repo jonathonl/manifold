@@ -23,8 +23,13 @@ namespace manifold
     }
     //----------------------------------------------------------------//
 
-    //----------------------------------------------------------------//
     future<void> router::route(server::request req, server::response res)
+    {
+      return router::operator()(std::move(req), std::move(res));
+    }
+
+    //----------------------------------------------------------------//
+    future<void> router::operator()(server::request req, server::response res)
     {
       bool both_matched = false;
       bool path_matched = false;
