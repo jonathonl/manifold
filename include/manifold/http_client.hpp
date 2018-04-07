@@ -51,64 +51,58 @@
 //  std::cout << &a << std::endl;
 //};
 
-namespace manifold
-{
-  namespace http
-  {
-    class endpoint
-    {
-    public:
-      static const bool secure = true;
-      static const bool plaintext = false;
-      endpoint() {}
-//      endpoint(const uri& uri)
-//        : host_(uri.host()), port_(uri.port()), encrypted_(uri.scheme_name() == "https")
+//namespace manifold
+//{
+//  namespace http
+//  {
+//    class endpoint
+//    {
+//    public:
+//      static const bool secure = true;
+//      static const bool plaintext = false;
+//      endpoint() {}
+//      endpoint(const std::string& host, bool encrypted = true, std::uint16_t port = 0)
+//        : host_(host), port_(port), encrypted_(encrypted)
 //      {
 //        if (!port_)
 //          port_ = (unsigned short)(encrypted_ ? 443 : 80);
 //      }
-      endpoint(const std::string& host, bool encrypted = true, std::uint16_t port = 0)
-        : host_(host), port_(port), encrypted_(encrypted)
-      {
-        if (!port_)
-          port_ = (unsigned short)(encrypted_ ? 443 : 80);
-      }
-
-      bool operator==(const endpoint& other) const
-      {
-        return (this->host_ == other.host_ && this->port_ == other.port_ && this->encrypted_ == other.encrypted_);
-      }
-
-      const std::string& host() const { return host_; }
-      unsigned short port() const { return port_; }
-      bool encrypted() const { return encrypted_; }
-      std::string socket_address() const
-      {
-        std::stringstream ret;
-        ret << this->host_ << ":" << this->port_;
-        return ret.str();
-      }
-    private:
-      std::string host_;
-      std::uint16_t port_;
-      bool encrypted_;
-    };
-
-    class non_tls_session;
-
-    class tls_session;
-  }
-}
-
-namespace std
-{
-  template <>
-  struct hash<manifold::http::endpoint>
-  {
-  public:
-    size_t operator()(const manifold::http::endpoint& ep) const;
-  };
-}
+//
+//      bool operator==(const endpoint& other) const
+//      {
+//        return (this->host_ == other.host_ && this->port_ == other.port_ && this->encrypted_ == other.encrypted_);
+//      }
+//
+//      const std::string& host() const { return host_; }
+//      unsigned short port() const { return port_; }
+//      bool encrypted() const { return encrypted_; }
+//      std::string socket_address() const
+//      {
+//        std::stringstream ret;
+//        ret << this->host_ << ":" << this->port_;
+//        return ret.str();
+//      }
+//    private:
+//      std::string host_;
+//      std::uint16_t port_;
+//      bool encrypted_;
+//    };
+//
+//    class non_tls_session;
+//
+//    class tls_session;
+//  }
+//}
+//
+//namespace std
+//{
+//  template <>
+//  struct hash<manifold::http::endpoint>
+//  {
+//  public:
+//    size_t operator()(const manifold::http::endpoint& ep) const;
+//  };
+//}
 
 namespace manifold
 {
@@ -157,18 +151,20 @@ namespace manifold
       };
       //================================================================//
 
+      client(asio::io_service& ioservice);
       client(asio::io_service& ioservice, asio::ssl::context& ctx);
       ~client();
 
       void reset_timeout(std::chrono::system_clock::duration value = std::chrono::system_clock::duration::max());
 
       void shutdown();
-      future<request> make_request(const endpoint& ep, request_head head, std::error_code& ec);
+      future<request> make_request(const std::string& host, request_head head, std::error_code& ec);
+      future<request> make_request(const std::string& host, std::uint16_t port, request_head head, std::error_code& ec);
     private:
       asio::io_service& io_service_;
-      asio::ssl::context& ssl_ctx_;
+      asio::ssl::context* ssl_ctx_;
       asio::ip::tcp::resolver tcp_resolver_;
-      std::unordered_multimap<endpoint, std::unique_ptr<connection>> connections_;
+      std::unordered_multimap<std::string, std::unique_ptr<connection>> connections_;
 //      std::unordered_multimap<endpoint,std::shared_ptr<non_tls_session>> non_tls_sessions_;
 //      std::unordered_multimap<endpoint,std::shared_ptr<tls_session>> tls_sessions_;
       std::chrono::system_clock::duration timeout_;

@@ -379,7 +379,7 @@ int main()
       std::error_code ec;
       http::request_head rh;
 
-      http::client::request req = co_await client.make_request({"www.google.com", http::endpoint::secure, 443}, rh, ec);
+      http::client::request req = co_await client.make_request("www.google.com", 443, rh, ec);
       if (ec)
       {
         std::cerr << ec.message() << std::endl;
@@ -463,7 +463,7 @@ int main()
     std::error_code ec;
     http::request_head rh;
 
-    http::client::request req = co_await client.make_request({"localhost", http::endpoint::secure, 8080}, rh, ec);
+    http::client::request req = co_await client.make_request("localhost", 8080, rh, ec);
     if (ec)
     {
       std::cerr << ec.message() << std::endl;

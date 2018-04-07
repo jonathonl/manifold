@@ -32,15 +32,15 @@ namespace manifold
   }
 }
 
-namespace std
-{
-  size_t hash<manifold::http::endpoint>::operator()(const manifold::http::endpoint& ep) const
-  {
-    size_t result = hash<std::string>()(ep.host());
-    result = result ^ hash<std::uint16_t>()(ep.port());
-    return result ^ (std::size_t)ep.encrypted();
-  }
-}
+//namespace std
+//{
+//  size_t hash<manifold::http::endpoint>::operator()(const manifold::http::endpoint& ep) const
+//  {
+//    size_t result = hash<std::string>()(ep.host());
+//    result = result ^ hash<std::uint16_t>()(ep.port());
+//    return result ^ (std::size_t)ep.encrypted();
+//  }
+//}
 
 namespace manifold
 {
@@ -413,13 +413,21 @@ namespace manifold
 //    //================================================================//
 
     //----------------------------------------------------------------//
+    client::client(asio::io_service& ioservice)
+      : io_service_(ioservice), ssl_ctx_(nullptr), tcp_resolver_(ioservice)
+    {
+      this->reset_timeout();
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
     client::client(asio::io_service& ioservice, asio::ssl::context& ctx)
-      : io_service_(ioservice), ssl_ctx_(ctx), tcp_resolver_(ioservice)
+      : io_service_(ioservice), ssl_ctx_(&ctx), tcp_resolver_(ioservice)
     {
       this->reset_timeout();
       std::vector<unsigned char> proto_list(::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS));
       std::copy_n(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS, ::strlen(MANIFOLD_HTTP_ALPN_SUPPORTED_PROTOCOLS), proto_list.begin());
-      ::SSL_CTX_set_alpn_protos(this->ssl_ctx_.native_handle(), proto_list.data(), proto_list.size());
+      ::SSL_CTX_set_alpn_protos(this->ssl_ctx_->native_handle(), proto_list.data(), proto_list.size());
     }
     //----------------------------------------------------------------//
 
@@ -453,10 +461,21 @@ namespace manifold
 //    //----------------------------------------------------------------//
 
     //----------------------------------------------------------------//
-    future<client::request> client::make_request(const endpoint& ep, request_head head, std::error_code& ec)
+    future<client::request> client::make_request(const std::string& host, request_head head, std::error_code& ec)
     {
+      return make_request(host, 0, std::move(head), ec);
+    }
+    //----------------------------------------------------------------//
+
+    //----------------------------------------------------------------//
+    future<client::request> client::make_request(const std::string& host, std::uint16_t port, request_head head, std::error_code& ec)
+    {
+      if (!port)
+       port = ssl_ctx_ ? std::uint16_t(443) : std::uint16_t(80);
+
+      std::string socket_address = host + ":" + std::to_string(port);
       auto it = this->connections_.end();
-      for (auto range = this->connections_.equal_range(ep); range.first != range.second; ++(range.first))
+      for (auto range = this->connections_.equal_range(socket_address); range.first != range.second; ++(range.first))
       {
         if (!range.first->second->is_closed())
           it = range.first;
@@ -467,18 +486,18 @@ namespace manifold
         auto stream_ptr = it->second->create_stream(0, 0);
         bool result = co_await stream_ptr->send_headers(head, head.method() == "GET" || head.method() == "HEAD");
 
-        co_return request(std::move(head), stream_ptr, ep.socket_address());
+        co_return request(std::move(head), stream_ptr, socket_address);
       }
       else
       {
         std::unique_ptr<connection> conn;
-        if (ep.encrypted())
+        if (ssl_ctx_)
         {
-          conn = co_await secure_connect(ep.host(), ep.port(), ec);
+          conn = co_await secure_connect(host, port, ec);
         }
         else
         {
-          conn = co_await insecure_connect(ep.host(), ep.port(), ec);
+          conn = co_await insecure_connect(host, port, ec);
         }
 
         if (!conn)
@@ -489,10 +508,10 @@ namespace manifold
         }
         else
         {
-          auto insert_res = this->connections_.emplace(endpoint(ep), std::move(conn));
+          auto insert_res = this->connections_.emplace(socket_address, std::move(conn));
           auto stream_ptr = insert_res->second->create_stream(0, 0);
           bool end_stream = head.method() == "GET" || head.method() == "HEAD";
-          request req(std::move(head), stream_ptr, ep.socket_address());
+          request req(std::move(head), stream_ptr, socket_address);
           bool result = co_await req.send_headers(end_stream);
 
           co_return req;
@@ -521,7 +540,7 @@ namespace manifold
         std::cerr << resolve_it->endpoint().address().to_string() << std::endl;
         std::cerr << resolve_it->endpoint().port() << std::endl;
 
-        ::manifold::tls_socket sock(io_service_, ssl_ctx_);
+        ::manifold::tls_socket sock(io_service_, *ssl_ctx_);
 
         for ( ; resolve_it != asio::ip::tcp::resolver::iterator(); ++resolve_it)
         {

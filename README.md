@@ -46,36 +46,28 @@ asio::io_service ioservice;
 asio::ssl::context ssl_ctx(asio::ssl::context::tlsv12);
 
 http::client user_agent(ioservice, ssl_ctx);
-user_agent.make_secure_request("www.example.com", 443, [](const std::error_code& ec, client::request&& req)
+auto req = co_await user_agent.make_request("www.example.com", 8080, http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}}), ec);
+if (ec)
 {
-  if (ec)
-  {
-    // Handle connect error...
-  }
+  // Handle connect error...
+}
+else
+{
+  co_await req.end("name=value&name2=value2");
+  
+  auto res = co_await req.response()
+  if (!res.head().has_successful_status())
+    res.cancel();
   else
   {
-    req.on_response([](http::client::response&& resp)
+    std::array<char, 1024> buf;
+    while (res)
     {
-      if (!resp.head().has_successful_status())
-        resp.cancel();
-      else
-      {
-        resp.on_data([](const char *const data, std::size_t datasz)
-        {
-          // ...
-        });
-
-        resp.on_end([]()
-        {
-          // ...
-        });
-      }
-    });
-
-    req.head() = http::request_head("/foobar", "POST", {{"content-type","application/x-www-form-urlencoded"}});
-    req.end("name=value&name2=value2");
+      std::size_t cnt = co_await res.recv(buf.data(), buf.size());
+      // ...
+    }
   }
-});
+}
 
 ioservice.run();
 ```
