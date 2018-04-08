@@ -6,6 +6,7 @@
 #include "uniform_resource_identifier.hpp"
 
 #include <iostream>
+#include <functional>
 
 namespace manifold
 {
@@ -85,9 +86,18 @@ namespace manifold
 
       const uri& remote_url() const;
       std::list<std::pair<std::string,std::string>>& request_headers();
+
+      void update_progress(std::int64_t transfered, std::int64_t total, std::ios::openmode direction);
+
+      template <typename Callback>
+      void on_progress(Callback fn)
+      {
+        progress_callback_ = fn;
+      }
     private:
       uri remote_url_;
       std::list<std::pair<std::string,std::string>> request_headers_;
+      std::function<void(std::int64_t, std::int64_t, std::ios::openmode)> progress_callback_;
     };
 
     class ios_transfer : public entity_transfer
@@ -112,8 +122,11 @@ namespace manifold
     public:
       file_download(uri remote_source, std::string local_destination);
       const std::string& local_destination() const;
+      void overwrite_existing(bool val);
+      bool overwrite_existing() const;
     private:
       std::string local_destination_;
+      bool overwrite_existing_ = false;
     };
 
     class file_upload : public entity_transfer
@@ -142,7 +155,7 @@ namespace manifold
     class entity_transfer_client
     {
     public:
-      typedef std::function<void(std::uint64_t, std::uint64_t, std::ios::openmode direction)> progress_callback;
+      typedef std::function<void(std::int64_t, std::int64_t, std::ios::openmode direction)> progress_callback;
 
       entity_transfer_client(asio::io_service& io_ctx, asio::ssl::context& ssl_ctx);
       ~entity_transfer_client();
@@ -160,7 +173,7 @@ namespace manifold
 
       void reset_max_redirects(std::uint8_t value = 5);
     private:
-      future<response_head> run_transfer(const std::string& method, uri request_url, std::error_code& ec, std::list<std::pair<std::string,std::string>> header_list = {}, std::istream* req_entity = nullptr, std::ostream* res_entity = nullptr, progress_callback progress = nullptr);
+      future<response_head> run_transfer(const std::string& method, uri request_url, std::error_code& ec, std::list<std::pair<std::string,std::string>> header_list, std::istream* req_entity, std::ostream* res_entity, progress_callback progress);
     private:
       asio::ssl::context& ssl_ctx_;
       client client_;

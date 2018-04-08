@@ -145,6 +145,12 @@ namespace manifold
     {
       return request_headers_;
     }
+
+    void entity_transfer::update_progress(std::int64_t transfered, std::int64_t total, std::ios::openmode direction)
+    {
+      if (progress_callback_)
+        progress_callback_(transfered, total, direction);
+    }
     //================================================================//
 
     //================================================================//
@@ -199,6 +205,16 @@ namespace manifold
     {
       return local_destination_;
     }
+
+    void file_download::overwrite_existing(bool val)
+    {
+      overwrite_existing_ = val;
+    }
+
+    bool file_download::overwrite_existing() const
+    {
+       return overwrite_existing_;
+    }
     //================================================================//
 
     //================================================================//
@@ -242,7 +258,7 @@ namespace manifold
 
     future<response_head> entity_transfer_client::operator()(ios_transfer& transfer, std::error_code& ec)
     {
-      return run_transfer(transfer.request_method(), transfer.remote_url(), ec, transfer.request_headers(), transfer.request_entity(), transfer.response_entity());
+      return run_transfer(transfer.request_method(), transfer.remote_url(), ec, transfer.request_headers(), transfer.request_entity(), transfer.response_entity(), std::bind(&entity_transfer::update_progress, &transfer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     }
 
     future<void> entity_transfer_client::operator()(file_download& transfer, std::error_code& ec)
@@ -269,16 +285,16 @@ namespace manifold
       }
       else
       {
-        std::list<std::pair<std::string, std::string>> headers;
         if (transfer.remote_url().password().size() || transfer.remote_url().username().size())
-          headers.emplace_back("authorization", basic_auth(transfer.remote_url().username(), transfer.remote_url().password()));
+          transfer.request_headers().emplace_back("authorization", basic_auth(transfer.remote_url().username(), transfer.remote_url().password()));
 
 
-        auto resp_head = co_await run_transfer("GET", transfer.remote_url(), ec, transfer.request_headers(), nullptr, &dest_ofs);
+        auto resp_head = co_await run_transfer("GET", transfer.remote_url(), ec, transfer.request_headers(), nullptr, &dest_ofs, std::bind(&entity_transfer::update_progress, &transfer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
         dest_ofs.close();
 
         if (ec)
         {
+          std::cerr << ec.value() << ": " << ec.message() << std::endl;
           std::remove(tmp_file_path.c_str());
           co_return;
         }
@@ -314,7 +330,7 @@ namespace manifold
           std::string destination_file_path = local_file_path;
 
 
-          if (false) // TODO: !ops.replace_existing_file)
+          if (!transfer.overwrite_existing())
           {
             for (std::size_t i = 1; detail::path_exists(destination_file_path); ++i)
             {
@@ -357,7 +373,7 @@ namespace manifold
         if (transfer.remote_url().password().size() || transfer.remote_url().username().size())
           headers.emplace_back("authorization", basic_auth(transfer.remote_url().username(), transfer.remote_url().password()));
 
-        auto resp_head = co_await run_transfer("PUT", transfer.remote_url(), ec, transfer.request_headers(), &src_ifs, nullptr);
+        auto resp_head = co_await run_transfer("PUT", transfer.remote_url(), ec, transfer.request_headers(), &src_ifs, nullptr, std::bind(&entity_transfer::update_progress, &transfer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
       }
 
       co_return;
@@ -371,7 +387,7 @@ namespace manifold
       if (transfer.remote_url().password().size() || transfer.remote_url().username().size())
         headers.emplace_back("authorization", basic_auth(transfer.remote_url().username(), transfer.remote_url().password()));
 
-      auto resp_head = co_await run_transfer("HEAD", transfer.remote_url(), ec, transfer.request_headers());
+      auto resp_head = co_await run_transfer("HEAD", transfer.remote_url(), ec, transfer.request_headers(), nullptr, nullptr, std::bind(&entity_transfer::update_progress, &transfer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
       if (!ec)
       {
@@ -420,10 +436,13 @@ namespace manifold
             req_entity->clear();
             req_entity->seekg(0, std::ios::beg);
 
-            std::uint64_t content_length = 0;
-            std::stringstream ss_content_length(req.head().header("content-length"));
-            ss_content_length >> content_length;
-            std::uint64_t total_bytes_sent = 0;
+            std::int64_t content_length = -1;
+            if (!req.head().header("content-length").empty())
+            {
+              std::stringstream ss_content_length(req.head().header("content-length"));
+              ss_content_length >> content_length;
+            }
+            std::int64_t total_bytes_sent = 0;
 
             std::array<char, 8192> buf;
 
@@ -448,10 +467,13 @@ namespace manifold
 
           if (resp.head().has_successful_status())
           {
-            std::uint64_t content_length = 0;
-            std::stringstream ss_content_length(resp.head().header("content-length"));
-            ss_content_length >> content_length;
-            std::uint64_t total_bytes_received = 0;
+            std::int64_t content_length = -1;
+            if (!resp.head().header("content-length").empty())
+            {
+              std::stringstream ss_content_length(resp.head().header("content-length"));
+              ss_content_length >> content_length;
+            }
+            std::int64_t total_bytes_received = 0;
 
             std::array<char, 8192> buf;
             while (resp)
