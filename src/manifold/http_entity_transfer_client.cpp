@@ -454,7 +454,7 @@ namespace manifold
                 co_await req.send(buf.data(), (std::size_t)bytes_in_buf);
                 total_bytes_sent += (std::size_t)bytes_in_buf;
                 if (progress)
-                  progress(total_bytes_sent, content_length, std::ios::out); //TODO
+                  progress(total_bytes_sent, content_length, std::ios::out);
               }
             }
 
@@ -479,11 +479,14 @@ namespace manifold
             while (resp)
             {
               std::size_t sz = co_await resp.recv(buf.data(), buf.size());
-              if (resp_entity)
-                resp_entity->write(buf.data(), sz);
-              total_bytes_received += sz;
-              if (progress)
-               progress(total_bytes_received, content_length, std::ios::in); // TODO
+              if (sz)
+              {
+                if (resp_entity)
+                  resp_entity->write(buf.data(), sz);
+                total_bytes_received += sz;
+                if (progress)
+                 progress(total_bytes_received, content_length, std::ios::in);
+              }
             }
 
 
