@@ -6,7 +6,7 @@
 #include "uniform_resource_identifier.hpp"
 #include "http_server.hpp"
 #include "http_client.hpp"
-#include "http_stream_client.hpp"
+#include "http_entity_transfer_client.hpp"
 
 #include <regex>
 #include <fstream>
@@ -41,40 +41,7 @@ namespace manifold
       future<void> handle_get(server::response res, std::string file_path);
       future<void> handle_put(server::request req, server::response res, std::string file_path);
     };
-
-
-    enum class file_transfer_errc
-    {
-
-    };
-
-    std::error_code make_error_code(manifold::http::file_transfer_errc e);
-
-    class file_transfer_client
-    {
-    public:
-      struct statistics
-      {
-        std::int64_t file_size;
-        std::string mime_type;
-        std::string modification_date;
-        // TODO: cache expire
-      };
-
-      file_transfer_client(asio::io_service& io_ctx);
-      future<void> download_file(const uri& remote_source, const std::string& local_destination, std::error_code& ec);
-      future<void> upload_file(const std::string& local_source, const uri& remote_destination, std::error_code& ec);
-      future<statistics> stat_remote_file(const uri& remote_file, std::error_code& ec);
-    private:
-      stream_client stream_client_;
-      std::mt19937 rng_;
-    };
   }
-}
-
-namespace std
-{
-  template<> struct is_error_code_enum<manifold::http::file_transfer_errc> : public true_type {};
 }
 
 namespace manifold

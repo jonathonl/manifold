@@ -101,7 +101,7 @@ add_library(manifold
             src/manifold/http_client.cpp include/manifold/http_client.hpp
             src/manifold/http_connection.cpp include/manifold/http_connection.hpp
             src/manifold/http_error_category.cpp include/manifold/http_error_category.hpp
-            src/manifold/http_file_transfer.cpp include/manifold/http_file_transfer.hpp
+            src/manifold/http_document_root.cpp include/manifold/http_document_root.hpp
             src/manifold/http_frame.cpp include/manifold/http_frame.hpp
             src/manifold/http_header_block.cpp include/manifold/http_header_block.hpp
             src/manifold/http_incoming_message.cpp include/manifold/http_incoming_message.hpp
@@ -111,9 +111,10 @@ add_library(manifold
             src/manifold/http_request_head.cpp include/manifold/http_request_head.hpp
             src/manifold/http_router.cpp include/manifold/http_router.hpp
             src/manifold/http_server.cpp include/manifold/http_server.hpp
-            src/manifold/http_stream_client.cpp include/manifold/http_stream_client.hpp
+            src/manifold/http_entity_transfer_client.cpp include/manifold/http_entity_transfer_client.hpp
             src/manifold/socket.cpp include/manifold/socket.hpp
-            src/manifold/uniform_resource_identifier.cpp include/manifold/uniform_resource_identifier.hpp)
+            src/manifold/uniform_resource_identifier.cpp include/manifold/uniform_resource_identifier.hpp
+            src/manifold/utility.cpp include/manifold/utility.hpp)
 
 target_include_directories(manifold PUBLIC include ${OPENSSL_INCLUDE_DIR} ${Boost_INCLUDE_DIRS})
 target_link_libraries(manifold ${OPENSSL_LIBRARIES} ${Boost_LIBRARIES})

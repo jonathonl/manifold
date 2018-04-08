@@ -1,5 +1,6 @@
 
-#include "manifold/http_file_transfer.hpp"
+#include "manifold/http_document_root.hpp"
+#include "manifold/utility.hpp"
 
 #include <chrono>
 #include <iomanip>
@@ -8,142 +9,7 @@ namespace manifold
 {
   namespace http
   {
-    //================================================================//
-    bool path_exists(const std::string& input_path)
-    {
-      struct stat s;
-      return (stat(input_path.c_str(), &s) == 0);
-    }
 
-    bool is_regular_file(const std::string& input_path)
-    {
-      struct stat s;
-      return (stat(input_path.c_str(), &s) == 0 && s.st_mode & S_IFREG);
-    }
-
-    bool is_directory(const std::string& input_path)
-    {
-      struct stat s;
-      return (stat(input_path.c_str(), &s) == 0 && s.st_mode & S_IFDIR);
-    }
-
-    std::string basename(const std::string& input_path)
-    {
-      return input_path.substr(input_path.find_last_of("/\\") + 1);
-    }
-
-    std::string basename_sans_extension(const std::string& input_path)
-    {
-      std::string ret = basename(input_path);
-
-      if (ret.size() && ret.front() == '.')
-      {
-        std::string tmp = ret.substr(1);
-        ret = "." + tmp.substr(0, tmp.find_last_of("."));
-      }
-      else
-      {
-        ret = ret.substr(0, ret.find_last_of("."));
-      }
-
-      return ret;
-    }
-
-    std::string extension(const std::string& input_path)
-    {
-      std::string ret;
-      if (input_path.size() && input_path.front() == '.')
-      {
-        std::string tmp = input_path.substr(1);
-        auto pos = tmp.find_last_of(".");
-        if (pos != std::string::npos)
-          ret = tmp.substr(pos);
-      }
-      else
-      {
-        auto pos = input_path.find_last_of(".");
-        if (pos != std::string::npos)
-          ret = input_path.substr(pos);
-      }
-      return ret;
-    }
-
-    std::string directory(const std::string& input_path)
-    {
-      std::string ret = input_path;
-      if (ret == "." || ret == "..")
-        ret += "/";
-      ret.erase(ret.find_last_of("/\\") + 1);
-      return ret;
-    }
-    //================================================================//
-
-    //================================================================//
-    static const std::map<std::string, std::string> content_type_index =
-      {
-        {".json", "application/json"},
-        {".js",   "application/javascript"},
-        {".html", "text/html"},
-        {".htm",  "text/html"},
-        {".css",  "text/css"},
-        {".xml",  "text/xml"},
-        {".txt",  "text/plain"},
-        {".md",   "text/markdown"}
-      };
-
-    std::string content_type_from_extension(const std::string& extension)
-    {
-      std::string ret;
-
-      auto it = content_type_index.find(extension);
-      if (it != content_type_index.end())
-        ret = it->second;
-
-      return ret;
-    }
-    //================================================================//
-
-    //================================================================//
-    // xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-    const std::uint64_t y[4] = {0x8000000000000000, 0x9000000000000000, 0xa000000000000000, 0xb000000000000000};
-
-    template<typename Rng>
-    std::array<std::uint64_t, 2> gen_uuid(Rng& rng)
-    {
-      std::array<std::uint64_t, 2> ret;
-
-      std::uint32_t r32 = (std::uint32_t) rng();
-
-      std::uint64_t r64_1 = rng();
-      r64_1 = r64_1 << 32;
-
-      std::uint64_t r64_2 = rng();
-      r64_2 = r64_2 << 32;
-
-      ret[0] = (0xFFFFFFFFFFFF0FFF & (r64_1 | rng())) | 0x4000;
-      ret[1] = ((0x0FFFFFFF00000000 & (r64_2 | rng())) | r32) | y[0x03 & r32]; // Should be using a separate rand call to choose index, but this is faster.
-
-      return ret;
-    }
-
-    template<typename Rng>
-    std::string gen_uuid_str(Rng& rng)
-    {
-      std::array<std::uint64_t, 2> tmp = gen_uuid(rng);
-      std::stringstream ret;
-      ret << std::hex << std::setfill('0');
-      ret << std::setw(8) << (0xFFFFFFFF & (tmp[0] >> 32));
-      ret << "-";
-      ret << std::setw(4) << (0xFFFF & (tmp[0] >> 16));
-      ret << "-";
-      ret << std::setw(4) << (0xFFFF & tmp[0]);
-      ret << "-";
-      ret << std::setw(4) << (0xFFFF & tmp[1] >> 48);
-      ret << "-";
-      ret << std::setw(12) << (0xFFFFFFFFFFFF & tmp[1]);
-      return ret.str();
-    }
-    //================================================================//
 
     //================================================================//
     document_root::document_root(const std::string& path)
@@ -251,7 +117,7 @@ namespace manifold
       else
       {
         res.head().header("content-length", std::to_string(st.st_size));
-        std::string content_type(content_type_from_extension(extension(file_path)));
+        std::string content_type(detail::content_type_from_extension(detail::extension(file_path)));
         res.head().header("content-type", content_type.size() ? content_type : "application/octet-stream");
 #if defined(__APPLE__)
         res.head().header("last-modified", server::date_string(st.st_mtimespec.tv_sec));
@@ -284,7 +150,7 @@ namespace manifold
         else
         {
           res.head().header("content-length", std::to_string(st.st_size));
-          std::string content_type(content_type_from_extension(extension(file_path)));
+          std::string content_type(detail::content_type_from_extension(detail::extension(file_path)));
           res.head().header("content-type", content_type.size() ? content_type : "application/octet-stream");
 #if defined(__APPLE__)
           res.head().header("last-modified", server::date_string(st.st_mtimespec.tv_sec));
@@ -364,162 +230,6 @@ namespace manifold
     }
     //================================================================//
 
-    //================================================================//
-    file_transfer_client::file_transfer_client(asio::io_service& io_ctx) :
-      stream_client_(io_ctx)
-    {
-      auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-      std::uint32_t arr[3] = {(std::uint32_t) (0xFFFFFFFF & (millis >> 32)), (std::uint32_t) std::clock(), (std::uint32_t) (0xFFFFFFFF & millis)};
-      std::seed_seq seq(std::begin(arr), std::end(arr));
-      this->rng_.seed(seq);
-    }
-
-    future<void> file_transfer_client::download_file(const uri& remote_source, const std::string& local_destination, std::error_code& ec)
-    {
-      std::string tmp_file_path;
-      if (is_directory(local_destination))
-      {
-        tmp_file_path = local_destination;
-        if (tmp_file_path.size() && (tmp_file_path.back() != '/' && tmp_file_path.back() != '\\'))
-          tmp_file_path.push_back('/');
-      }
-      else
-      {
-        tmp_file_path = directory(local_destination);
-      }
-
-      tmp_file_path += (gen_uuid_str(this->rng_) + ".tmp");
-
-      std::ofstream dest_ofs(tmp_file_path, std::ios::binary);
-
-      if (!dest_ofs.good())
-      {
-        ec = std::error_code(errno, std::system_category());
-      }
-      else
-      {
-        std::list<std::pair<std::string, std::string>> headers;
-        if (remote_source.password().size() || remote_source.username().size())
-          headers.emplace_back("authorization", basic_auth(remote_source.username(), remote_source.password()));
-
-        auto resp_head = co_await stream_client_.send_request("GET", remote_source, ec, headers, nullptr, &dest_ofs);
-
-        dest_ofs.close();
-
-        if (ec)
-        {
-          std::remove(tmp_file_path.c_str());
-          co_return;
-        }
-        else
-        {
-          std::string local_file_path = local_destination;
-          std::replace(local_file_path.begin(), local_file_path.end(), '\\', '/');
-          if (is_directory(local_file_path))
-          {
-            if (local_file_path.size() && local_file_path.back() != '/')
-              local_file_path += "/";
-            std::string content_disposition = resp_head.header("content-disposition");
-            std::string filename;
-            std::regex exp(".*filename=(?:\"([^\"]*)\"|([^\\s;]*)).*", std::regex::ECMAScript);
-            std::smatch sm;
-            if (std::regex_match(content_disposition, sm, exp))
-            {
-              if (sm[1].matched)
-                filename = basename(sm[1].str());
-              else if (sm[2].matched)
-                filename = basename(sm[2].str());
-            }
-            else
-            {
-              filename = basename(remote_source.path());
-            }
-
-            if (filename.empty() || filename == "." || filename == "/")
-              filename = "file";
-            local_file_path += filename;
-          }
-
-          std::string destination_file_path = local_file_path;
-
-
-          if (false) // TODO: !ops.replace_existing_file)
-          {
-            for (std::size_t i = 1; path_exists(destination_file_path); ++i)
-            {
-              std::stringstream ss;
-              ss << directory(local_file_path) << basename_sans_extension(local_file_path) << "_" << i << extension(local_file_path);
-              destination_file_path = ss.str();
-            }
-          }
-          else if (is_regular_file(destination_file_path))
-          {
-            std::remove(destination_file_path.c_str());
-          }
-
-          if (std::rename(tmp_file_path.c_str(), destination_file_path.c_str()) != 0)
-          {
-            std::remove(tmp_file_path.c_str());
-            ec = std::error_code(errno, std::system_category());
-          }
-          else
-          {
-            std::remove(tmp_file_path.c_str());
-          }
-        }
-      }
-
-      co_return;
-    }
-
-
-    future<void> file_transfer_client::upload_file(const std::string& local_source, const uri& remote_destination, std::error_code& ec)
-    {
-      std::ifstream src_ifs(local_source, std::ios::binary);
-
-      if (!src_ifs.good())
-      {
-        ec = std::error_code(errno, std::system_category());
-      }
-      else
-      {
-        std::list<std::pair<std::string, std::string>> headers;
-        if (remote_destination.password().size() || remote_destination.username().size())
-          headers.emplace_back("authorization", basic_auth(remote_destination.username(), remote_destination.password()));
-
-        auto resp_head = co_await stream_client_.send_request("PUT", remote_destination, ec, headers, &src_ifs, nullptr);
-      }
-    }
-
-    future<file_transfer_client::statistics> file_transfer_client::stat_remote_file(const uri& remote_file, std::error_code& ec)
-    {
-      statistics st;
-
-      std::list<std::pair<std::string, std::string>> headers;
-      if (remote_file.password().size() || remote_file.username().size())
-        headers.emplace_back("authorization", basic_auth(remote_file.username(), remote_file.password()));
-
-      auto req_head = co_await stream_client_.send_request("HEAD", remote_file, ec, headers);
-
-      if (!ec)
-      {
-        st.file_size = 0;
-        if (req_head.header_exists("content-length"))
-          st.file_size = -1;
-        else
-        {
-          std::stringstream ss(req_head.header("content-length"));
-          ss >> st.file_size;
-        }
-
-        st.mime_type = req_head.header("content-type");
-
-        st.modification_date = req_head.header("last-modified");
-      }
-
-      co_return st;
-    }
-    //================================================================//
 #if 0
     //================================================================//
     const char* file_transfer_error_category_impl::name() const noexcept

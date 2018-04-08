@@ -1,5 +1,9 @@
 
-#include "manifold/http_stream_client.hpp"
+#include "manifold/http_entity_transfer_client.hpp"
+#include "manifold/utility.hpp"
+
+#include <fstream>
+#include <regex>
 
 namespace manifold
 {
@@ -125,26 +129,270 @@ namespace manifold
 {
   namespace http
   {
+
     //================================================================//
-    stream_client::stream_client(asio::io_service& io_ctx) :
-      ssl_ctx_(asio::ssl::context::tlsv12),
+    entity_transfer::entity_transfer(uri remote_url) :
+      remote_url_(std::move(remote_url))
+    {
+    }
+
+    const uri& entity_transfer::remote_url() const
+    {
+      return remote_url_;
+    }
+
+    std::list<std::pair<std::string,std::string>>& entity_transfer::request_headers()
+    {
+      return request_headers_;
+    }
+    //================================================================//
+
+    //================================================================//
+    ios_transfer::ios_transfer(uri remote_url, std::string method, std::istream& request_entity, std::ostream& response_entity) :
+      entity_transfer(std::move(remote_url)),
+      request_entity_(&request_entity),
+      response_entity_(&response_entity)
+    {
+    }
+
+    ios_transfer::ios_transfer(uri remote_url, std::string method, std::istream& request_entity) :
+      entity_transfer(std::move(remote_url)),
+      request_entity_(&request_entity)
+    {
+    }
+
+    ios_transfer::ios_transfer(uri remote_url, std::string method, std::ostream& response_entity) :
+      entity_transfer(std::move(remote_url)),
+      response_entity_(&response_entity)
+    {
+    }
+
+    ios_transfer::ios_transfer(uri remote_url, std::string method) :
+      entity_transfer(std::move(remote_url))
+    {
+    }
+
+    const std::string& ios_transfer::request_method() const
+    {
+      return request_method_;
+    }
+
+    std::istream* ios_transfer::request_entity()
+    {
+      return request_entity_;
+    }
+
+    std::ostream* ios_transfer::response_entity()
+    {
+      return response_entity_;
+    }
+    //================================================================//
+
+    //================================================================//
+    file_download::file_download(uri remote_source, std::string local_destination) :
+      entity_transfer(std::move(remote_source)),
+      local_destination_(std::move(local_destination))
+    {
+    }
+
+    const std::string& file_download::local_destination() const
+    {
+      return local_destination_;
+    }
+    //================================================================//
+
+    //================================================================//
+    file_upload::file_upload(uri remote_destination, std::string local_source) :
+      entity_transfer(std::move(remote_destination)),
+      local_source_(std::move(local_source))
+    {
+    }
+
+    const std::string& file_upload::local_source() const
+    {
+      return local_source_;
+    }
+    //================================================================//
+
+    //================================================================//
+    remote_file_stat::remote_file_stat(uri remote_file) :
+      entity_transfer(std::move(remote_file))
+    {
+    }
+    //================================================================//
+
+    //================================================================//
+    entity_transfer_client::entity_transfer_client(asio::io_service& io_ctx, asio::ssl::context& ssl_ctx) :
+      ssl_ctx_(ssl_ctx),
       client_(io_ctx),
       secure_client_(io_ctx, ssl_ctx_)
     {
       this->reset_max_redirects();
     }
 
-    stream_client::~stream_client()
+    entity_transfer_client::~entity_transfer_client()
     {
 
     }
 
-    void stream_client::reset_max_redirects(std::uint8_t value)
+    void entity_transfer_client::reset_max_redirects(std::uint8_t value)
     {
       this->max_redirects_ = value;
     }
 
-    future<response_head> stream_client::send_request(const std::string& method, uri request_url, std::error_code& ec, std::list<std::pair<std::string,std::string>> header_list, std::istream* req_entity, std::ostream* resp_entity , progress_callback progress)
+    future<response_head> entity_transfer_client::operator()(ios_transfer& transfer, std::error_code& ec)
+    {
+      return run_transfer(transfer.request_method(), transfer.remote_url(), ec, transfer.request_headers(), transfer.request_entity(), transfer.response_entity());
+    }
+
+    future<void> entity_transfer_client::operator()(file_download& transfer, std::error_code& ec)
+    {
+      std::string tmp_file_path;
+      if (detail::is_directory(transfer.local_destination()))
+      {
+        tmp_file_path = transfer.local_destination();
+        if (tmp_file_path.size() && (tmp_file_path.back() != '/' && tmp_file_path.back() != '\\'))
+          tmp_file_path.push_back('/');
+      }
+      else
+      {
+        tmp_file_path = detail::directory(transfer.local_destination());
+      }
+
+      tmp_file_path += (detail::gen_uuid_str(this->rng_) + ".tmp");
+
+      std::ofstream dest_ofs(tmp_file_path, std::ios::binary);
+
+      if (!dest_ofs.good())
+      {
+        ec = std::error_code(errno, std::system_category());
+      }
+      else
+      {
+        std::list<std::pair<std::string, std::string>> headers;
+        if (transfer.remote_url().password().size() || transfer.remote_url().username().size())
+          headers.emplace_back("authorization", basic_auth(transfer.remote_url().username(), transfer.remote_url().password()));
+
+
+        auto resp_head = co_await run_transfer("GET", transfer.remote_url(), ec, transfer.request_headers(), nullptr, &dest_ofs);
+        dest_ofs.close();
+
+        if (ec)
+        {
+          std::remove(tmp_file_path.c_str());
+          co_return;
+        }
+        else
+        {
+          std::string local_file_path = transfer.local_destination();
+          std::replace(local_file_path.begin(), local_file_path.end(), '\\', '/');
+          if (detail::is_directory(local_file_path))
+          {
+            if (local_file_path.size() && local_file_path.back() != '/')
+              local_file_path += "/";
+            std::string content_disposition = resp_head.header("content-disposition");
+            std::string filename;
+            std::regex exp(".*filename=(?:\"([^\"]*)\"|([^\\s;]*)).*", std::regex::ECMAScript);
+            std::smatch sm;
+            if (std::regex_match(content_disposition, sm, exp))
+            {
+              if (sm[1].matched)
+                filename = detail::basename(sm[1].str());
+              else if (sm[2].matched)
+                filename = detail::basename(sm[2].str());
+            }
+            else
+            {
+              filename = detail::basename(transfer.remote_url().path());
+            }
+
+            if (filename.empty() || filename == "." || filename == "/")
+              filename = "file";
+            local_file_path += filename;
+          }
+
+          std::string destination_file_path = local_file_path;
+
+
+          if (false) // TODO: !ops.replace_existing_file)
+          {
+            for (std::size_t i = 1; detail::path_exists(destination_file_path); ++i)
+            {
+              std::stringstream ss;
+              ss << detail::directory(local_file_path) << detail::basename_sans_extension(local_file_path) << "_" << i << detail::extension(local_file_path);
+              destination_file_path = ss.str();
+            }
+          }
+          else if (detail::is_regular_file(destination_file_path))
+          {
+            std::remove(destination_file_path.c_str());
+          }
+
+          if (std::rename(tmp_file_path.c_str(), destination_file_path.c_str()) != 0)
+          {
+            std::remove(tmp_file_path.c_str());
+            ec = std::error_code(errno, std::system_category());
+          }
+          else
+          {
+            std::remove(tmp_file_path.c_str());
+          }
+        }
+      }
+
+      co_return;
+    }
+
+    future<void> entity_transfer_client::operator()(file_upload& transfer, std::error_code& ec)
+    {
+      std::ifstream src_ifs(transfer.local_source(), std::ios::binary);
+
+      if (!src_ifs.good())
+      {
+        ec = std::error_code(errno, std::system_category());
+      }
+      else
+      {
+        std::list<std::pair<std::string, std::string>> headers;
+        if (transfer.remote_url().password().size() || transfer.remote_url().username().size())
+          headers.emplace_back("authorization", basic_auth(transfer.remote_url().username(), transfer.remote_url().password()));
+
+        auto resp_head = co_await run_transfer("PUT", transfer.remote_url(), ec, transfer.request_headers(), &src_ifs, nullptr);
+      }
+
+      co_return;
+    }
+
+    future<remote_file_stat::statistics> entity_transfer_client::operator()(remote_file_stat& transfer, std::error_code& ec)
+    {
+      remote_file_stat::statistics st{};
+
+      std::list<std::pair<std::string, std::string>> headers;
+      if (transfer.remote_url().password().size() || transfer.remote_url().username().size())
+        headers.emplace_back("authorization", basic_auth(transfer.remote_url().username(), transfer.remote_url().password()));
+
+      auto resp_head = co_await run_transfer("HEAD", transfer.remote_url(), ec, transfer.request_headers());
+
+      if (!ec)
+      {
+        st.file_size = 0;
+        if (resp_head.header_exists("content-length"))
+          st.file_size = -1;
+        else
+        {
+          std::stringstream ss(resp_head.header("content-length"));
+          ss >> st.file_size;
+        }
+
+        st.mime_type = resp_head.header("content-type");
+
+        st.modification_date = resp_head.header("last-modified");
+      }
+
+      co_return st;
+    }
+
+    future<response_head> entity_transfer_client::run_transfer(const std::string& method, uri request_url, std::error_code& ec, std::list<std::pair<std::string,std::string>> header_list, std::istream* req_entity, std::ostream* resp_entity , progress_callback progress)
     {
       response_head ret;
       request_head rh;
