@@ -139,20 +139,19 @@ namespace manifold
     {
     }
 
-    const uri& entity_transfer::remote_url() const
-    {
-      return remote_url_;
-    }
-
     std::list<std::pair<std::string,std::string>>& entity_transfer::request_headers()
     {
       return request_headers_;
     }
 
-    void entity_transfer::update_progress(std::int64_t transfered, std::int64_t total, std::ios::openmode direction)
+    void entity_transfer::cancel()
     {
-      if (progress_callback_)
-        progress_callback_(transfered, total, direction);
+      if (!canceled_)
+      {
+        canceled_ = true;
+        if (req_)
+          req_->cancel();
+      }
     }
     //================================================================//
 
@@ -180,21 +179,6 @@ namespace manifold
       entity_transfer(std::move(remote_url))
     {
     }
-
-    const std::string& ios_transfer::request_method() const
-    {
-      return request_method_;
-    }
-
-    std::istream* ios_transfer::request_entity()
-    {
-      return request_entity_;
-    }
-
-    std::ostream* ios_transfer::response_entity()
-    {
-      return response_entity_;
-    }
     //================================================================//
 
     //================================================================//
@@ -204,19 +188,9 @@ namespace manifold
     {
     }
 
-    const std::string& file_download::local_destination() const
-    {
-      return local_destination_;
-    }
-
     void file_download::overwrite_existing(bool val)
     {
       overwrite_existing_ = val;
-    }
-
-    bool file_download::overwrite_existing() const
-    {
-       return overwrite_existing_;
     }
     //================================================================//
 
@@ -225,11 +199,6 @@ namespace manifold
       entity_transfer(std::move(remote_destination)),
       local_source_(std::move(local_source))
     {
-    }
-
-    const std::string& file_upload::local_source() const
-    {
-      return local_source_;
     }
     //================================================================//
 
@@ -261,21 +230,21 @@ namespace manifold
 
     future<response_head> entity_transfer_client::operator()(ios_transfer& transfer, std::error_code& ec)
     {
-      return run_transfer(transfer.request_method(), transfer.remote_url(), ec, transfer.request_headers(), transfer.request_entity(), transfer.response_entity(), std::bind(&entity_transfer::update_progress, &transfer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+      return run_transfer(transfer, transfer.request_method_, transfer.request_entity_, transfer.response_entity_, ec);
     }
 
     future<void> entity_transfer_client::operator()(file_download& transfer, std::error_code& ec)
     {
       std::string tmp_file_path;
-      if (detail::is_directory(transfer.local_destination()))
+      if (detail::is_directory(transfer.local_destination_))
       {
-        tmp_file_path = transfer.local_destination();
+        tmp_file_path = transfer.local_destination_;
         if (tmp_file_path.size() && (tmp_file_path.back() != '/' && tmp_file_path.back() != '\\'))
           tmp_file_path.push_back('/');
       }
       else
       {
-        tmp_file_path = detail::directory(transfer.local_destination());
+        tmp_file_path = detail::directory(transfer.local_destination_);
       }
 
       tmp_file_path += (detail::gen_uuid_str(this->rng_) + ".tmp");
@@ -288,11 +257,11 @@ namespace manifold
       }
       else
       {
-        if (transfer.remote_url().password().size() || transfer.remote_url().username().size())
-          transfer.request_headers().emplace_back("authorization", basic_auth(transfer.remote_url().username(), transfer.remote_url().password()));
+        if (transfer.remote_url_.password().size() || transfer.remote_url_.username().size())
+          transfer.request_headers().emplace_back("authorization", basic_auth(transfer.remote_url_.username(), transfer.remote_url_.password()));
 
 
-        auto resp_head = co_await run_transfer("GET", transfer.remote_url(), ec, transfer.request_headers(), nullptr, &dest_ofs, std::bind(&entity_transfer::update_progress, &transfer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        auto resp_head = co_await run_transfer(transfer, "GET", nullptr, &dest_ofs, ec);
         dest_ofs.close();
 
         if (ec)
@@ -303,7 +272,7 @@ namespace manifold
         }
         else
         {
-          std::string local_file_path = transfer.local_destination();
+          std::string local_file_path = transfer.local_destination_;
           std::replace(local_file_path.begin(), local_file_path.end(), '\\', '/');
           if (detail::is_directory(local_file_path))
           {
@@ -322,7 +291,7 @@ namespace manifold
             }
             else
             {
-              filename = detail::basename(transfer.remote_url().path());
+              filename = detail::basename(transfer.remote_url_.path());
             }
 
             if (filename.empty() || filename == "." || filename == "/")
@@ -333,7 +302,7 @@ namespace manifold
           std::string destination_file_path = local_file_path;
 
 
-          if (!transfer.overwrite_existing())
+          if (!transfer.overwrite_existing_)
           {
             for (std::size_t i = 1; detail::path_exists(destination_file_path); ++i)
             {
@@ -364,7 +333,7 @@ namespace manifold
 
     future<void> entity_transfer_client::operator()(file_upload& transfer, std::error_code& ec)
     {
-      std::ifstream src_ifs(transfer.local_source(), std::ios::binary);
+      std::ifstream src_ifs(transfer.local_source_, std::ios::binary);
 
       if (!src_ifs.good())
       {
@@ -372,11 +341,10 @@ namespace manifold
       }
       else
       {
-        std::list<std::pair<std::string, std::string>> headers;
-        if (transfer.remote_url().password().size() || transfer.remote_url().username().size())
-          headers.emplace_back("authorization", basic_auth(transfer.remote_url().username(), transfer.remote_url().password()));
+        if (transfer.remote_url_.password().size() || transfer.remote_url_.username().size())
+          transfer.request_headers().emplace_back("authorization", basic_auth(transfer.remote_url_.username(), transfer.remote_url_.password()));
 
-        auto resp_head = co_await run_transfer("PUT", transfer.remote_url(), ec, transfer.request_headers(), &src_ifs, nullptr, std::bind(&entity_transfer::update_progress, &transfer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        auto resp_head = co_await run_transfer(transfer, "PUT", &src_ifs, nullptr, ec);
       }
 
       co_return;
@@ -386,11 +354,10 @@ namespace manifold
     {
       remote_file_stat::statistics st{};
 
-      std::list<std::pair<std::string, std::string>> headers;
-      if (transfer.remote_url().password().size() || transfer.remote_url().username().size())
-        headers.emplace_back("authorization", basic_auth(transfer.remote_url().username(), transfer.remote_url().password()));
+      if (transfer.remote_url_.password().size() || transfer.remote_url_.username().size())
+        transfer.request_headers().emplace_back("authorization", basic_auth(transfer.remote_url_.username(), transfer.remote_url_.password()));
 
-      auto resp_head = co_await run_transfer("HEAD", transfer.remote_url(), ec, transfer.request_headers(), nullptr, nullptr, std::bind(&entity_transfer::update_progress, &transfer, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+      auto resp_head = co_await run_transfer(transfer, "HEAD", nullptr, nullptr, ec);
 
       if (!ec)
       {
@@ -411,19 +378,19 @@ namespace manifold
       co_return st;
     }
 
-    future<response_head> entity_transfer_client::run_transfer(const std::string& method, uri request_url, std::error_code& ec, std::list<std::pair<std::string,std::string>> header_list, std::istream* req_entity, std::ostream* resp_entity , progress_callback progress)
+    future<response_head> entity_transfer_client::run_transfer(entity_transfer& transfer, const std::string& method, std::istream* req_entity, std::ostream* resp_entity, std::error_code& ec)
     {
       response_head ret;
       request_head rh;
       rh.method(method);
-      rh.path(request_url.path_with_query());
-      for (auto it = header_list.begin(); it != header_list.end(); ++it)
+      rh.path(transfer.remote_url_.path_with_query());
+      for (auto it = transfer.request_headers().begin(); it != transfer.request_headers().end(); ++it)
         rh.header(it->first, it->second);
 
       std::size_t redirect_cnt = 0;
       for ( ; !ec && redirect_cnt <= max_redirects_; ++redirect_cnt)
       {
-        auto req = co_await (request_url.scheme_name() == "https" ? secure_client_ : client_ ).make_request(request_url.host(), request_url.port(), rh, ec);
+        transfer.req_ = std::make_unique<client::request>(co_await (transfer.remote_url_.scheme_name() == "https" ? secure_client_ : client_ ).make_request(transfer.remote_url_.host(), transfer.remote_url_.port(), rh, ec));
         if (ec)
         {
 
@@ -432,7 +399,7 @@ namespace manifold
         {
           if (!req_entity)
           {
-            co_await req.end();
+            co_await transfer.req_->end();
           }
           else
           {
@@ -440,9 +407,9 @@ namespace manifold
             req_entity->seekg(0, std::ios::beg);
 
             std::int64_t content_length = -1;
-            if (!req.head().header("content-length").empty())
+            if (!transfer.req_->head().header("content-length").empty())
             {
-              std::stringstream ss_content_length(req.head().header("content-length"));
+              std::stringstream ss_content_length(transfer.req_->head().header("content-length"));
               ss_content_length >> content_length;
             }
             std::int64_t total_bytes_sent = 0;
@@ -454,17 +421,17 @@ namespace manifold
               long bytes_in_buf = req_entity->read(buf.data(), buf.size()).gcount();
               if (bytes_in_buf > 0)
               {
-                co_await req.send(buf.data(), (std::size_t)bytes_in_buf);
+                co_await transfer.req_->send(buf.data(), (std::size_t)bytes_in_buf);
                 total_bytes_sent += (std::size_t)bytes_in_buf;
-                if (progress)
-                  progress(total_bytes_sent, content_length, std::ios::out);
+                if (transfer.progress_callback_)
+                  transfer.progress_callback_(total_bytes_sent, content_length, std::ios::out);
               }
             }
 
-            co_await req.end();
+            co_await transfer.req_->end();
           }
 
-          auto resp = co_await req.response();
+          auto resp = co_await transfer.req_->response();
 
 
 
@@ -487,8 +454,8 @@ namespace manifold
                 if (resp_entity)
                   resp_entity->write(buf.data(), sz);
                 total_bytes_received += sz;
-                if (progress)
-                 progress(total_bytes_received, content_length, std::ios::in);
+                if (transfer.progress_callback_)
+                  transfer.progress_callback_(total_bytes_received, content_length, std::ios::in);
               }
             }
 
@@ -508,16 +475,16 @@ namespace manifold
             {
               if (redirect_url.is_relative())
               {
-                redirect_url.host(request_url.host());
-                redirect_url.port(request_url.port());
+                redirect_url.host(transfer.remote_url_.host());
+                redirect_url.port(transfer.remote_url_.port());
               }
 
               if (redirect_url.scheme_name().empty())
-                redirect_url.scheme_name(request_url.scheme_name());
+                redirect_url.scheme_name(transfer.remote_url_.scheme_name());
 
 
               std::list<std::pair<std::string,std::string>> redirect_header_list;
-              for (auto it = header_list.begin(); it != header_list.end(); ++it)
+              for (auto it = transfer.request_headers().begin(); it != transfer.request_headers().end(); ++it)
               {
                 if (it->first != "authentication" // TODO: Add option to trust location header
                   && it->first != "cookie") // TODO: Add cookie manager.
@@ -526,8 +493,8 @@ namespace manifold
                 }
               }
 
-              header_list = redirect_header_list;
-              request_url = redirect_url;
+              transfer.request_headers() = redirect_header_list;
+              transfer.remote_url_ = redirect_url;
             }
           }
           else

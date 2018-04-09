@@ -84,37 +84,35 @@ namespace manifold
 
     class entity_transfer
     {
+      friend class entity_transfer_client;
     public:
       entity_transfer(uri remote_url);
       virtual ~entity_transfer() {}
 
-      const uri& remote_url() const;
       std::list<std::pair<std::string,std::string>>& request_headers();
-
-      void update_progress(std::int64_t transfered, std::int64_t total, std::ios::openmode direction);
+      void cancel();
 
       template <typename Callback>
       void on_progress(Callback fn)
       {
         progress_callback_ = fn;
       }
-    private:
+    protected:
       uri remote_url_;
       std::list<std::pair<std::string,std::string>> request_headers_;
       std::function<void(std::int64_t, std::int64_t, std::ios::openmode)> progress_callback_;
+      std::unique_ptr<http::client::request> req_;
+      bool canceled_ = false;
     };
 
     class ios_transfer : public entity_transfer
     {
+      friend class entity_transfer_client;
     public:
       ios_transfer(uri remote_url, std::string request_method, std::istream& request_entity, std::ostream& response_entity);
       ios_transfer(uri remote_url, std::string request_method, std::istream& request_entity);
       ios_transfer(uri remote_url, std::string request_method, std::ostream& response_entity);
       ios_transfer(uri remote_url, std::string request_method);
-
-      const std::string& request_method() const;
-      std::istream* request_entity();
-      std::ostream* response_entity();
     private:
       std::string request_method_;
       std::istream* request_entity_ = nullptr;
@@ -123,11 +121,10 @@ namespace manifold
 
     class file_download : public entity_transfer
     {
+      friend class entity_transfer_client;
     public:
       file_download(uri remote_source, std::string local_destination);
-      const std::string& local_destination() const;
       void overwrite_existing(bool val);
-      bool overwrite_existing() const;
     private:
       std::string local_destination_;
       bool overwrite_existing_ = false;
@@ -135,15 +132,16 @@ namespace manifold
 
     class file_upload : public entity_transfer
     {
+      friend class entity_transfer_client;
     public:
       file_upload(uri remote_destination, std::string local_source);
-      const std::string& local_source() const;
     private:
       std::string local_source_;
     };
 
     class remote_file_stat : public entity_transfer
     {
+      friend class entity_transfer_client;
     public:
       struct statistics
       {
@@ -177,7 +175,7 @@ namespace manifold
 
       void reset_max_redirects(std::uint8_t value = 5);
     private:
-      future<response_head> run_transfer(const std::string& method, uri request_url, std::error_code& ec, std::list<std::pair<std::string,std::string>> header_list, std::istream* req_entity, std::ostream* res_entity, progress_callback progress);
+      future<response_head> run_transfer(entity_transfer& transfer, const std::string& method, std::istream* req_entity, std::ostream* resp_entity, std::error_code& ec);
     private:
       asio::ssl::context& ssl_ctx_;
       client client_;

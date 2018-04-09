@@ -14,6 +14,7 @@
 #include "manifold/http_router.hpp"
 #include "manifold/hpack.hpp"
 #include "manifold/http_document_root.hpp"
+#include "manifold/http_entity_transfer_client.hpp"
 
 //#include "mysql.hpp"
 #include <experimental/any>
@@ -458,7 +459,9 @@ int main()
   asio::ssl::context client_ssl_ctx(asio::ssl::context::tlsv12);
   manifold::http::client client(ioservice, client_ssl_ctx);
 
-  auto req_fn = [](manifold::http::client& client) -> manifold::future<void>
+  manifold::http::entity_transfer_client transfer_client(ioservice, client_ssl_ctx);
+
+  auto req_fn = [](manifold::http::client& client, manifold::http::entity_transfer_client& transfer_client) -> manifold::future<void>
   {
     std::error_code ec;
     http::request_head rh;
@@ -479,9 +482,15 @@ int main()
 
       }
     }
-  };
 
-  req_fn(client);
+    http::file_download transfer({"https://user:password@localhost:8080/files/README.md"}, "README.md.downloaded");
+    transfer.on_progress([](std::int64_t amount, std::int64_t total, std::ios::openmode dir)
+    {
+      if (dir == std::ios::in)
+        std::cerr << static_cast<float>(amount) / static_cast<float>(total) * 100.f << "%" << std::endl;
+    });
+    co_await transfer_client(transfer, ec);
+  } (client, transfer_client);
 
   ioservice.run();
 
