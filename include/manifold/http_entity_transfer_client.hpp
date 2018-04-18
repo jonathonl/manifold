@@ -181,7 +181,7 @@ namespace manifold
       client client_;
       client secure_client_;
       std::uint8_t max_redirects_;
-      std::mt19937 rng_;
+      std::mt19937_64 rng_;
     };
   }
 }

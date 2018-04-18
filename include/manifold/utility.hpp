@@ -31,25 +31,24 @@ namespace manifold
 
     std::string content_type_from_extension(const std::string& extension);
 
-    //================================================================//
-    // xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-    static const std::uint64_t y[4] = {0x8000000000000000, 0x9000000000000000, 0xa000000000000000, 0xb000000000000000};
-
     template<typename Rng>
-    std::array<std::uint64_t, 2> gen_uuid(Rng& rng)
+    static std::array<std::uint8_t, 16> gen_uuid(Rng& rng)
     {
-      std::array<std::uint64_t, 2> ret;
+      static_assert(sizeof(typename Rng::result_type) == 8, "gen_uuid requires a 64 bit PRNG");
 
-      std::uint32_t r32 = (std::uint32_t) rng();
+      // xxxxxxxx-xxxx-4xxx-{8,9,A,B}xxx-xxxxxxxxxxxx
+      // https://www.cryptosys.net/pki/uuid-rfc4122.html
 
-      std::uint64_t r64_1 = rng();
-      r64_1 = r64_1 << 32;
+      std::array<std::uint8_t, 16> ret;
 
-      std::uint64_t r64_2 = rng();
-      r64_2 = r64_2 << 32;
+      std::uint64_t r1 = rng();
+      std::uint64_t r2 = rng();
 
-      ret[0] = (0xFFFFFFFFFFFF0FFF & (r64_1 | rng())) | 0x4000;
-      ret[1] = ((0x0FFFFFFF00000000 & (r64_2 | rng())) | r32) | y[0x03 & r32]; // Should be using a separate rand call to choose index, but this is faster.
+      std::memcpy(ret.data(), &r1, 8);
+      std::memcpy(ret.data() + 8, &r2, 8);
+
+      ret[6] = static_cast<std::uint8_t>(ret[6] & 0x0F) | static_cast<std::uint8_t>(0x40);
+      ret[8] = static_cast<std::uint8_t>(ret[8] & 0x3F) | static_cast<std::uint8_t>(0x80);
 
       return ret;
     }
@@ -57,18 +56,18 @@ namespace manifold
     template<typename Rng>
     std::string gen_uuid_str(Rng& rng)
     {
-      std::array<std::uint64_t, 2> tmp = gen_uuid(rng);
+      std::array<std::uint8_t, 16> tmp = gen_uuid(rng);
       std::stringstream ret;
       ret << std::hex << std::setfill('0');
-      ret << std::setw(8) << (0xFFFFFFFF & (tmp[0] >> 32));
-      ret << "-";
-      ret << std::setw(4) << (0xFFFF & (tmp[0] >> 16));
-      ret << "-";
-      ret << std::setw(4) << (0xFFFF & tmp[0]);
-      ret << "-";
-      ret << std::setw(4) << (0xFFFF & tmp[1] >> 48);
-      ret << "-";
-      ret << std::setw(12) << (0xFFFFFFFFFFFF & tmp[1]);
+
+      std::size_t i = 0;
+      for ( ; i < 16; ++i)
+      {
+        if (i == 4 || i == 6 || i == 8 || i == 10)
+          ret << "-";
+        ret << std::setw(2) << (unsigned)tmp[i];
+      }
+
       return ret.str();
     }
 

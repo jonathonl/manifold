@@ -215,6 +215,11 @@ namespace manifold
       client_(io_ctx),
       secure_client_(io_ctx, ssl_ctx_)
     {
+      auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+      std::uint32_t arr[4] = {(std::uint32_t) (0xFFFFFFFF & (millis >> 32)), (std::uint32_t) std::clock(), (std::uint32_t) (0xFFFFFFFF & millis)};
+      std::seed_seq seq(std::begin(arr), std::end(arr));
+      this->rng_.seed(seq);
+
       this->reset_max_redirects();
     }
 
